@@ -2,6 +2,8 @@
 
 A Flutter plugin for sending and receving midi
 
+See example folder for how to use
+
 ## Getting Started
 
 For help getting started with Flutter, view our online
