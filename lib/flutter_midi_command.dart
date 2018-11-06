@@ -24,6 +24,7 @@ class MidiCommand {
   final EventChannel _rxChannel;
   final EventChannel _setupChannel;
 
+  /// Gets a list of available MIDI devices and returns it.
   Future<List<MidiDevice>> get devices async {
     var devs = await _channel.invokeMethod('getDevices');
     return devs.map<MidiDevice>((m) {
@@ -32,29 +33,44 @@ class MidiCommand {
     }).toList();
   }
 
+  /// Starts scanning for BLE MIDI devices.
+  ///
+  /// Found devices will be included in the list returned by [devices].
   void scanForBluetoothDevices() {
     _channel.invokeMethod('scanForDevices');
   }
 
+  /// Connects to the device.
   void connectToDevice(MidiDevice device) {
     _channel.invokeMethod('connectToDevice', device.toDictionary);
   }
 
+  /// Disconnects from the device.
   void disconnectDevice() {
     _channel.invokeMethod('disconnectDevice');
   }
 
+  /// Sends data to the currently connected device.
+  ///
+  /// Data is an UInt8List of individual MIDI command bytes.
   void sendData(Uint8List data) {
     _channel.invokeMethod('sendData', data);
   }
 
+  /// Stream firing events whenever a midi package is received.
+  ///
+  /// The event contains the raw bytes contained in the MIDI package.
   Stream<Uint8List> get onMidiDataReceived => _rxChannel.receiveBroadcastStream().asBroadcastStream().map((d) {
         return Uint8List.fromList(List<int>.from(d));
       });
 
+  /// Stream firing events whenever a change in the MIDI setup occurs.
+  ///
+  /// For example, when a new BLE devices is discovered.
   Stream<String> get onMidiSetupChanged => _setupChannel.receiveBroadcastStream().asBroadcastStream().cast<String>();
 }
 
+/// MIDI device data.
 class MidiDevice {
   String name;
   String id;
@@ -67,6 +83,7 @@ class MidiDevice {
   }
 }
 
+/// Helper class to ease transmission of common types of MIDI messages.
 class MidiCommandHelper {
   static void sendCCMessage(int channel, int controller, int value) {
     var data = Uint8List(3);

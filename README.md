@@ -2,7 +2,9 @@
 
 A Flutter plugin for sending and receving midi
 
-See example folder for how to use
+Currently works with USB and BLE connections on Android, and USB and network(session) connections on iOS. BLE on iOS is WIP.
+
+See example folder for how to use.
 
 ## Getting Started
 

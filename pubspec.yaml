@@ -1,8 +1,8 @@
 name: flutter_midi_command
 description: A Flutter plugin for sending and receving midi
 version: 0.0.1
-author:
-homepage:
+author: Morten Boye Mortensen <morten@invisiblewrench.com>
+homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
 
 environment:
   sdk: ">=2.0.0-dev.68.0 <3.0.0"
