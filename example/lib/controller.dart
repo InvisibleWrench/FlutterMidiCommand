@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_midi_command/midi_command.dart';
+import 'package:flutter_midi_command/flutter_midi_command.dart';
 
 class ControllerPage extends StatelessWidget {
   Future<bool> _save() {
     print('close disconnect');
-    MidiCommand.disconnectDevice();
+    MidiCommand().disconnectDevice();
     return Future.value(true);
   }
 
@@ -36,11 +36,12 @@ class MidiControlsState extends State<MidiControls> {
   var _value = 0;
 
   StreamSubscription<List<int>> _rxSubscription;
+  MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
     print('init controller');
-    _rxSubscription = MidiCommand.onMidiDataReceived.listen((data) {
+    _rxSubscription = _midiCommand.onMidiDataReceived.listen((data) {
       print('on data $data');
       var status = data[0];
 

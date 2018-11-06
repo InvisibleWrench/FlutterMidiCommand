@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_midi_command/midi_command.dart';
+import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command_example/controller.dart';
 
 void main() => runApp(new MyApp());
@@ -13,13 +13,14 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   StreamSubscription<String> _setupSubscription;
+  MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
     super.initState();
 
-    MidiCommand.scanForBluetoothDevices();
-    _setupSubscription = MidiCommand.onMidiSetupChanged.listen((data) {
+    _midiCommand.scanForBluetoothDevices();
+    _setupSubscription = _midiCommand.onMidiSetupChanged.listen((data) {
       print("setup changed $data");
 
       switch (data) {
@@ -50,7 +51,7 @@ class _MyAppState extends State<MyApp> {
           actions: <Widget>[
             IconButton(
                 onPressed: () {
-                  MidiCommand.scanForBluetoothDevices();
+                  _midiCommand.scanForBluetoothDevices();
                   setState(() {});
                 },
                 icon: Icon(Icons.refresh))
@@ -58,7 +59,7 @@ class _MyAppState extends State<MyApp> {
         ),
         body: new Center(
             child: FutureBuilder(
-                future: MidiCommand.devices,
+                future: _midiCommand.devices,
                 builder: (BuildContext context, AsyncSnapshot snapshot) {
                   if (snapshot.hasData && snapshot.data != null) {
                     var devices = snapshot.data as List<MidiDevice>;
@@ -77,7 +78,7 @@ class _MyAppState extends State<MyApp> {
                           ),
                           trailing: device.type == "BLE" ? Icon(Icons.bluetooth) : null,
                           onTap: () {
-                            MidiCommand.connectToDevice(device);
+                            _midiCommand.connectToDevice(device);
                             Navigator.of(context).push(MaterialPageRoute<Null>(
                               builder: (_) => ControllerPage(),
                             ));
