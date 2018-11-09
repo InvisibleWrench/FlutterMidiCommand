@@ -7,9 +7,12 @@ import 'package:meta/meta.dart' show visibleForTesting;
 class MidiCommand {
   factory MidiCommand() {
     if (_instance == null) {
-      final MethodChannel methodChannel = const MethodChannel('plugins.invisiblewrench.com/flutter_midi_command');
-      final EventChannel rxChannel = EventChannel('plugins.invisiblewrench.com/flutter_midi_command/rx_channel');
-      final EventChannel setupChannel = EventChannel('plugins.invisiblewrench.com/flutter_midi_command/setup_channel');
+      final MethodChannel methodChannel = const MethodChannel(
+          'plugins.invisiblewrench.com/flutter_midi_command');
+      final EventChannel rxChannel = EventChannel(
+          'plugins.invisiblewrench.com/flutter_midi_command/rx_channel');
+      final EventChannel setupChannel = EventChannel(
+          'plugins.invisiblewrench.com/flutter_midi_command/setup_channel');
       _instance = MidiCommand.private(methodChannel, rxChannel, setupChannel);
     }
     return _instance;
@@ -60,14 +63,16 @@ class MidiCommand {
   /// Stream firing events whenever a midi package is received.
   ///
   /// The event contains the raw bytes contained in the MIDI package.
-  Stream<Uint8List> get onMidiDataReceived => _rxChannel.receiveBroadcastStream().asBroadcastStream().map((d) {
+  Stream<Uint8List> get onMidiDataReceived =>
+      _rxChannel.receiveBroadcastStream().asBroadcastStream().map((d) {
         return Uint8List.fromList(List<int>.from(d));
       });
 
   /// Stream firing events whenever a change in the MIDI setup occurs.
   ///
   /// For example, when a new BLE devices is discovered.
-  Stream<String> get onMidiSetupChanged => _setupChannel.receiveBroadcastStream().asBroadcastStream().cast<String>();
+  Stream<String> get onMidiSetupChanged =>
+      _setupChannel.receiveBroadcastStream().asBroadcastStream().cast<String>();
 }
 
 /// MIDI device data.
