@@ -54,7 +54,7 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
 
   lateinit var bluetoothAdapter:BluetoothAdapter
   lateinit var bluetoothScanner:BluetoothLeScanner
-  private val SCAN_PERIOD: Long = 30000 // Stops scanning after 10 seconds.
+  private val SCAN_PERIOD: Long = 30000 // Stops scanning after 30 seconds.
   private val PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 95453 // arbitrary
 
   var discoveredDevices = mutableSetOf<BluetoothDevice>()

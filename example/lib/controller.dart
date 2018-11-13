@@ -50,15 +50,16 @@ class MidiControlsState extends State<MidiControls> {
         return;
       }
 
-      var d1 = data[1];
-      var d2 = data[2];
-      var rawStatus = status & 0xF0; // without channel
-      var channel = (status & 0x0F) + 1;
-
-      if (rawStatus == 0xB0 && channel == _channel && d1 == _controller) {
-        setState(() {
-          _value = d2;
-        });
+      if (data.length >= 2) {
+        var d1 = data[1];
+        var d2 = data[2];
+        var rawStatus = status & 0xF0; // without channel
+        var channel = (status & 0x0F) + 1;
+        if (rawStatus == 0xB0 && channel == _channel && d1 == _controller) {
+          setState(() {
+            _value = d2;
+          });
+        }
       }
     });
     super.initState();

@@ -3,8 +3,7 @@
 A Flutter plugin for sending and receving MIDI messages between Flutter and physical and virtual MIDI devices. 
 
 Wraps CoreMIDI and android.media.midi in a thin dart/flutter layer.
-Currently works with USB and BLE connections on Android, and USB and network(session) connections on iOS.
-BLE support on iOS is WIP.
+Works with USB and BLE MIDI connections on Android, and USB, network(session) and BLE MIDI connections on iOS.
 
 ## Getting Started
 
