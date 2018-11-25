@@ -1,3 +1,7 @@
+## 0.0.4
+
+Fixed stream broadcast bug
+
 ## 0.0.3
 
 Added Support for BLE MIDI devices on iOS

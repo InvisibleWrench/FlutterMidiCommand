@@ -7,6 +7,8 @@ Works with USB and BLE MIDI connections on Android, and USB, network(session) an
 
 ## Getting Started
 
+This plugin is build using Swift and Kotlin on the native side, so make sure your project supports this.
+
 - Get a list of available MIDI devices by calling `MidiCommand().devices` which returns a list of `MidiDevice`
 - Start scanning for BLE MIDI devices by calling `MidiCommand().scanForBluetoothDevices()`
 - Listen for updates in the MIDI setup by subscribing to `MidiCommand().onMidiSetupChanged`

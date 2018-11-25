@@ -7,12 +7,9 @@ import 'package:meta/meta.dart' show visibleForTesting;
 class MidiCommand {
   factory MidiCommand() {
     if (_instance == null) {
-      final MethodChannel methodChannel = const MethodChannel(
-          'plugins.invisiblewrench.com/flutter_midi_command');
-      final EventChannel rxChannel = EventChannel(
-          'plugins.invisiblewrench.com/flutter_midi_command/rx_channel');
-      final EventChannel setupChannel = EventChannel(
-          'plugins.invisiblewrench.com/flutter_midi_command/setup_channel');
+      final MethodChannel methodChannel = const MethodChannel('plugins.invisiblewrench.com/flutter_midi_command');
+      final EventChannel rxChannel = EventChannel('plugins.invisiblewrench.com/flutter_midi_command/rx_channel');
+      final EventChannel setupChannel = EventChannel('plugins.invisiblewrench.com/flutter_midi_command/setup_channel');
       _instance = MidiCommand.private(methodChannel, rxChannel, setupChannel);
     }
     return _instance;
@@ -26,6 +23,9 @@ class MidiCommand {
   final MethodChannel _channel;
   final EventChannel _rxChannel;
   final EventChannel _setupChannel;
+
+  Stream<Uint8List> _rxStream;
+  Stream<String> _setupStream;
 
   /// Gets a list of available MIDI devices and returns it.
   Future<List<MidiDevice>> get devices async {
@@ -63,16 +63,20 @@ class MidiCommand {
   /// Stream firing events whenever a midi package is received.
   ///
   /// The event contains the raw bytes contained in the MIDI package.
-  Stream<Uint8List> get onMidiDataReceived =>
-      _rxChannel.receiveBroadcastStream().asBroadcastStream().map((d) {
-        return Uint8List.fromList(List<int>.from(d));
-      });
+  Stream<Uint8List> get onMidiDataReceived {
+    _rxStream ??= _rxChannel.receiveBroadcastStream().map<Uint8List>((d) {
+      return Uint8List.fromList(List<int>.from(d));
+    });
+    return _rxStream;
+  }
 
   /// Stream firing events whenever a change in the MIDI setup occurs.
   ///
   /// For example, when a new BLE devices is discovered.
-  Stream<String> get onMidiSetupChanged =>
-      _setupChannel.receiveBroadcastStream().asBroadcastStream().cast<String>();
+  Stream<String> get onMidiSetupChanged {
+    _setupStream ??= _setupChannel.receiveBroadcastStream().cast<String>();
+    return _setupStream;
+  }
 }
 
 /// MIDI device data.
