@@ -98,7 +98,7 @@ class MidiControlsState extends State<MidiControls> {
   _onValueChanged(int newValue) {
     setState(() {
       _value = newValue;
-      MidiCommandHelper.sendCCMessage(_channel, _controller, _value);
+      CCMessage(channel: _channel, controller: _controller, value: _value).send();
     });
   }
 }
