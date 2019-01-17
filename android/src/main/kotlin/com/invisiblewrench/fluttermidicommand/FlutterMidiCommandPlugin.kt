@@ -54,7 +54,6 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
 
   lateinit var bluetoothAdapter:BluetoothAdapter
   lateinit var bluetoothScanner:BluetoothLeScanner
-  private val SCAN_PERIOD: Long = 30000 // Stops scanning after 30 seconds.
   private val PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 95453 // arbitrary
 
   var discoveredDevices = mutableSetOf<BluetoothDevice>()
@@ -83,6 +82,9 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
 
     if (call.method.equals("scanForDevices")) {
       startScanningLeDevices()
+      result.success(null)
+    } else if (call.method.equals("stopScanForDevices")) {
+      stopScanningLeDevices()
       result.success(null)
     } else if (call.method.equals("getDevices")) {
       result.success(listOfDevices())
@@ -114,6 +116,11 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
       val settings = ScanSettings.Builder().build()
       bluetoothScanner.startScan(listOf(filter), settings, bleScanner)
     }
+  }
+
+  private fun stopScanningLeDevices() {
+    bluetoothScanner.stopScan(bleScanner)
+    discoveredDevices.clear()
   }
 
   fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>,
@@ -192,7 +199,7 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
   }
 
   fun sendData(data: ByteArray) {
-    Log.d("FlutterMIDICommand","send data $data")
+//    Log.d("FlutterMIDICommand","send data $data")
     if (deviceInputPort != null) {
       deviceInputPort?.send(data, 0, data.count())
     } else {
@@ -232,7 +239,7 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
   class RXHandler(stream: FlutterStreamHandler) : MidiReceiver() {
     val stream = stream
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
-      Log.d("FlutterMIDICommand","received data $msg offset:$offset count:$count")
+//      Log.d("FlutterMIDICommand","received data $msg offset:$offset count:$count")
       msg?.also {
         stream.send( it.slice(IntRange(offset, offset+count-1)))
       }
