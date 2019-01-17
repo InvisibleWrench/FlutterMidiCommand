@@ -16,7 +16,7 @@ This plugin is build using Swift and Kotlin on the native side, so make sure you
 - Disconnect from the current device by calling `MidiCommand.disconnectDevice()`
 - Listen for incoming MIDI messages on from the current device by subscribing to `MidiCommand().onMidiDataReceived`, after which the listener will recieve inbound MIDI messages as an UInt8List of variable length.
 - Send a MIDI message by calling `MidiCommand.sendData(data)`, where data is an UInt8List of bytes following the MIDI spec.
-- Or use the static `MidiCommandHelper` functions to send PC, CC, NoteOn and NoteOff messsages.
+- Or use the various `MidiCommand` subtypes to send PC, CC, NoteOn and NoteOff messsages.
 
 See example folder for how to use.
 

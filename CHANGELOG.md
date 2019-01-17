@@ -1,3 +1,10 @@
+## 0.0.5
+
+Updated kotlin version.
+Specific MidiMessage type now exist as separate sdubtypes of MidiMessage.
+Added StopScanning function.
+Updated example.
+
 ## 0.0.4
 
 Fixed stream broadcast bug
