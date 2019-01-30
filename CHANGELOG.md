@@ -1,3 +1,7 @@
+## 0.0.7
+
+Updated readme
+
 ## 0.0.6
 
 Added missing stopScanForDevices function on iOS
@@ -5,7 +9,7 @@ Added missing stopScanForDevices function on iOS
 ## 0.0.5
 
 Updated kotlin version.
-Specific MidiMessage type now exist as separate sdubtypes of MidiMessage.
+Specific MidiMessage type now exist as separate subtypes of MidiMessage.
 Added StopScanning function.
 Updated example.
 
@@ -25,5 +29,5 @@ Readme and formatting
 
 Initial Release.
 Functioning discovery and connection to MIDI devices on Android and iOS, as well as BLE MIDI devices on Android.
-Functioning sending and receving of MIDI data
+Functioning sending and receiving of MIDI data
 
