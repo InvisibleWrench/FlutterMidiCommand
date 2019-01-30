@@ -1,3 +1,7 @@
+## 0.0.7
+
+Updated readme
+
 ## 0.0.6
 
 Added missing stopScanForDevices function on iOS
