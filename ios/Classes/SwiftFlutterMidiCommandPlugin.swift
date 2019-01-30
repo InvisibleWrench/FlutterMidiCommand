@@ -99,6 +99,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
             result(nil)
             break
+        case "stopScanForDevices":
+            manager.stopScan()
+            break
         case "getDevices":
             let destinations = getDestinations()
             print("--- Destinations ---\n\(destinations)")

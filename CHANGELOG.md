@@ -1,3 +1,7 @@
+## 0.0.6
+
+Added missing stopScanForDevices function on iOS
+
 ## 0.0.5
 
 Updated kotlin version.
