@@ -1,6 +1,7 @@
 ## 0.0.8
 
-Gradle update
+Gradle and Kotlin update.
+AndroidX
 
 ## 0.0.7
 
