@@ -4,13 +4,13 @@
 Pod::Spec.new do |s|
   s.name             = 'flutter_midi_command'
   s.version          = '0.0.1'
-  s.summary          = 'A Flutter plugin for sending and receving midi'
+  s.summary          = 'A Flutter plugin for sending and receiving MIDI messages'
   s.description      = <<-DESC
-A Flutter plugin for sending and receiving midi
+A Flutter plugin for sending and receiving MIDI messages
                        DESC
   s.homepage         = 'http://example.com'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Invisible Wrench' => 'morten@invisiblewrench.com' }
+  s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.public_header_files = 'Classes/**/*.h'

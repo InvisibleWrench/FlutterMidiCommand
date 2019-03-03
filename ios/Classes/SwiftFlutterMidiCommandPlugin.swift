@@ -13,74 +13,74 @@ import CoreBluetooth
 
 
 public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, FlutterPlugin {
-    
+
     // MIDI
     var midiClient = MIDIClientRef()
     var outputPort = MIDIPortRef()
     var inputPort = MIDIPortRef()
     var connectedId = 0
-    
+
     // Flutter
     var midiRXChannel:FlutterEventChannel?
     var rxStreamHandler = StreamHandler()
     var midiSetupChannel:FlutterEventChannel?
     var setupStreamHandler = StreamHandler()
-    
+
     // BLE
     var manager:CBCentralManager!
     var connectedPeripheral:CBPeripheral?
     var connectedCharacteristic:CBCharacteristic?
     var discoveredDevices:Set<CBPeripheral> = []
-    
+
     // General
     var endPointType:String?
-    
+
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger())
         let instance = SwiftFlutterMidiCommandPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
-        
+
         instance.setup(registrar)
     }
-    
+
     deinit {
         NotificationCenter.default.removeObserver(self)
         MIDIClientDispose(midiClient)
     }
-    
+
     func setup(_ registrar: FlutterPluginRegistrar) {
         // Stream setup
         midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger())
         midiRXChannel?.setStreamHandler(rxStreamHandler)
-        
+
         midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger())
         midiSetupChannel?.setStreamHandler(setupStreamHandler)
-        
+
         // MIDI client with notification handler
         MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &midiClient) { (notification) in
             self.handleMIDINotification(notification)
         }
-        
+
         // MIDI output
         MIDIOutputPortCreate(midiClient, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
-        
+
         // MIDI Input with handler
         MIDIInputPortCreateWithBlock(midiClient, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
             self.handlePacketList(packetList)
         }
-        
+
         let session = MIDINetworkSession.default()
         session.isEnabled = true
         session.connectionPolicy = MIDINetworkConnectionPolicy.anyone
-        
+
         NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationSessionDidChange), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkContactsChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationContactsDidChange), object: nil)
-        
+
         manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.main)
     }
-    
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         print("call method \(call.method)")
         switch call.method {
@@ -88,7 +88,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //            if manager == nil {
 //                manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.main)
 //            }
-            
+
             print("\(manager.state.rawValue)")
             if manager.state == CBManagerState.poweredOn {
                 print("Start discovery")
@@ -131,8 +131,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(FlutterMethodNotImplemented)
         }
     }
-    
-    
+
+
     func connectToDevice(deviceId:String, type:String) {
         endPointType = type
         print("connect \(deviceId) \(type)")
@@ -150,7 +150,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 var src:MIDIEndpointRef = MIDIGetSource(id)
                 print("setup endpoint \(src)")
                 if (src != 0) {
-                    let status:OSStatus = MIDIPortConnectSource(inputPort, src, &src)
+                    let status:OSStatus =   (inputPort, src, &src)
                     if (status == noErr) {
                         connectedId = id
                     } else {
@@ -160,7 +160,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-    
+
     func disconnectDevice() {
         if endPointType == "BLE" {
             if let p = connectedPeripheral {
@@ -170,8 +170,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-    
-    
+
+
     func sendData(_ data: FlutterStandardTypedData) {
         if endPointType == "BLE" && connectedPeripheral != nil && connectedCharacteristic != nil {
             connectedPeripheral?.writeValue(data.data, for: connectedCharacteristic!, type: CBCharacteristicWriteType.withoutResponse)
@@ -181,14 +181,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             var packet = MIDIPacketListInit(packetList);
             let time = mach_absolute_time()
             packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes);
-            
+
             let dest:MIDIEndpointRef = MIDIGetDestination(connectedId)
             MIDISend(outputPort, dest, packetList);
-            
+
             packetList.deallocate()
         }
     }
-    
+
     func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
         var param: Unmanaged<CFString>?
         var result: String = "Error"
@@ -196,29 +196,29 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         if err == OSStatus(noErr) { result = param!.takeRetainedValue() as String }
         return result
     }
-    
+
     func getDestinations() -> [Dictionary<String, String>] {
         var destinations:[Dictionary<String, String>] = []
-        
+
         let count: Int = MIDIGetNumberOfDestinations()
         for i in 0..<count {
             let endpoint:MIDIEndpointRef = MIDIGetDestination(i);
             destinations.append(["name" : getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint), "id":String(i), "type":"native"])
         }
-        
+
         for periph:CBPeripheral in discoveredDevices {
             destinations.append(["name" : periph.name ?? "Unknown", "id" : periph.identifier.uuidString, "type" : "BLE"])
         }
-        
+
         return destinations;
     }
-    
+
     func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>) {
         let packets = packetList.pointee
         let packet:MIDIPacket = packets.packet
         var ap = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 1)
         ap.initialize(to:packet)
-        
+
         for _ in 0 ..< packets.numPackets {
             let p = ap.pointee
             var tmp = p.data
@@ -228,7 +228,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             ap = MIDIPacketNext(ap)
         }
     }
-    
+
     @objc func midiNetworkChanged(notification:NSNotification) {
         print("\(#function)")
         print("\(notification)")
@@ -242,7 +242,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             print("destinationEndpoint \(session.destinationEndpoint())")
             print("networkName \(session.networkName)")
             print("localName \(session.localName)")
-            
+
             //            if let name = getDeviceName(session.sourceEndpoint()) {
             //                print("source name \(name)")
             //            }
@@ -253,7 +253,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
         setupStreamHandler.send(data: "\(#function) \(notification)")
     }
-    
+
     @objc func midiNetworkContactsChanged(notification:NSNotification) {
         print("\(#function)")
         print("\(notification)")
@@ -265,18 +265,18 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
         setupStreamHandler.send(data: "\(#function) \(notification)")
     }
-    
+
     func handleMIDINotification(_ midiNotification: UnsafePointer<MIDINotification>) {
         print("\ngot a MIDINotification!")
-        
+
         let notification = midiNotification.pointee
         print("MIDI Notify, messageId= \(notification.messageID)")
         print("MIDI Notify, messageSize= \(notification.messageSize)")
-        
+
         setupStreamHandler.send(data: "\(notification.messageID)")
-        
+
         switch notification.messageID {
-            
+
         // Some aspect of the current MIDISetup has changed.  No data.  Should ignore this  message if messages 2-6 are handled.
         case .msgSetupChanged:
             print("MIDI setup changed")
@@ -287,14 +287,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             print("id \(m.messageID)")
             print("size \(m.messageSize)")
             break
-            
-            
+
+
         // A device, entity or endpoint was added. Structure is MIDIObjectAddRemoveNotification.
         case .msgObjectAdded:
-            
+
             print("added")
             //            let ptr = UnsafeMutablePointer<MIDIObjectAddRemoveNotification>(midiNotification)
-            
+
             midiNotification.withMemoryRebound(to: MIDIObjectAddRemoveNotification.self, capacity: 1) {
                 let m = $0.pointee
                 print(m)
@@ -308,16 +308,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 showMIDIObjectType(m.parentType)
                 //                print("childName \(String(describing: getDisplayName(m.child)))")
             }
-            
-            
+
+
             break
-            
+
         // A device, entity or endpoint was removed. Structure is MIDIObjectAddRemoveNotification.
         case .msgObjectRemoved:
             print("kMIDIMsgObjectRemoved")
             //            let ptr = UnsafeMutablePointer<MIDIObjectAddRemoveNotification>(midiNotification)
             midiNotification.withMemoryRebound(to: MIDIObjectAddRemoveNotification.self, capacity: 1) {
-                
+
                 let m = $0.pointee
                 print(m)
                 print("id \(m.messageID)")
@@ -326,16 +326,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("child type \(m.childType)")
                 print("parent \(m.parent)")
                 print("parentType \(m.parentType)")
-                
+
                 //                print("childName \(String(describing: getDisplayName(m.child)))")
             }
             break
-            
+
         // An object's property was changed. Structure is MIDIObjectPropertyChangeNotification.
         case .msgPropertyChanged:
             print("kMIDIMsgPropertyChanged")
             midiNotification.withMemoryRebound(to: MIDIObjectPropertyChangeNotification.self, capacity: 1) {
-                
+
                 let m = $0.pointee
                 print(m)
                 print("id \(m.messageID)")
@@ -344,27 +344,27 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("objectType  \(m.objectType)")
                 print("propertyName  \(m.propertyName)")
                 print("propertyName  \(m.propertyName.takeUnretainedValue())")
-                
+
                 if m.propertyName.takeUnretainedValue() as String == "apple.midirtp.session" {
                     print("connected")
                 }
             }
-            
+
             break
-            
+
         //     A persistent MIDI Thru connection wasor destroyed.  No data.
         case .msgThruConnectionsChanged:
             print("MIDI thru connections changed.")
             break
-            
+
         //A persistent MIDI Thru connection was created or destroyed.  No data.
         case .msgSerialPortOwnerChanged:
             print("MIDI serial port owner changed.")
             break
-            
+
         case .msgIOError:
             print("MIDI I/O error.")
-            
+
             //let ptr = UnsafeMutablePointer<MIDIIOErrorNotification>(midiNotification)
             midiNotification.withMemoryRebound(to: MIDIIOErrorNotification.self, capacity: 1) {
                 let m = $0.pointee
@@ -377,56 +377,56 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             break
         }
     }
-    
+
     func showMIDIObjectType(_ ot: MIDIObjectType) {
         switch ot {
         case .other:
             os_log("midiObjectType: Other", log: midiLog, type: .debug)
             break
-            
+
         case .device:
             os_log("midiObjectType: Device", log: midiLog, type: .debug)
             break
-            
+
         case .entity:
             os_log("midiObjectType: Entity", log: midiLog, type: .debug)
             break
-            
+
         case .source:
             os_log("midiObjectType: Source", log: midiLog, type: .debug)
             break
-            
+
         case .destination:
             os_log("midiObjectType: Destination", log: midiLog, type: .debug)
             break
-            
+
         case .externalDevice:
             os_log("midiObjectType: ExternalDevice", log: midiLog, type: .debug)
             break
-            
+
         case .externalEntity:
             print("midiObjectType: ExternalEntity")
             os_log("midiObjectType: ExternalEntity", log: midiLog, type: .debug)
             break
-            
+
         case .externalSource:
             os_log("midiObjectType: ExternalSource", log: midiLog, type: .debug)
             break
-            
+
         case .externalDestination:
             os_log("midiObjectType: ExternalDestination", log: midiLog, type: .debug)
             break
         }
-        
+
     }
-    
+
     /// BLE handling
-    
+
     // Central
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         print("central did update state \(central.state.rawValue)")
     }
-    
+
     public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         print("central didDiscover \(peripheral)")
         if !discoveredDevices.contains(peripheral) {
@@ -434,26 +434,26 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             setupStreamHandler.send(data: "deviceFound")
         }
     }
-    
+
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print("central did connect \(peripheral)")
         connectedPeripheral = peripheral
         peripheral.delegate = self
         peripheral.discoverServices([CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")])
     }
-    
-    
+
+
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("central did fail to connect state \(peripheral)")
     }
-    
+
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
         connectedPeripheral = nil
         connectedCharacteristic = nil
         setupStreamHandler.send(data: "deviceDisconnected")
     }
-    
+
     // Peripheral
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         print("perif didDiscoverServices  \(String(describing: peripheral.services))")
@@ -461,7 +461,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             peripheral.discoverCharacteristics(nil, for: service)
         }
     }
-    
+
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         print("perif didDiscoverCharacteristicsFor  \(String(describing: service.characteristics))")
         for characteristic:CBCharacteristic in service.characteristics! {
@@ -471,7 +471,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-    
+
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
         if let value = characteristic.value {
@@ -490,19 +490,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
 
 class StreamHandler : NSObject, FlutterStreamHandler {
-    
+
     var sink:FlutterEventSink?
-    
+
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         sink = events
         return nil
     }
-    
+
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
         sink = nil
         return nil
     }
-    
+
     func send(data: Any) {
         if let sink = sink {
             sink(data)

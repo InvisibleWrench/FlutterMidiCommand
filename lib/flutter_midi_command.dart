@@ -258,8 +258,6 @@ class NRPNHexMessage extends MidiMessage {
 
   NRPNHexMessage({this.channel = 0, this.parameterMSB = 0, this.parameterLSB = 0, this.valueMSB = 0, this.valueLSB = 0});
 
-
-
   @override
   void send() {
     var length = valueLSB > -1 ? 12 : 9;
