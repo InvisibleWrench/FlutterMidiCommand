@@ -18,7 +18,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var midiClient = MIDIClientRef()
     var outputPort = MIDIPortRef()
     var inputPort = MIDIPortRef()
-    var connectedId = 0
+    var connectedDevices = Dictionary<String, ConnectedDevice>()
+    var connectingDevice:ConnectedDevice?
 
     // Flutter
     var midiRXChannel:FlutterEventChannel?
@@ -28,12 +29,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     // BLE
     var manager:CBCentralManager!
-    var connectedPeripheral:CBPeripheral?
-    var connectedCharacteristic:CBCharacteristic?
+//    var connectedPeripheral:CBPeripheral?
+//    var connectedCharacteristic:CBCharacteristic?
     var discoveredDevices:Set<CBPeripheral> = []
 
     // General
-    var endPointType:String?
+//    var endPointType:String?
 
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
 
@@ -76,13 +77,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         session.connectionPolicy = MIDINetworkConnectionPolicy.anyone
 
         NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationSessionDidChange), object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkContactsChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationContactsDidChange), object: nil)
+//        NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkContactsChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationContactsDidChange), object: nil)
 
         manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.main)
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        print("call method \(call.method)")
+//        print("call method \(call.method)")
         switch call.method {
         case "scanForDevices":
 //            if manager == nil {
@@ -116,12 +117,18 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
             break
         case "disconnectDevice":
-            disconnectDevice()
+            if let deviceInfo = call.arguments as? Dictionary<String, String> {
+                disconnectDevice(deviceId: deviceInfo["id"]!)
+                result(nil)
+            } else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse device id", details: call.arguments))
+            }
             result(nil)
             break
         case "sendData":
             if let data = call.arguments as? FlutterStandardTypedData {
-                sendData(data)
+//                let deviceId =
+                sendData(data, deviceId: nil)
                 result(nil)
             } else {
                 result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
@@ -134,12 +141,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
 
     func connectToDevice(deviceId:String, type:String) {
-        endPointType = type
+//        endPointType = type
         print("connect \(deviceId) \(type)")
+        
+        let conDev = ConnectedDevice(id: deviceId, type: type)
+        
         if type == "BLE" {
             if let periph = discoveredDevices.filter({ (p) -> Bool in
                 p.identifier.uuidString == deviceId
             }).first {
+                connectingDevice = conDev
+                conDev.peripheral = periph
                 manager.stopScan()
                 manager.connect(periph, options: nil)
             } else {
@@ -147,12 +159,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         } else if type == "native" {
             if let id = Int(deviceId) {
-                var src:MIDIEndpointRef = MIDIGetSource(id)
+                let src:MIDIEndpointRef = MIDIGetSource(id)
                 print("setup endpoint \(src)")
                 if (src != 0) {
-                    let status:OSStatus =   (inputPort, src, &src)
+                    var devId = deviceId
+                    let status:OSStatus =   MIDIPortConnectSource(inputPort, src, &devId)
                     if (status == noErr) {
-                        connectedId = id
+                        conDev.endPoint = src
+                        connectedDevices[deviceId] = conDev
+                        setupStreamHandler.send(data: "deviceConnected")
+                        print("Connected MIDI for \(conDev)")
                     } else {
                         print("error connecting to device \(deviceId) [\(type)]")
                     }
@@ -161,31 +177,62 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
 
-    func disconnectDevice() {
-        if endPointType == "BLE" {
-            if let p = connectedPeripheral {
-                manager.cancelPeripheralConnection(p)
+    func disconnectDevice(deviceId:String) {
+        let device = connectedDevices[deviceId]
+        print("disconnect \(String(describing: device)) for id \(deviceId)")
+        if let device = device {
+            if device.type == "BLE" {
+                if let p = device.peripheral {
+                    manager.cancelPeripheralConnection(p)
+                } else {
+                    print("no BLE device to disconnect")
+                }
             } else {
-                print("no BLE device to disconnect")
+                print("disconmmected MIDI")
             }
+            connectedDevices.removeValue(forKey: deviceId)
         }
     }
 
 
-    func sendData(_ data: FlutterStandardTypedData) {
-        if endPointType == "BLE" && connectedPeripheral != nil && connectedCharacteristic != nil {
-            connectedPeripheral?.writeValue(data.data, for: connectedCharacteristic!, type: CBCharacteristicWriteType.withoutResponse)
+    func sendData(_ data: FlutterStandardTypedData, deviceId: String?) {
+        if let deviceId = deviceId {
+            if let device = connectedDevices[deviceId] {
+                _sendDataToDevice(device: device, data: data)
+            }
         } else {
-            let bytes = Array(data.data)
-            let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
-            var packet = MIDIPacketListInit(packetList);
-            let time = mach_absolute_time()
-            packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes);
-
-            let dest:MIDIEndpointRef = MIDIGetDestination(connectedId)
-            MIDISend(outputPort, dest, packetList);
-
-            packetList.deallocate()
+            connectedDevices.values.forEach({ (device) in
+                _sendDataToDevice(device: device, data: data)
+            })
+        }
+    }
+    
+    func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
+//        print("send data to device \(device.id)")
+        if (device.type == "BLE") {
+//            print("BLE")
+            if (device.peripheral != nil && device.characteristic != nil) {
+                device.peripheral?.writeValue(data.data, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+            } else {
+                print("No peripheral/characteristic in device")
+            }
+        } else {
+//            print("MIDI")
+            let dest = MIDIGetDestination(Int(device.id) ?? 0)
+            if (dest != 0) {
+                let bytes = Array(data.data)
+                let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
+                var packet = MIDIPacketListInit(packetList);
+                let time = mach_absolute_time()
+                packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes);
+                
+    //            let dest:MIDIEndpointRef = MIDIGetDestination(connectedId)
+                MIDISend(outputPort, dest, packetList);
+                
+                packetList.deallocate()
+            } else {
+                print("No MIDI destination for id \(device.id)")
+            }
         }
     }
 
@@ -202,12 +249,24 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
         let count: Int = MIDIGetNumberOfDestinations()
         for i in 0..<count {
-            let endpoint:MIDIEndpointRef = MIDIGetDestination(i);
-            destinations.append(["name" : getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint), "id":String(i), "type":"native"])
+            let endpoint:MIDIEndpointRef = MIDIGetDestination(i)
+            let id = String(i)
+            destinations.append([
+                "name" : getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint),
+                "id":id,
+                "type":"native",
+                "connected":(connectedDevices.keys.contains(id) ? "true" : "false")
+                ])
         }
 
         for periph:CBPeripheral in discoveredDevices {
-            destinations.append(["name" : periph.name ?? "Unknown", "id" : periph.identifier.uuidString, "type" : "BLE"])
+            let id = periph.identifier.uuidString
+            destinations.append([
+                "name" : periph.name ?? "Unknown",
+                "id" : id,
+                "type" : "BLE",
+                "connected":(connectedDevices.keys.contains(id) ? "true" : "false")
+                ])
         }
 
         return destinations;
@@ -223,7 +282,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-            print("RX data \(data)")
+//            print("RX data \(data)")
             rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
             ap = MIDIPacketNext(ap)
         }
@@ -375,6 +434,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("errorCode \(m.errorCode)")
             }
             break
+        @unknown default:
+            break
         }
     }
 
@@ -416,6 +477,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         case .externalDestination:
             os_log("midiObjectType: ExternalDestination", log: midiLog, type: .debug)
             break
+        @unknown default:
+            break
         }
 
     }
@@ -437,7 +500,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print("central did connect \(peripheral)")
-        connectedPeripheral = peripheral
+//        connectedPeripheral = peripheral
         peripheral.delegate = self
         peripheral.discoverServices([CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")])
     }
@@ -445,12 +508,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("central did fail to connect state \(peripheral)")
+        connectingDevice = nil
     }
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
-        connectedPeripheral = nil
-        connectedCharacteristic = nil
+        
+//        connectedPeripheral = nil
+//        connectedCharacteristic = nil
         setupStreamHandler.send(data: "deviceDisconnected")
     }
 
@@ -467,7 +532,15 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         for characteristic:CBCharacteristic in service.characteristics! {
             if characteristic.uuid.uuidString == "7772E5DB-3868-4112-A1A9-F2669D106BF3" {
                 peripheral.setNotifyValue(true, for: characteristic)
-                connectedCharacteristic = characteristic
+                print("set up characteristic for device")
+//                connectedCharacteristic = characteristic
+                if let connecting = connectingDevice {
+                    connecting.characteristic = characteristic
+                    connectedDevices[connecting.id] = connecting
+                    connectingDevice = nil
+                    print(discoveredDevices)
+                    setupStreamHandler.send(data: "deviceConnected")
+                }
             }
         }
     }
@@ -509,5 +582,18 @@ class StreamHandler : NSObject, FlutterStreamHandler {
         } else {
             print("no sink")
         }
+    }
+}
+
+class ConnectedDevice {
+    var id:String
+    var type:String
+    var endPoint:MIDIEndpointRef = 0
+    var peripheral:CBPeripheral?
+    var characteristic:CBCharacteristic?
+    
+    init(id:String, type:String) {
+        self.id = id
+        self.type = type
     }
 }
