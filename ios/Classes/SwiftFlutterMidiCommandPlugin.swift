@@ -150,7 +150,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 var src:MIDIEndpointRef = MIDIGetSource(id)
                 print("setup endpoint \(src)")
                 if (src != 0) {
-                    let status:OSStatus =   (inputPort, src, &src)
+                    let status:OSStatus = MIDIPortConnectSource(inputPort, src, &src)
                     if (status == noErr) {
                         connectedId = id
                     } else {
