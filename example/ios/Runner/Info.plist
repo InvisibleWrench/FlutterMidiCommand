@@ -41,5 +41,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Use Bluetooth to connect to Bluetooth MIDI devices</string>
 </dict>
 </plist>
