@@ -2,11 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
+import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 
 class ControllerPage extends StatelessWidget {
   Future<bool> _save() {
-    print('close disconnect');
-    MidiCommand().disconnectDevice();
+    print('close and disconnect all');
+    MidiCommand().teardown();
     return Future.value(true);
   }
 
