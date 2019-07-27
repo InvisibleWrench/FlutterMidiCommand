@@ -1,3 +1,7 @@
+## 0.1.1
+
+Added missing entitlement in iOS plist for bluetooth access
+
 ## 0.1.0
 
 Moved Message Types into separate file: flutter_midi_command_messages.dart.
