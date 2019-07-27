@@ -7,7 +7,6 @@ Gradle dependency raised to 3.4.2
 minSDKversion raised to 24
 Version bumped to 0.1.0
 
-
 ## 0.0.8
 
 Gradle and Kotlin update.
