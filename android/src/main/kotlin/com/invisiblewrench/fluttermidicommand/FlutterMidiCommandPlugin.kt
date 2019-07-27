@@ -27,14 +27,22 @@ import android.app.Activity.RESULT_CANCELED
 
 
 
-class FlutterMidiCommandPlugin(): MethodCallHandler {
+class FlutterMidiCommandPlugin: MethodCallHandler {
   companion object {
     @JvmStatic
     fun registerWith(registrar: Registrar): Unit {
+
       val channel = MethodChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command")
       var instance = FlutterMidiCommandPlugin()
       channel.setMethodCallHandler(instance)
       instance.setup(registrar)
+
+      registrar.addViewDestroyListener {
+        Log.d("FlutterMIDICommand", "view destroy")
+        instance.teardown()
+        return@addViewDestroyListener true
+      }
+
     }
   }
 
@@ -44,16 +52,12 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
   lateinit var midiManager:MidiManager
   lateinit var handler: Handler
 
-//  private var device:MidiDevice? = null
   private var connectedDevices = mutableMapOf<String, ConnectedDevice>()
 
-//  private var deviceInputPort:MidiInputPort? = null
-//  private var deviceOutputPort:MidiOutputPort? = null
-
   lateinit var rxChannel:EventChannel
-  val rxStreamHandler = FlutterStreamHandler()
+  lateinit var rxStreamHandler:FlutterStreamHandler
   lateinit var setupChannel:EventChannel
-  val setupStreamHandler = FlutterStreamHandler()
+  lateinit var setupStreamHandler:FlutterStreamHandler
 
   lateinit var bluetoothAdapter:BluetoothAdapter
   lateinit var bluetoothScanner:BluetoothLeScanner
@@ -67,46 +71,61 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
     context = registrar.activeContext()
     activity = registrar.activity()
 
+    handler = Handler(context.mainLooper)
+    midiManager = context.getSystemService(Context.MIDI_SERVICE) as MidiManager
+    midiManager.registerDeviceCallback(deviceConnectionCallback, handler)
+
+    rxStreamHandler = FlutterStreamHandler(handler)
     rxChannel = EventChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command/rx_channel")
     rxChannel.setStreamHandler( rxStreamHandler )
 
+    setupStreamHandler = FlutterStreamHandler(handler)
     setupChannel = EventChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command/setup_channel")
     setupChannel.setStreamHandler( setupStreamHandler )
-
-    handler = Handler(registrar.context().mainLooper)
-    midiManager = context.getSystemService(Context.MIDI_SERVICE) as MidiManager
-    midiManager.registerDeviceCallback(deviceConnectionCallback, handler)
 
     blManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     bluetoothAdapter = blManager.adapter
     bluetoothScanner = bluetoothAdapter.bluetoothLeScanner
   }
 
+
   override fun onMethodCall(call: MethodCall, result: Result): Unit {
 //    Log.d("FlutterMIDICommand","call method ${call.method}")
 
-    if (call.method.equals("scanForDevices")) {
-      startScanningLeDevices()
-      result.success(null)
-    } else if (call.method.equals("stopScanForDevices")) {
-      stopScanningLeDevices()
-      result.success(null)
-    } else if (call.method.equals("getDevices")) {
-      result.success(listOfDevices())
-    } else if (call.method.equals("connectToDevice")) {
-      var args = call.arguments<Map<String, Any>>()
-      connectToDevice(args["id"].toString(), args["type"].toString())
-      result.success(null)
-    } else if (call.method.equals("disconnectDevice")) {
-      var args = call.arguments<Map<String, Any>>()
-      disconnectDevice(args["id"].toString())
-      result.success(null)
-    } else if (call.method.equals("sendData")){
-      val data = call.arguments<ByteArray>()
-      sendData(data, null)
-      result.success(null)
-    } else {
-      result.notImplemented()
+    when (call.method) {
+      "sendData" -> {
+        val data = call.arguments<ByteArray>()
+        sendData(data, null)
+        result.success(null)
+      }
+      "getDevices" -> {
+        result.success(listOfDevices())
+      }
+      "scanForDevices" -> {
+        startScanningLeDevices()
+        result.success(null)
+      }
+      "stopScanForDevices" -> {
+        stopScanningLeDevices()
+        result.success(null)
+      }
+      "connectToDevice" -> {
+        var args = call.arguments<Map<String, Any>>()
+        connectToDevice(args["id"].toString(), args["type"].toString())
+        result.success(null)
+      }
+      "disconnectDevice" -> {
+        var args = call.arguments<Map<String, Any>>()
+        disconnectDevice(args["id"].toString())
+        result.success(null)
+      }
+      "teardown" -> {
+        teardown()
+        result.success(null)
+      }
+      else -> {
+        result.notImplemented()
+      }
     }
   }
 
@@ -131,6 +150,7 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
 
   fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>,
                                  grantResults: IntArray) {
+    Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
     if (requestCode == PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
       startScanningLeDevices()
     } else {
@@ -138,10 +158,33 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
     }
   }
 
+  private fun connectToDevice(deviceId:String, type:String) {
+    Log.d("FlutterMIDICommand", "connect to $type device: $deviceId")
+
+
+    if (type == "BLE") {
+      val bleDevices = discoveredDevices.filter { it.address == deviceId }
+      if (bleDevices.count() == 0) {
+        Log.d("FlutterMIDICommand", "Device not found ${deviceId}")
+      } else {
+        Log.d("FlutterMIDICommand", "Stop BLE Scan - Open device")
+        midiManager.openBluetoothDevice(bleDevices.first(), deviceOpenedListener, handler)
+      }
+    } else if (type == "native") {
+      val devices =  midiManager.devices.filter { d -> d.id.toString() == deviceId }
+      if (devices.count() == 0) {
+        Log.d("FlutterMIDICommand", "not found device $devices")
+      } else {
+        Log.d("FlutterMIDICommand", "open device ${devices[0]}")
+        midiManager.openDevice(devices[0], deviceOpenedListener, handler)
+      }
+    }
+  }
+
   private val bleScanner = object : ScanCallback() {
     override fun onScanResult(callbackType: Int, result: ScanResult?) {
       super.onScanResult(callbackType, result)
-      Log.d("FlutterMIDICommand","onScanResult: ${result?.device?.address} - ${result?.device?.name}")
+      Log.d("FlutterMIDICommand", "onScanResult: ${result?.device?.address} - ${result?.device?.name}")
       result?.also {
         if (!discoveredDevices.contains(it.device)) {
           discoveredDevices.add(it.device)
@@ -150,56 +193,40 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
       }
     }
 
-    override fun onScanFailed(errorCode: Int) {
-      super.onScanFailed(errorCode)
-      Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
-      setupStreamHandler.send("BLE Scan failed $errorCode")
-    }
-  }
-
-  fun connectToDevice(deviceId:String, type:String) {
-    Log.d("FlutterMIDICommand","connect to $type device: $deviceId")
-
-    if (type == "BLE") {
-      val bleDevices = discoveredDevices.filter { it.address == deviceId }
-      if (bleDevices.count() == 0) {
-        Log.d("FlutterMIDICommand", "Device not found ${deviceId}")
-      } else {
-        Log.d("FlutterMIDICommand", "Stop BLE Scan - Open device")
-//        bluetoothScanner.stopScan(bleScanner)
-        midiManager.openBluetoothDevice(bleDevices.first(), deviceOpenedListener, handler)
-      }
-    } else if (type == "native") {
-      val devices =  midiManager.devices.filter { d -> d.getId().toString() == deviceId }
-      if (devices.count() == 0) {
-        Log.d("FlutterMIDICommand", "not found device $devices")
-      } else {
-        midiManager.openDevice(devices[0], deviceOpenedListener, handler)
+      override fun onScanFailed(errorCode: Int) {
+        super.onScanFailed(errorCode)
+        Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
+        setupStreamHandler.send("BLE Scan failed $errorCode")
       }
     }
+
+
+  fun teardown() {
+    Log.d("FlutterMIDICommand", "teardown")
+
+    connectedDevices.forEach { s, connectedDevice -> connectedDevice.close() }
+    connectedDevices.clear()
+
+    Log.d("FlutterMIDICommand", "unregisterDeviceCallback")
+    midiManager.unregisterDeviceCallback(deviceConnectionCallback)
   }
+
 
   private val deviceOpenedListener = object : MidiManager.OnDeviceOpenedListener {
     override fun onDeviceOpened(it: MidiDevice?) {
+      Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
-//        device = it
+
         val id = it.info.id.toString()
-        val device = ConnectedDevice(id, it.info.type.toString(), it)
-        device.connectWithHandler(RXHandler(rxStreamHandler))
+        val device = ConnectedDevice(it)
+        device.connectWithReceiver(RXReceiver(rxStreamHandler))
         connectedDevices[id] = device
 
-        Log.d("FlutterMIDICommand", "Opened ${it.info.toString()}")
-
-//        if (it.info.inputPortCount > 0)
-//          deviceInputPort = it.openInputPort(0)
-//        if (it.info.outputPortCount > 0) {
-//          deviceOutputPort = it.openOutputPort(0)
-//          deviceOutputPort?.connect()
-//        }
-//        Log.d("FlutterMIDICommand", "Ports ${deviceInputPort?.portNumber} ${deviceOutputPort?.portNumber}")
+        Log.d("FlutterMIDICommand", "Opened\n${it.info.toString()}")
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceOpened")
       }
     }
+
   }
 
   fun disconnectDevice(deviceId: String) {
@@ -212,75 +239,98 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
   fun sendData(data: ByteArray, deviceId: String?) {
     if (deviceId != null && connectedDevices.containsKey(deviceId)) {
       connectedDevices[deviceId]?.let {
-        sendDataToDevice(it, data)
+        it.send(data)
       }
     } else {
       connectedDevices.values.forEach {
-        sendDataToDevice(it, data)
+        it.send(data)
       }
     }
-
   }
 
-  fun sendDataToDevice(device:ConnectedDevice, data: ByteArray) {
-    device.inputPort?.send(data, 0, data.count())
-  }
 
   fun listOfDevices() : List<Map<String, Any>> {
     var list = mutableListOf<Map<String, Any>>()
 
     val devs:Array<MidiDeviceInfo> = midiManager.devices
+    Log.d("FlutterMIDICommand", "devices $devs")
     devs.forEach { d -> list.add(mapOf("name" to d.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "id" to d.id.toString(), "type" to "native", "connected" to if (connectedDevices.contains(d.id.toString())) "true" else "false" )) }
 
     discoveredDevices.forEach {
       list.add(mapOf("name" to it.name, "id" to it.address, "type" to "BLE", "connected" to if (connectedDevices.contains(it.address)) "true" else "false"))
     }
-
     return list.toList()
   }
+
 
   private val deviceConnectionCallback = object : MidiManager.DeviceCallback() {
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       device?.also {
-          Log.d("FlutterMIDICommand", "device added $it")
+        Log.d("FlutterMIDICommand", "device added $it")
+        this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceAdded")
       }
     }
 
     override fun onDeviceRemoved(device: MidiDeviceInfo?) {
       super.onDeviceRemoved(device)
       device?.also {
-          Log.d("FlutterMIDICommand","device removed $it")
+        Log.d("FlutterMIDICommand","device removed $it")
+        connectedDevices[it.id.toString()]?.also {
+          Log.d("FlutterMIDICommand","remove removed device $it")
+          connectedDevices.remove(it.id)
+        }
+        this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceRemoved")
       }
+    }
+
+    override fun onDeviceStatusChanged(status: MidiDeviceStatus?) {
+      super.onDeviceStatusChanged(status)
+      Log.d("FlutterMIDICommand","device status changed ${status.toString()}")
+
+      status?.also {
+        connectedDevices[status.deviceInfo.id.toString()]?.also {
+          Log.d("FlutterMIDICommand", "update device status")
+          it.status = status
+        }
+      }
+
+      this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceStatusChanged")
+
     }
   }
 
-  class RXHandler(stream: FlutterStreamHandler) : MidiReceiver() {
+  class RXReceiver(stream: FlutterStreamHandler) : MidiReceiver() {
     val stream = stream
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
-//      Log.d("FlutterMIDICommand","received data $msg offset:$offset count:$count")
+//      Log.d("FlutterMIDICommand","RXReceiver onSend(receive) ${this}")
       msg?.also {
         stream.send( it.slice(IntRange(offset, offset+count-1)))
       }
     }
   }
 
-  class FlutterStreamHandler : EventChannel.StreamHandler {
+  class FlutterStreamHandler(handler: Handler) : EventChannel.StreamHandler {
+    val handler = handler
     private var eventSink: EventChannel.EventSink? = null
 
     // EventChannel.StreamHandler methods
     override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink?) {
+      Log.d("FlutterMIDICommand","FlutterStreamHandler onListen")
       this.eventSink = eventSink
     }
 
     override fun onCancel(arguments: Any?) {
+      Log.d("FlutterMIDICommand","FlutterStreamHandler onCancel")
       eventSink = null
     }
 
     fun send(data: Any) {
-      eventSink?.success(data)
+//      Log.d("FlutterMIDICommand","FlutterStreamHandler send ${data}")
+      handler.post {
+        eventSink?.success(data)
+      }
     }
-
   }
 
   class ConnectedDevice {
@@ -289,28 +339,57 @@ class FlutterMidiCommandPlugin(): MethodCallHandler {
     var midiDevice:MidiDevice? = null
     var inputPort:MidiInputPort? = null
     var outputPort:MidiOutputPort? = null
-    private var handler:MidiReceiver? = null
+    var status:MidiDeviceStatus? = null
+    private var receiver:MidiReceiver? = null
 
-    constructor(id:String, type:String, device:MidiDevice) {
-      this.id = id
-      this.type = type
+    constructor(device:MidiDevice) {
       this.midiDevice = device
+      this.id = device.info.id.toString()
+      this.type = device.info.type.toString()
     }
 
-    fun connectWithHandler(handler: MidiReceiver) {
-      this.inputPort = this.midiDevice?.openInputPort(0)
-      this.outputPort = this.midiDevice?.openOutputPort(0)
-      this.handler = handler
-      this.outputPort?.connect(handler)
+    fun connectWithReceiver(receiver: MidiReceiver) {
+      Log.d("FlutterMIDICommand","connectWithHandler")
+
+      this.midiDevice?.info?.let {
+        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
+
+//        it.ports.forEach {
+//          Log.d("FlutterMIDICommand", "${it.name} ${it.type} ${it.portNumber}")
+//        }
+
+//        Log.d("FlutterMIDICommand", "is binder alive? ${this.midiDevice?.info?.properties?.getBinder(null)?.isBinderAlive}")
+
+        if(it.inputPortCount > 0) {
+          this.inputPort = this.midiDevice?.openInputPort(0)
+        }
+        if (it.outputPortCount > 0) {
+          this.outputPort = this.midiDevice?.openOutputPort(0)
+        }
+      }
+
+      this.receiver = receiver
+      this.outputPort?.connect(receiver)
+    }
+
+    fun send(data: ByteArray) {
+      this.inputPort?.send(data, 0, data.count())
     }
 
     fun close() {
+      Log.d("FlutterMIDICommand", "Flush input port ${this.inputPort}")
+      this.inputPort?.flush()
+      Log.d("FlutterMIDICommand", "Close input port ${this.inputPort}")
       this.inputPort?.close()
+      Log.d("FlutterMIDICommand", "Close output port ${this.outputPort}")
       this.outputPort?.close()
-      this.outputPort?.disconnect(this.handler)
-      this.handler = null
+      Log.d("FlutterMIDICommand", "Disconnect receiver ${this.receiver}")
+      this.outputPort?.disconnect(this.receiver)
+      this.receiver = null
+      Log.d("FlutterMIDICommand", "Close device ${this.midiDevice}")
       this.midiDevice?.close()
     }
+
   }
 }
 
