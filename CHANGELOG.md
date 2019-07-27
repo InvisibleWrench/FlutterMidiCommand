@@ -1,3 +1,13 @@
+## 0.1.0
+
+Moved Message Types into separate file: flutter_midi_command_messages.dart.
+Fixed threading issue. https://github.com/InvisibleWrench/FlutterMidiCommand/issues/4
+Added teardown function to disconnect and close all ports and devices.
+Gradle dependency raised to 3.4.2
+minSDKversion raised to 24
+Version bumped to 0.1.0
+
+
 ## 0.0.8
 
 Gradle and Kotlin update.
