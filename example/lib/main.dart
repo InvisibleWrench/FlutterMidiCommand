@@ -19,7 +19,9 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    _midiCommand.startScanningForBluetoothDevices();
+    _midiCommand.startScanningForBluetoothDevices().catchError((err) {
+      print("Error $err");
+    });
     _setupSubscription = _midiCommand.onMidiSetupChanged.listen((data) {
       print("setup changed $data");
 
@@ -51,7 +53,9 @@ class _MyAppState extends State<MyApp> {
           actions: <Widget>[
             IconButton(
                 onPressed: () {
-                  _midiCommand.startScanningForBluetoothDevices();
+                  _midiCommand.startScanningForBluetoothDevices().catchError((err) {
+                    print("Error $err");
+                  });
                   setState(() {});
                 },
                 icon: Icon(Icons.refresh))

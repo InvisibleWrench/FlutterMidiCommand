@@ -41,8 +41,12 @@ class MidiCommand {
   /// Starts scanning for BLE MIDI devices.
   ///
   /// Found devices will be included in the list returned by [devices].
-  void startScanningForBluetoothDevices() {
-    _channel.invokeMethod('scanForDevices');
+  Future<void> startScanningForBluetoothDevices() async {
+    try {
+      await _channel.invokeMethod('scanForDevices');
+    } on PlatformException catch (e) {
+      throw (e.message);
+    }
   }
 
   void stopScanningForBluetoothDevices() {

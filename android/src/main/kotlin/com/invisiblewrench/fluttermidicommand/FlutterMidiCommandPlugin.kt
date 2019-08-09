@@ -23,8 +23,9 @@ import android.content.pm.PackageManager
 import android.os.ParcelUuid
 import android.Manifest
 import android.app.Activity.RESULT_CANCELED
-
-
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
 
 
 class FlutterMidiCommandPlugin: MethodCallHandler {
@@ -60,7 +61,7 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
   lateinit var setupStreamHandler:FlutterStreamHandler
 
   lateinit var bluetoothAdapter:BluetoothAdapter
-  lateinit var bluetoothScanner:BluetoothLeScanner
+  var bluetoothScanner:BluetoothLeScanner? = null
   private val PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 95453 // arbitrary
 
   var discoveredDevices = mutableSetOf<BluetoothDevice>()
@@ -82,10 +83,6 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
     setupStreamHandler = FlutterStreamHandler(handler)
     setupChannel = EventChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command/setup_channel")
     setupChannel.setStreamHandler( setupStreamHandler )
-
-    blManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-    bluetoothAdapter = blManager.adapter
-    bluetoothScanner = bluetoothAdapter.bluetoothLeScanner
   }
 
 
@@ -102,8 +99,12 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
         result.success(listOfDevices())
       }
       "scanForDevices" -> {
-        startScanningLeDevices()
-        result.success(null)
+        val errorMsg = startScanningLeDevices()
+        if (errorMsg != null) {
+          result.error("ERROR", errorMsg, null)
+        } else {
+          result.success(null)
+        }
       }
       "stopScanForDevices" -> {
         stopScanningLeDevices()
@@ -129,22 +130,87 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
     }
   }
 
-  private fun startScanningLeDevices() {
+  private fun tryToInitBT() : String? {
+    Log.d("FlutterMIDICommand", "tryToInitBT")
 
     if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-      activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_COARSE_LOCATION), PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION)
+
+      if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+        Log.d("FlutterMIDICommand", "Show rationale for Location")
+        return "showRationaleForPermission"
+      } else {
+        activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_COARSE_LOCATION), PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION)
+      }
+    } else {
+      Log.d("FlutterMIDICommand", "Already permitted")
+
+      blManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+      bluetoothAdapter = blManager.adapter
+      if (bluetoothAdapter != null) {
+        bluetoothScanner = bluetoothAdapter.bluetoothLeScanner
+
+        if (bluetoothScanner != null) {
+          // Listen for changes in Bluetooth state
+          context.registerReceiver(broadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+
+          startScanningLeDevices()
+        } else {
+          Log.d("FlutterMIDICommand", "bluetoothScanner is null")
+          return "bluetoothNotAvailable"
+        }
+      } else {
+        Log.d("FlutterMIDICommand", "bluetoothAdapter is null")
+      }
+    }
+    return null
+  }
+
+  private val broadcastReceiver = object : BroadcastReceiver() {
+      override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action
+
+        if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+          val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+
+          when (state) {
+            BluetoothAdapter.STATE_OFF -> {
+              Log.d("FlutterMIDICommand", "BT is now off")
+              bluetoothScanner = null
+            }
+
+            BluetoothAdapter.STATE_TURNING_OFF -> {
+              Log.d("FlutterMIDICommand", "BT is now turning off")
+            }
+
+            BluetoothAdapter.STATE_ON -> {
+              Log.d("FlutterMIDICommand", "BT is now on")
+            }
+          }
+        }
+      }
+    }
+
+
+  private fun startScanningLeDevices() : String? {
+
+    if (bluetoothScanner == null) {
+      val errMsg = tryToInitBT()
+      errMsg?.let {
+        return it
+      }
     } else {
       Log.d("FlutterMIDICommand", "Start BLE Scan")
       discoveredDevices.clear()
       val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")).build()
       val settings = ScanSettings.Builder().build()
-      bluetoothScanner.startScan(listOf(filter), settings, bleScanner)
+      bluetoothScanner?.startScan(listOf(filter), settings, bleScanner)
     }
+    return null
   }
 
   private fun stopScanningLeDevices() {
-    bluetoothScanner.stopScan(bleScanner)
+    bluetoothScanner?.stopScan(bleScanner)
     discoveredDevices.clear()
   }
 
@@ -209,6 +275,8 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
 
     Log.d("FlutterMIDICommand", "unregisterDeviceCallback")
     midiManager.unregisterDeviceCallback(deviceConnectionCallback)
+    Log.d("FlutterMIDICommand", "unregister broadcastReceiver")
+    context.unregisterReceiver(broadcastReceiver)
   }
 
 
