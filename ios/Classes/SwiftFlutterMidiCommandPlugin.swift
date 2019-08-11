@@ -86,19 +86,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //        print("call method \(call.method)")
         switch call.method {
         case "scanForDevices":
-//            if manager == nil {
-//                manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.main)
-//            }
-
             print("\(manager.state.rawValue)")
             if manager.state == CBManagerState.poweredOn {
                 print("Start discovery")
                 discoveredDevices.removeAll()
                 manager.scanForPeripherals(withServices: [CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")], options: nil)
+                result(nil)
             } else {
                 print("BT not ready")
+                result(FlutterError(code: "MESSAGEERROR", message: "bluetoothNotAvailable", details: call.arguments))
             }
-            result(nil)
             break
         case "stopScanForDevices":
             manager.stopScan()
