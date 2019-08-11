@@ -1,3 +1,7 @@
+## 0.1.2
+
+Better handling of disabled Bluetooth 
+
 ## 0.1.1
 
 Added missing entitlement in iOS plist for bluetooth access
