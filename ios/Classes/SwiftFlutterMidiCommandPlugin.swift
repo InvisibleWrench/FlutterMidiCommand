@@ -545,14 +545,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
         if let value = characteristic.value {
-            if value.count > 2 { // We might have a valid message
-                let messageBytes = value.advanced(by: 2) // Skip the initial two timestamp bytes
-                let messages = messageBytes.split { (val) -> Bool in // Split at subseqent timestamps, if any
-                    val & 0x80 == 1
-                }
-                for message:Data in messages {
-                    rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
-                }
+			if value.count >= 4 { // We might have a valid message
+				let header = value[0]
+				let timestamp = value[1]
+				//see specs here http://www.hangar42.nl/wp-content/uploads/2017/10/BLE-MIDI-spec.pdf
+				if (header & 128)==128 && (header & 64)==0 && (timestamp & 128)==128 {
+					let messageBytes = value.advanced(by: 2) // Skip the initial two timestamp bytes
+					let messages = messageBytes.split { (val) -> Bool in // Split at subseqent timestamps, if any
+						val == timestamp
+					}
+					for message:Data in messages {
+						rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
+					}
+				}
             }
         }
     }
