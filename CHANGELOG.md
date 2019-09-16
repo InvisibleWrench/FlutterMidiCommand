@@ -1,5 +1,10 @@
 ## 0.1.2
 
+Fixed message splitting on iOS Bluetooth MIDI
+Thanks to https://github.com/TheKashe for the contribution.
+
+## 0.1.2
+
 Better handling of disabled Bluetooth 
 
 ## 0.1.1
