@@ -557,6 +557,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 	
 	
 	
+	//some debug functions
+	/*
 	func dumpMidiPacket(_ d:Data){
 		let filename = getDocumentsDirectory().appendingPathComponent("midi_log.txt")
 		let str = d.map { String(format: "%d\n", $0) }.joined()
@@ -591,38 +593,50 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 			print("nope")
 			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
 		}
-	}
+	}*/
+	
 	
 	
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
 		func sendMidiMsg(ts:Int64, message:Data){
-			dumpSentMidiPacket(message)
+			//dumpSentMidiPacket(message)
 			let d = [FlutterStandardTypedData(int64: ts.data as Data),FlutterStandardTypedData(bytes: message)]	 as [FlutterStandardTypedData?]
 			rxStreamHandler.send(data: d )
 		}
 		
-		func findSysExEnd(packet:Data) -> Int? {
+		/**
+		Searches for sys.ex end command without timestamp
+		
+		In case the packet starts as sys.ex additional message,
+		it will have:
+		 - header,
+		 - data
+		 - sys.ex end (0b11110111)
+		- THEN it will have timestamp low and then a normal packet continues
+		
+		*/
+		func findSysExEndIdx(packet:Data) -> Int? {
 			for i in 0...packet.count-1{
 				if (packet[i] & 0b11110111) == 0b11110111{
-						return i+1
-					}
+					return i
+				}
 			}
 			return nil
 		}
 
+		/**
+		 Searches for sys.ex end command with timestamp
 		
-		func findSysExEnd(packet:Data, tsLow:UInt8) -> Int? {
-			for i in 0...packet.count-1{
+		 In case we got timestamp low (as 2nd byte), this
+		 timestamp will preceed sys.ex en cmd
+		
+	    */
+		func findSysExEndIdx(packet:Data, tsLow:UInt8) -> Int? {
+			for i in 0...packet.count-2{
 				if packet[i] == tsLow &&
 				   (packet[i+1] & 0b11110111) == 0b11110111{
-					if i==0 {
-						//this message is sysex.end only b0 is ts, b1 is msg
-						//returning 2 means below handling works for both cases
-						return 2
-					} else {
-						return i
-					}
+						return i+1
 				}
 			}
 			return nil
@@ -630,112 +644,105 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 		
         if let value = characteristic.value {
 			let ts = Date().toMillis()!
+			/*
 			dumpMidiPacket(value)
-			dprint("\n\n")
-			dprint("-------------------------------------------")
-			dprint(value.map { String(format: "%d, ", $0) }.joined())
+			print("\n\n")
+			print("-------------------------------------------")
+			print(value.map { String(format: "%d, ", $0) }.joined())
+			*/
 			//see specs here http://www.hangar42.nl/wp-content/uploads/2017/10/BLE-MIDI-spec.pdf
 			if value.count >= 2 { // We might have a valid packet
 				var header : UInt8?;
 				var tsLow : UInt8?;
 				var runningMidiStatus : UInt8?
 				var remainingPacket : Data?
-				var specialDelivery = false
+				
+				/**
+				Handles sysex end message sending, which is used in 2 cases below,
+				hence the helper function
+				*/
+				func handleSysexEnd(from:Int, sysexEnd:Int){
+					//send midi message starting at from to sysexEnd+1
+					sendMidiMsg(ts: ts, message: remainingPacket!.subdata(in: from..<sysexEnd+1))
+					if remainingPacket!.count>sysexEnd+1{
+						remainingPacket = remainingPacket!.advanced(by: sysexEnd+1)
+						//after sysExEnd we expect tsLow
+						//but if packet starts with additional msg data, ts is first
+						//presented here
+						//if tsLow == nil, ts will be processed on next while, so
+						//we assign there for consistency
+						if tsLow != nil && remainingPacket![0] != tsLow{
+							tsLow = remainingPacket![0]
+						}
+					} else {
+						//this should mean sysexEnd was the last byte
+						remainingPacket = nil
+					}
+				}
+				
 				remainingPacket = value
 				while remainingPacket != nil && remainingPacket!.count >= 2{
-					dprint(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
+					//print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
 					switch (remainingPacket![0], remainingPacket![1]){
-					
-
-					/*case let (b0,b1) where remainingPacket!.count>4
-									   && header == nil
-						               && (b1 & 0b10000000) == 0b10000000
-									   && remainingPacket![2] >= 0xF0
-						               && (remainingPacket![3] & 0b10000000) == 0b10000000:
-						//this is not in specs, but I keep getting such packets from Roland Aerophone Go
-					    //there is a header, then timestamp(??), then sys message ??),
-						//THEN a new timestamp low
-						print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
-						header = b0
-						tsLow = remainingPacket![3]
-						remainingPacket = remainingPacket?.advanced(by: 3)
-						runningMidiStatus = nil
-						break;*/
-					case let (b0,_) where (b0 & 0b10000000) == 0b10000000
-						                && header == nil:
+					case let (b0,_) where header == nil
+									   && (b0 & 0b10000000) == 0b10000000 :
 						//packet header
-						dprint("handling packet header")
+						//print("handling packet header")
 						header = b0
 						remainingPacket = remainingPacket?.advanced(by: 1)
 						runningMidiStatus = nil
 						break;
-					case let (b0,_) where (b0 & 0b10000000) == 0b10000000
-						                && tsLow == nil:
+					case let (b0,_) where tsLow == nil
+									   && (b0 & 0b10000000) == 0b10000000 :
 						//packet timestamp
-						dprint("handling packet timestamp")
+						//print("handling packet timestamp")
 						tsLow  = b0
 						//note, here we don't advance packet so that we can compare
 						//against this ts even on the first message, simplifying algo
 						runningMidiStatus = nil
 						break;
-					case let (b0,_) where (b0 & 0b10000000) == 0
-									    && header != nil
-										&& tsLow == nil :
-						dprint("handling sys.ex additional msg")
-						let sysexEnd : Int? = findSysExEnd(packet: remainingPacket!)
+					case let (b0,_) where header != nil
+						               && tsLow  == nil
+									   && (b0 & 0b10000000) == 0:
+						//sys.ex additional msg, starts with header but no timestamplow
+						//however, after sys.ex end message, apparently
+						//there can be a timestamp and normal massages (got such packets from my controller)
+						//print("handling sys.ex additional msg")
 						
 						runningMidiStatus = nil
+						
+						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!)
+
 						if sysexEnd == nil{
 							//here we send ALL remaining packet, because we already are at b0
 							sendMidiMsg(ts: ts, message: remainingPacket!)
 							remainingPacket = nil
 						} else {
-							sendMidiMsg(ts: ts, message: remainingPacket!.subdata(in: 0..<sysexEnd!))
-							if remainingPacket!.count>sysexEnd!{
-								remainingPacket = remainingPacket!.advanced(by: sysexEnd!)
-								if remainingPacket![0] != tsLow{
-									//after sysExEnd we expect tsLow
-									//but I've seen data where after sysExEnd a new timestamp
-									//appears. if we don't update tsLow, further processing fails
-									tsLow = remainingPacket![0]
-								}
-								
-							} else {
-								remainingPacket = nil
-							}
+							//we send sys.ex end along with additional msg
+							handleSysexEnd(from:0,sysexEnd:sysexEnd!)
 						}
-						
-					case let (b0,b1) where (b0 == tsLow
-						                && (b1 & 0b11110000) == 0b11110000):
+						break;
+					case let (b0,b1) where b0 == tsLow
+									    && (b1 & 0b11110000) == 0b11110000:
 						//sys.ex message
-						dprint("handling sys.ex message")
-						
-						let sysexEnd : Int? = findSysExEnd(packet: remainingPacket!, tsLow: tsLow!)
-						
+						//print("handling sys.ex message")
 						runningMidiStatus = nil
+
+						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!, tsLow: tsLow!)
+						
 						if sysexEnd == nil{
+							//no sysexend message, return complete remaining packet
 							sendMidiMsg(ts: ts, message: remainingPacket!.advanced(by: 1))
 							remainingPacket = nil
 						} else {
-							sendMidiMsg(ts: ts, message: remainingPacket!.subdata(in: 1..<sysexEnd!))
-							if remainingPacket!.count>sysexEnd!{
-								remainingPacket = remainingPacket!.advanced(by: sysexEnd!)
-								if remainingPacket![0] != tsLow{
-									//after sysExEnd we expect tsLow
-									//but I've seen data where after sysExEnd a new timestamp
-									//appears. if we don't update tsLow, further processing fails
-									tsLow = remainingPacket![0]
-								}
-								
-							} else {
-								remainingPacket = nil
-							}
+							//note here we skip timestamp byte
+							handleSysexEnd(from:1,sysexEnd:sysexEnd!)
 						}
 						break;
 					case let (b0,b1) where b0 == tsLow
 										&& (b1 & 0b10000000) == 0b10000000:
 						//midi message
-						dprint("handling midi message")
+						//print("handling midi message")
 						runningMidiStatus = b1
 						sendMidiMsg(ts: ts, message: remainingPacket!.subdata(in: 1..<4))
 						if remainingPacket!.count>4{
@@ -748,7 +755,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 										&& (b0 & 0b10000000) == 0
 									    && (b1 & 0b10000000) == 0:
 						//running status midi
-						dprint("handling running status midi message")
+						//print("handling running status midi message")
 						var message = Data(bytes:&runningMidiStatus!, count:MemoryLayout<UInt8>.size)
 						message.append(remainingPacket!.subdata(in: 0..<2))
 						sendMidiMsg(ts: ts, message: message)
@@ -758,31 +765,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 									    && b0 == tsLow
 										&& (b1 & 0b10000000) == 0:
 						//running status midi with timestamp
-						dprint("handling running status midi message with ts")
+						//print("handling running status midi message with ts")
 						var message = Data(bytes:&runningMidiStatus!, count:MemoryLayout<UInt8>.size)
 						message.append(remainingPacket!.subdata(in: 1..<3))
 						sendMidiMsg(ts: ts, message: message)
 						remainingPacket = remainingPacket?.advanced(by: 3)
 						break;
-					/*case let (_,_) where header == nil
-						              && sysExSplit == true:
-						print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
-						let sysexEnd : Int? = findSysExEnd(packet: remainingPacket!)
-						if sysexEnd != nil{
-							sendMidiMsg(ts: ts, message: remainingPacket!.subdata(in: 1..<sysexEnd!))
-							if remainingPacket!.count>sysexEnd!{
-								header=255 //dummy
-								remainingPacket = remainingPacket!.advanced(by: sysexEnd!)
-								print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
-							} else {
-								remainingPacket = nil
-							}
-						}
-						break;*/
 					default:
 						print("unkown packet, ignoring")
 						print(value.map { String(format: "%d, ", $0) }.joined())
-						dumpBadMidiPacket(value)
+						//dumpBadMidiPacket(value)
 						remainingPacket = nil
 						break;
 					}
@@ -790,30 +782,15 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 				if(!(remainingPacket == nil || (remainingPacket!.count==0))){
 					print("packet not finished correctly")
 					print(value.map { String(format: "%d, ", $0) }.joined())
-					dumpBadMidiPacket(value)
+					//dumpBadMidiPacket(value)
 				}
 			} else {
 				print("packet too short to be a valid midi ble packet, ignoring")
-				dumpBadMidiPacket(value)
+				//dumpBadMidiPacket(value)
 			}//if value.count >= 2
         } // let value = characteristic.value
     }
 }
-
-extension Date {
-	func toMillis() -> Int64! {
-		return Int64(self.timeIntervalSince1970 * 1000)
-	}
-}
-
-extension Int64 {
-	var data: NSData {
-		var int = self
-		return NSData(bytes: &int, length:MemoryLayout.size(ofValue:int))
-			//sizeof(UInt64))
-	}
-}
-
 
 class StreamHandler : NSObject, FlutterStreamHandler {
 
@@ -849,6 +826,20 @@ class ConnectedDevice {
         self.id = id
         self.type = type
     }
+}
+
+extension Date {
+	func toMillis() -> Int64! {
+		return Int64(self.timeIntervalSince1970 * 1000)
+	}
+}
+
+extension Int64 {
+	var data: NSData {
+		var int = self
+		return NSData(bytes: &int, length:MemoryLayout.size(ofValue:int))
+		//sizeof(UInt64))
+	}
 }
 
 extension String {
