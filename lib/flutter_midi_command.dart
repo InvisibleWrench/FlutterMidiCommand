@@ -26,7 +26,7 @@ class MidiCommand {
   final EventChannel _rxChannel;
   final EventChannel _setupChannel;
 
-  Stream<Uint8List> _rxStream;
+  Stream<MidiData> _rxStream;
   Stream<String> _setupStream;
 
   /// Gets a list of available MIDI devices and returns it.
@@ -75,14 +75,15 @@ class MidiCommand {
     _channel.invokeMethod('sendData', data);
   }
 
+
   /// Stream firing events whenever a midi package is received.
   ///
   /// The event contains the raw bytes contained in the MIDI package.
-  Stream<Uint8List> get onMidiDataReceived {
+  Stream<MidiData> get onMidiDataReceived {
     print("get on midi data");
-    _rxStream ??= _rxChannel.receiveBroadcastStream().map<Uint8List>((d) {
-      //      print("data $d");
-      return Uint8List.fromList(List<int>.from(d));
+    _rxStream ??= _rxChannel.receiveBroadcastStream().map<MidiData>((d) {
+            //print("data $d");
+      return MidiData(d[0].first, Uint8List.fromList(List<int>.from(d[1])));
     });
     return _rxStream;
   }
@@ -94,6 +95,12 @@ class MidiCommand {
     _setupStream ??= _setupChannel.receiveBroadcastStream().cast<String>();
     return _setupStream;
   }
+}
+
+class MidiData{
+    final int timestamp;
+    final Uint8List data;
+    MidiData(this.timestamp,this.data);
 }
 
 /// MIDI device data.
