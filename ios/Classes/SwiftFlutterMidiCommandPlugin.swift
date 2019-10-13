@@ -211,10 +211,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if (device.peripheral != nil && device.characteristic != nil) {
                 var bytes = [UInt8](data.data)
                 if bytes.first == 0xF0 && bytes.last == 0xF7 {
-                    bytes.insert(0x80, at: bytes.count-1) // Insert 0x80 in front of Sysex End-byte
+                    bytes.insert(0x80, at: bytes.count-1) // Insert timestamp low in front of Sysex End-byte
                 }
                 
-                // Insert 0x8080 in front of BLE Midi message
+                // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                 bytes.insert(0x80, at: 0)
                 bytes.insert(0x80, at: 0)
                 
