@@ -205,11 +205,20 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
     
     func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
-//        print("send data to device \(device.id)")
+//        print("send data \(data) to device \(device.id)")
         if (device.type == "BLE") {
 //            print("BLE")
             if (device.peripheral != nil && device.characteristic != nil) {
-                device.peripheral?.writeValue(data.data, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+                var bytes = [UInt8](data.data)
+                if bytes.first == 0xF0 && bytes.last == 0xF7 {
+                    bytes.insert(0x80, at: bytes.count-1) // Insert 0x80 in front of Sysex End-byte
+                }
+                
+                // Insert 0x8080in front of BLE Midi message
+                bytes.insert(0x80, at: 0)
+                bytes.insert(0x80, at: 0)
+                
+                device.peripheral?.writeValue(Data(bytes), for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
             } else {
                 print("No peripheral/characteristic in device")
             }
@@ -217,13 +226,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //            print("MIDI")
             let dest = MIDIGetDestination(Int(device.id) ?? 0)
             if (dest != 0) {
-                let bytes = Array(data.data)
+                let bytes = [UInt8](data.data)
                 let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
                 var packet = MIDIPacketListInit(packetList);
                 let time = mach_absolute_time()
                 packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes);
                 
-    //            let dest:MIDIEndpointRef = MIDIGetDestination(connectedId)
                 MIDISend(outputPort, dest, packetList);
                 
                 packetList.deallocate()
@@ -545,6 +553,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
         if let value = characteristic.value {
+            print("ble value \(value)")
 			if value.count >= 4 { // We might have a valid message
 				let header = value[0]
 				let timestamp = value[1]
