@@ -214,7 +214,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                     bytes.insert(0x80, at: bytes.count-1) // Insert 0x80 in front of Sysex End-byte
                 }
                 
-                // Insert 0x8080in front of BLE Midi message
+                // Insert 0x8080 in front of BLE Midi message
                 bytes.insert(0x80, at: 0)
                 bytes.insert(0x80, at: 0)
                 
