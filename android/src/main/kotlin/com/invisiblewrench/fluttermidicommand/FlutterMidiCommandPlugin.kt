@@ -276,7 +276,13 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
     Log.d("FlutterMIDICommand", "unregisterDeviceCallback")
     midiManager.unregisterDeviceCallback(deviceConnectionCallback)
     Log.d("FlutterMIDICommand", "unregister broadcastReceiver")
-    context.unregisterReceiver(broadcastReceiver)
+    try {
+      context.unregisterReceiver(broadcastReceiver)
+    } catch (e: Exception) {
+      // The receiver was not registered.
+      // There is nothing to do in that case.
+      // Everything is fine.
+    }
   }
 
 
