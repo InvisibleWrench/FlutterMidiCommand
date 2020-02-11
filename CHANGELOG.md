@@ -1,3 +1,7 @@
+## 0.1.3
+
+Better handling of broadcast receiver on Android.
+
 ## 0.1.2
 
 Fixed message splitting on iOS Bluetooth MIDI
