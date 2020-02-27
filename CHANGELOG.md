@@ -1,3 +1,9 @@
+## 0.1.4
+
+Updated Gradle version
+Merge PR #8
+
+
 ## 0.1.3
 
 Better handling of broadcast receiver on Android.
