@@ -3,6 +3,7 @@ import UIKit
 import CoreMIDI
 import os.log
 import CoreBluetooth
+import Foundation
 
 ///
 /// Credit to
@@ -79,7 +80,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationSessionDidChange), object: nil)
 //        NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkContactsChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationContactsDidChange), object: nil)
 
-        manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.main)
+        manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -549,29 +550,244 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-
+	
+	//some debug functions
+	/*
+	
+	func getDocumentsDirectory() -> URL {
+		let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+		return paths[0]
+	}
+	func dumpMidiPacket(_ d:Data){
+		let filename = getDocumentsDirectory().appendingPathComponent("midi_log.txt")
+		let str = d.map { String(format: "%d\n", $0) }.joined()
+		do {
+			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
+			
+		} catch {
+			print("nope")
+			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
+		}
+	}
+	
+	func dumpBadMidiPacket(_ d:Data){
+		let filename = getDocumentsDirectory().appendingPathComponent("bad_midi_log.txt")
+		let str = d.map { String(format: "%d\n", $0) }.joined()
+		do {
+			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
+			
+		} catch {
+			print("nope")
+			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
+		}
+	}
+	
+	func dumpSentMidiPacket(_ d:Data){
+		let filename = getDocumentsDirectory().appendingPathComponent("sent_midi_log.txt")
+		let str = d.map { String(format: "%d\n", $0) }.joined()
+		do {
+			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
+			
+		} catch {
+			print("nope")
+			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
+		}
+	}*/
+	
+	
+	
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
+		func sendMidiMsg(message:Data){
+			//dumpSentMidiPacket(message)
+			rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
+		}
+		
+		/**
+		Searches for sys.ex end command without timestamp
+		
+		In case the packet starts as sys.ex additional message,
+		it will have:
+		 - header,
+		 - data
+		 - sys.ex end (0b11110111)
+		- THEN it will have timestamp low and then a normal packet continues
+		
+		*/
+		func findSysExEndIdx(packet:Data) -> Int? {
+			for i in 0...packet.count-1{
+				if (packet[i] & 0b11110111) == 0b11110111{
+					return i
+				}
+			}
+			return nil
+		}
+
+		/**
+		 Searches for sys.ex end command with timestamp
+		
+		 In case we got timestamp low (as 2nd byte), this
+		 timestamp will preceed sys.ex en cmd
+		
+	    */
+		func findSysExEndIdx(packet:Data, tsLow:UInt8) -> Int? {
+			for i in 0...packet.count-2{
+				if packet[i] == tsLow &&
+				   (packet[i+1] & 0b11110111) == 0b11110111{
+						return i+1
+				}
+			}
+			return nil
+		}
+		
         if let value = characteristic.value {
-            print("ble value \(value)")
-			if value.count >= 4 { // We might have a valid message
-				let header = value[0]
-				let timestamp = value[1]
-				//see specs here http://www.hangar42.nl/wp-content/uploads/2017/10/BLE-MIDI-spec.pdf
-				if (header & 128)==128 && (header & 64)==0 && (timestamp & 128)==128 {
-					let messageBytes = value.advanced(by: 2) // Skip the initial two timestamp bytes
-					let messages = messageBytes.split { (val) -> Bool in // Split at subseqent timestamps, if any
-						val == timestamp
-					}
-					for message:Data in messages {
-						rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
+			/*
+			dumpMidiPacket(value)
+			print("\n\n")
+			print("-------------------------------------------")
+			print(value.map { String(format: "%d, ", $0) }.joined())
+			*/
+			//see specs here http://www.hangar42.nl/wp-content/uploads/2017/10/BLE-MIDI-spec.pdf
+			if value.count >= 2 { // We might have a valid packet
+				var header : UInt8?;
+				var tsLow : UInt8?;
+				var runningMidiStatus : UInt8?
+				var remainingPacket : Data?
+				
+				/**
+				Handles sysex end message sending, which is used in 2 cases below,
+				hence the helper function
+				*/
+				func handleSysexEnd(from:Int, sysexEnd:Int){
+					//send midi message starting at from to sysexEnd+1
+					sendMidiMsg(message: remainingPacket!.subdata(in: from..<sysexEnd+1))
+					if remainingPacket!.count>sysexEnd+1{
+						remainingPacket = remainingPacket!.advanced(by: sysexEnd+1)
+						//after sysExEnd we expect tsLow
+						//but if packet starts with additional msg data, ts is first
+						//presented here
+						//if tsLow == nil, ts will be processed on next while, so
+						//we assign there for consistency
+						if tsLow != nil && remainingPacket![0] != tsLow{
+							tsLow = remainingPacket![0]
+						}
+					} else {
+						//this should mean sysexEnd was the last byte
+						remainingPacket = nil
 					}
 				}
-            }
-        }
+				
+				remainingPacket = value
+				while remainingPacket != nil && remainingPacket!.count >= 2{
+					//print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
+					switch (remainingPacket![0], remainingPacket![1]){
+					case let (b0,_) where header == nil
+									   && (b0 & 0b10000000) == 0b10000000 :
+						//packet header
+						//print("handling packet header")
+						header = b0
+						remainingPacket = remainingPacket?.advanced(by: 1)
+						runningMidiStatus = nil
+						break;
+					case let (b0,_) where tsLow == nil
+									   && (b0 & 0b10000000) == 0b10000000 :
+						//packet timestamp
+						//print("handling packet timestamp")
+						tsLow  = b0
+						//note, here we don't advance packet so that we can compare
+						//against this ts even on the first message, simplifying algo
+						runningMidiStatus = nil
+						break;
+					case let (b0,_) where header != nil
+						               && tsLow  == nil
+									   && (b0 & 0b10000000) == 0:
+						//sys.ex additional msg, starts with header but no timestamplow
+						//however, after sys.ex end message, apparently
+						//there can be a timestamp and normal massages (got such packets from my controller)
+						//print("handling sys.ex additional msg")
+						
+						runningMidiStatus = nil
+						
+						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!)
+
+						if sysexEnd == nil{
+							//here we send ALL remaining packet, because we already are at b0
+							sendMidiMsg(message: remainingPacket!)
+							remainingPacket = nil
+						} else {
+							//we send sys.ex end along with additional msg
+							handleSysexEnd(from:0,sysexEnd:sysexEnd!)
+						}
+						break;
+					case let (b0,b1) where b0 == tsLow
+									    && (b1 & 0b11110000) == 0b11110000:
+						//sys.ex message
+						//print("handling sys.ex message")
+						runningMidiStatus = nil
+
+						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!, tsLow: tsLow!)
+						
+						if sysexEnd == nil{
+							//no sysexend message, return complete remaining packet
+							sendMidiMsg(message: remainingPacket!.advanced(by: 1))
+							remainingPacket = nil
+						} else {
+							//note here we skip timestamp byte
+							handleSysexEnd(from:1,sysexEnd:sysexEnd!)
+						}
+						break;
+					case let (b0,b1) where b0 == tsLow
+										&& (b1 & 0b10000000) == 0b10000000:
+						//midi message
+						//print("handling midi message")
+						runningMidiStatus = b1
+						sendMidiMsg(message: remainingPacket!.subdata(in: 1..<4))
+						if remainingPacket!.count>4{
+							remainingPacket = remainingPacket?.advanced(by: 4)
+						} else {
+							remainingPacket = nil
+						}
+						break;
+					case let (b0,b1) where runningMidiStatus != nil
+										&& (b0 & 0b10000000) == 0
+									    && (b1 & 0b10000000) == 0:
+						//running status midi
+						//print("handling running status midi message")
+						var message = Data(bytes:&runningMidiStatus!, count:MemoryLayout<UInt8>.size)
+						message.append(remainingPacket!.subdata(in: 0..<2))
+						sendMidiMsg(message: message)
+						remainingPacket = remainingPacket?.advanced(by: 2)
+						break;
+					case let (b0,b1) where runningMidiStatus != nil
+									    && b0 == tsLow
+										&& (b1 & 0b10000000) == 0:
+						//running status midi with timestamp
+						//print("handling running status midi message with ts")
+						var message = Data(bytes:&runningMidiStatus!, count:MemoryLayout<UInt8>.size)
+						message.append(remainingPacket!.subdata(in: 1..<3))
+						sendMidiMsg(message: message)
+						remainingPacket = remainingPacket?.advanced(by: 3)
+						break;
+					default:
+						print("unkown packet, ignoring")
+						print(value.map { String(format: "%d, ", $0) }.joined())
+						//dumpBadMidiPacket(value)
+						remainingPacket = nil
+						break;
+					}
+				}//while
+				if(!(remainingPacket == nil || (remainingPacket!.count==0))){
+					print("packet not finished correctly")
+					print(value.map { String(format: "%d, ", $0) }.joined())
+					//dumpBadMidiPacket(value)
+				}
+			} else {
+				print("packet too short to be a valid midi ble packet, ignoring")
+				//dumpBadMidiPacket(value)
+			}//if value.count >= 2
+        } // let value = characteristic.value
     }
 }
-
 
 class StreamHandler : NSObject, FlutterStreamHandler {
 
@@ -607,4 +823,44 @@ class ConnectedDevice {
         self.id = id
         self.type = type
     }
+}
+
+extension Date {
+	func toMillis() -> Int64! {
+		return Int64(self.timeIntervalSince1970 * 1000)
+	}
+}
+
+extension Int64 {
+	var data: NSData {
+		var int = self
+		return NSData(bytes: &int, length:MemoryLayout.size(ofValue:int))
+		//sizeof(UInt64))
+	}
+}
+
+extension String {
+	func appendLineToURL(fileURL: URL) throws {
+		try (self + "\n").appendToURL(fileURL: fileURL)
+	}
+	
+	func appendToURL(fileURL: URL) throws {
+		let data = self.data(using: String.Encoding.utf8)!
+		try data.append(fileURL: fileURL)
+	}
+}
+
+extension Data {
+	func append(fileURL: URL) throws {
+		if let fileHandle = FileHandle(forWritingAtPath: fileURL.path) {
+			defer {
+				fileHandle.closeFile()
+			}
+			fileHandle.seekToEndOfFile()
+			fileHandle.write(self)
+		}
+		else {
+			try write(to: fileURL, options: .atomic)
+		}
+	}
 }
