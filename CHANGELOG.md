@@ -1,8 +1,12 @@
+## 0.1.5
+
+Updated Android plugin structure
+Fixed iOS compilation error, with latest Dart
+
 ## 0.1.4
 
 Updated Gradle version
 Merge PR #8
-
 
 ## 0.1.3
 

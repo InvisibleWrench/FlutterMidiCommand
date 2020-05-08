@@ -1,4 +1,4 @@
 #import <Flutter/Flutter.h>
 
-@interface FlutterMidiCommandPlugin : NSObject<FlutterPlugin>
+@interface FluttermidicommandPlugin : NSObject<FlutterPlugin>
 @end

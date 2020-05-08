@@ -1,57 +1,44 @@
 package com.invisiblewrench.fluttermidicommand
 
-import android.app.Activity
-import android.bluetooth.BluetoothAdapter
-import android.content.Context
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.PluginRegistry.Registrar
-import android.content.Context.MIDI_SERVICE
-import android.media.midi.*
-import android.os.Handler
-import android.util.Log
 import io.flutter.plugin.common.EventChannel
-import io.flutter.plugin.common.FlutterException
-import java.util.*
+
+import android.app.Activity
+import android.os.Handler
+import android.media.midi.*
+import android.content.Context.MIDI_SERVICE
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.*
-import android.content.Context.BLUETOOTH_SERVICE
 import android.content.pm.PackageManager
 import android.os.ParcelUuid
 import android.Manifest
-import android.app.Activity.RESULT_CANCELED
 import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import io.flutter.plugin.common.BinaryMessenger
+
+import android.util.Log
 
 
-class FlutterMidiCommandPlugin: MethodCallHandler {
-  companion object {
-    @JvmStatic
-    fun registerWith(registrar: Registrar): Unit {
+/** FlutterMidiCommandPlugin */
+public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
-      val channel = MethodChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command")
-      var instance = FlutterMidiCommandPlugin()
-      channel.setMethodCallHandler(instance)
-      instance.setup(registrar)
+  lateinit var context: Context
+  private var activity:Activity? = null
+  lateinit var  messenger:BinaryMessenger
 
-      registrar.addViewDestroyListener {
-        Log.d("FlutterMIDICommand", "view destroy")
-        instance.teardown()
-        return@addViewDestroyListener true
-      }
-
-    }
-  }
-
-  lateinit var context:Context
-  lateinit var activity:Activity
-
-  lateinit var midiManager:MidiManager
-  lateinit var handler: Handler
+  private lateinit var midiManager:MidiManager
+  private lateinit var handler: Handler
 
   private var connectedDevices = mutableMapOf<String, ConnectedDevice>()
 
@@ -68,20 +55,78 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
 
   lateinit var blManager:BluetoothManager
 
-  fun setup(registrar: Registrar) {
-    context = registrar.activeContext()
-    activity = registrar.activity()
+  override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+    messenger = flutterPluginBinding.binaryMessenger
+    context = flutterPluginBinding.applicationContext
+  }
+
+  override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    print("detached from engine")
+  }
+
+  override fun onAttachedToActivity(p0: ActivityPluginBinding) {
+    print("onAttachedToActivity")
+    // TODO: your plugin is now attached to an Activity
+    activity = p0?.activity
+    setup()
+  }
+
+  override fun onDetachedFromActivityForConfigChanges() {
+    print("onDetachedFromActivityForConfigChanges")
+    // TODO: the Activity your plugin was attached to was
+// destroyed to change configuration.
+// This call will be followed by onReattachedToActivityForConfigChanges().
+  }
+
+  override fun onReattachedToActivityForConfigChanges(p0: ActivityPluginBinding) {
+    // TODO: your plugin is now attached to a new Activity
+
+// after a configuration change.
+    print("onReattachedToActivityForConfigChanges")
+  }
+
+  override fun onDetachedFromActivity() { // TODO: your plugin is no longer associated with an Activity.
+// Clean up references.
+    print("onDetachedFromActivity")
+    activity = null
+  }
+
+
+  // This static function is optional and equivalent to onAttachedToEngine. It supports the old
+  // pre-Flutter-1.12 Android projects. You are encouraged to continue supporting
+  // plugin registration via this function while apps migrate to use the new Android APIs
+  // post-flutter-1.12 via https://flutter.dev/go/android-project-migration.
+  //
+  // It is encouraged to share logic between onAttachedToEngine and registerWith to keep
+  // them functionally equivalent. Only one of onAttachedToEngine or registerWith will be called
+  // depending on the user's project. onAttachedToEngine or registerWith must both be defined
+  // in the same class.
+  companion object {
+    @JvmStatic
+    fun registerWith(registrar: Registrar) {
+//      val channel = MethodChannel(registrar.messenger(), "fluttermidicommand")
+      var instance = FlutterMidiCommandPlugin()
+      instance.messenger = registrar.messenger()
+      instance.context = registrar.activeContext()
+    }
+  }
+
+
+  fun setup() {
+    print("setup")
+    val channel = MethodChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command")
+    channel.setMethodCallHandler(this)
 
     handler = Handler(context.mainLooper)
     midiManager = context.getSystemService(Context.MIDI_SERVICE) as MidiManager
     midiManager.registerDeviceCallback(deviceConnectionCallback, handler)
 
     rxStreamHandler = FlutterStreamHandler(handler)
-    rxChannel = EventChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command/rx_channel")
+    rxChannel = EventChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command/rx_channel")
     rxChannel.setStreamHandler( rxStreamHandler )
 
     setupStreamHandler = FlutterStreamHandler(handler)
-    setupChannel = EventChannel(registrar.messenger(), "plugins.invisiblewrench.com/flutter_midi_command/setup_channel")
+    setupChannel = EventChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command/setup_channel")
     setupChannel.setStreamHandler( setupStreamHandler )
   }
 
@@ -136,11 +181,14 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
     if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
-      if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)) {
-        Log.d("FlutterMIDICommand", "Show rationale for Location")
-        return "showRationaleForPermission"
-      } else {
-        activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_COARSE_LOCATION), PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION)
+      if (activity != null) {
+        var activity = activity!!
+        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+          Log.d("FlutterMIDICommand", "Show rationale for Location")
+          return "showRationaleForPermission"
+        } else {
+          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_COARSE_LOCATION), PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION)
+        }
       }
     } else {
       Log.d("FlutterMIDICommand", "Already permitted")
@@ -167,29 +215,29 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
   }
 
   private val broadcastReceiver = object : BroadcastReceiver() {
-      override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action
+    override fun onReceive(context: Context, intent: Intent) {
+      val action = intent.action
 
-        if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
-          val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+      if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+        val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
 
-          when (state) {
-            BluetoothAdapter.STATE_OFF -> {
-              Log.d("FlutterMIDICommand", "BT is now off")
-              bluetoothScanner = null
-            }
+        when (state) {
+          BluetoothAdapter.STATE_OFF -> {
+            Log.d("FlutterMIDICommand", "BT is now off")
+            bluetoothScanner = null
+          }
 
-            BluetoothAdapter.STATE_TURNING_OFF -> {
-              Log.d("FlutterMIDICommand", "BT is now turning off")
-            }
+          BluetoothAdapter.STATE_TURNING_OFF -> {
+            Log.d("FlutterMIDICommand", "BT is now turning off")
+          }
 
-            BluetoothAdapter.STATE_ON -> {
-              Log.d("FlutterMIDICommand", "BT is now on")
-            }
+          BluetoothAdapter.STATE_ON -> {
+            Log.d("FlutterMIDICommand", "BT is now on")
           }
         }
       }
     }
+  }
 
 
   private fun startScanningLeDevices() : String? {
@@ -259,12 +307,12 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
       }
     }
 
-      override fun onScanFailed(errorCode: Int) {
-        super.onScanFailed(errorCode)
-        Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
-        setupStreamHandler.send("BLE Scan failed $errorCode")
-      }
+    override fun onScanFailed(errorCode: Int) {
+      super.onScanFailed(errorCode)
+      Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
+      setupStreamHandler.send("BLE Scan failed $errorCode")
     }
+  }
 
 
   fun teardown() {
@@ -466,5 +514,3 @@ class FlutterMidiCommandPlugin: MethodCallHandler {
 
   }
 }
-
-
