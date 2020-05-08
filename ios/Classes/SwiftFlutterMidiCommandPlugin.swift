@@ -211,8 +211,71 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //            print("BLE")
             if (device.peripheral != nil && device.characteristic != nil) {
                 var bytes = [UInt8](data.data)
-                if bytes.first == 0xF0 && bytes.last == 0xF7 {
-                    bytes.insert(0x80, at: bytes.count-1) // Insert timestamp low in front of Sysex End-byte
+                let packetSize = 20
+                
+                if bytes.first == 0xF0 && bytes.last == 0xF7 { //  this is a sysex message, handle carefully
+                    if bytes.count > 17 { // Split into multiple messages of 20 bytes total
+                        var dataBytes = data.data
+                        
+                        // First packet
+                        var packet = dataBytes.subdata(in: 0..<packetSize-2)
+                        
+                        print("count \(dataBytes.count)")
+                        
+                        // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
+                        packet.insert(0x80, at: 0)
+                        packet.insert(0x80, at: 0)
+                        
+//                        print("packet \(packet)")
+                        print("packet \(hexEncodedString(packet))")
+                        
+                        device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+                        
+                        
+                        dataBytes = dataBytes.advanced(by: packetSize-2)
+                        
+                        // More packets
+                        while dataBytes.count > 0 {
+                            
+                            print("count \(dataBytes.count)")
+                            
+                            let pickCount = min(dataBytes.count, packetSize-1)
+//                            print("pickCount \(pickCount)")
+                            packet = dataBytes.subdata(in: 0..<pickCount) // Pick bytes for packet
+                            
+                            // Insert header
+                            packet.insert(0x80, at: 0)
+                            
+                            if (packet.count < packetSize) { // Last packet
+                                // Timestamp before Sysex End byte
+                                print("insert end")
+                                packet.insert(0x80, at: packet.count-1)
+                            }
+                            
+                            print("packet \(hexEncodedString(packet))")
+                            
+
+                            device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+                            
+                            if (dataBytes.count > packetSize-2) {
+                                dataBytes = dataBytes.advanced(by: pickCount) // Advance buffer
+                            }
+                            else {
+                                print("done")
+                                return
+                            }
+                        }
+                    } else {
+                        // Insert timestamp low in front of Sysex End-byte
+                        bytes.insert(0x80, at: bytes.count-1)
+                        
+                        // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
+                        bytes.insert(0x80, at: 0)
+                        bytes.insert(0x80, at: 0)
+                        
+                        device.peripheral?.writeValue(Data(bytes), for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+                    }
+                    return
                 }
                 
                 // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
@@ -224,23 +287,33 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("No peripheral/characteristic in device")
             }
         } else {
-//            print("MIDI")
+            print("MIDI")
             let dest = MIDIGetDestination(Int(device.id) ?? 0)
             if (dest != 0) {
                 let bytes = [UInt8](data.data)
                 let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
                 var packet = MIDIPacketListInit(packetList);
                 let time = mach_absolute_time()
-                packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes);
-                
+                packet = MIDIPacketListAdd(packetList, bytes.count, packet, time, bytes.count, bytes);
+
                 MIDISend(outputPort, dest, packetList);
-                
+
                 packetList.deallocate()
             } else {
                 print("No MIDI destination for id \(device.id)")
             }
         }
     }
+    
+        public func hexEncodedString(_ data:Data) -> String {
+           let hexAlphabet = "0123456789abcdef".unicodeScalars.map { $0 }
+            
+            return String(data.reduce(into: "".unicodeScalars, { (result, value) in
+                result.append(hexAlphabet[Int(value/16)])
+                result.append(hexAlphabet[Int(value%16)])
+            }))
+        }
+    
 
     func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
         var param: Unmanaged<CFString>?
