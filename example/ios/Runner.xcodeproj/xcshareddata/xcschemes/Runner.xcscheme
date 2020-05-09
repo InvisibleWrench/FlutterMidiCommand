@@ -40,6 +40,18 @@
       </MacroExpansion>
       <AdditionalOptions>
       </AdditionalOptions>
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5AD9469624661FBF00A98477"
+               BuildableName = "fluttermidicommand_bleParsingTests.xctest"
+               BlueprintName = "fluttermidicommand_bleParsingTests"
+               ReferencedContainer = "container:Runner.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

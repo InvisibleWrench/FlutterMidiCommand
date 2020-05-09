@@ -33,6 +33,32 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //    var connectedPeripheral:CBPeripheral?
 //    var connectedCharacteristic:CBCharacteristic?
     var discoveredDevices:Set<CBPeripheral> = []
+    
+    // BLE MIDI parsing
+    enum BLE_HANDLER_STATE
+    {
+        case HEADER
+        case TIMESTAMP
+        case STATUS
+        case STATUS_RUNNING
+        case PARAMS
+        case SYSTEM_RT
+        case SYSEX
+        case SYSEX_END
+        case SYSEX_INT
+    }
+
+    var bleHandlerState = BLE_HANDLER_STATE.HEADER
+
+//    var sysExBufferPos:UInt16
+    var sysExBuffer: [UInt8] = []
+    var timestamp: UInt16 = 0
+//    uint8_t tsHigh;
+//    uint8_t tsLow;
+    var bleMidiBuffer:[UInt8] = []
+//    var bleMidiBufferPos:Int
+    var bleMidiPacketLength:UInt8 = 0
+    var bleSysExHasFinished = true
 
     // General
 //    var endPointType:String?
@@ -623,52 +649,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-	
-	//some debug functions
-	/*
-	
-	func getDocumentsDirectory() -> URL {
-		let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-		return paths[0]
-	}
-	func dumpMidiPacket(_ d:Data){
-		let filename = getDocumentsDirectory().appendingPathComponent("midi_log.txt")
-		let str = d.map { String(format: "%d\n", $0) }.joined()
-		do {
-			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-			
-		} catch {
-			print("nope")
-			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
-		}
-	}
-	
-	func dumpBadMidiPacket(_ d:Data){
-		let filename = getDocumentsDirectory().appendingPathComponent("bad_midi_log.txt")
-		let str = d.map { String(format: "%d\n", $0) }.joined()
-		do {
-			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-			
-		} catch {
-			print("nope")
-			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
-		}
-	}
-	
-	func dumpSentMidiPacket(_ d:Data){
-		let filename = getDocumentsDirectory().appendingPathComponent("sent_midi_log.txt")
-		let str = d.map { String(format: "%d\n", $0) }.joined()
-		do {
-			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-			
-		} catch {
-			print("nope")
-			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
-		}
-	}*/
-	
-	
-	
+
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
 		func sendMidiMsg(message:Data){
@@ -860,6 +841,330 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 			}//if value.count >= 2
         } // let value = characteristic.value
     }
+    
+    public func parseBLEPacket(_ packet:Data) -> Void {
+        print("parse \(packet)")
+        
+        if (packet.count > 1)
+          {
+            // parse BLE message
+            bleHandlerState = BLE_HANDLER_STATE.HEADER
+
+            let header = packet[0]
+            var statusByte:UInt8 = 0
+
+            print ("bleHeader \(header)")
+
+//            for (size_t i = 1; i < length; i++)
+                for i in 1...packet.count-1 {
+                    print("index \(i)")
+                let midiByte:UInt8 = packet[i]
+//              print ("bleHandlerState \(bleHandlerState) byte \(midiByte)")
+
+              // State handling
+              switch (bleHandlerState)
+              {
+              case BLE_HANDLER_STATE.HEADER:
+                if (!bleSysExHasFinished)
+                {
+                  if ((midiByte & 0x80) == 0x80)
+                  { // System messages can interrupt ongoing sysex
+                    // bleHandlerState = BLE_TIMESTAMP;
+                    bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                  }
+                  else
+                  {
+                    // Sysex continue
+                    bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                  }
+                }
+                else
+                {
+                  bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                }
+                break
+
+              case BLE_HANDLER_STATE.TIMESTAMP:
+                if ((midiByte & 0xFF) == 0xF0)
+                { // Sysex start
+                  bleSysExHasFinished = false
+                    sysExBuffer.removeAll()
+                  bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                }
+                else if ((midiByte & 0x80) == 0x80)
+                { // Status/System start
+                  bleHandlerState = BLE_HANDLER_STATE.STATUS
+                }
+                else
+                {
+                  bleHandlerState = BLE_HANDLER_STATE.STATUS_RUNNING
+                }
+                break
+
+              case BLE_HANDLER_STATE.STATUS:
+                if ((midiByte & 0x80) == 0x80)
+                { // If theres a timestamp after a status, it must have been a single byte real time message
+                  bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                }
+                else
+                {
+                  bleHandlerState = BLE_HANDLER_STATE.PARAMS
+                }
+                break
+
+              case BLE_HANDLER_STATE.STATUS_RUNNING:
+                bleHandlerState = BLE_HANDLER_STATE.PARAMS
+                break;
+
+              case BLE_HANDLER_STATE.PARAMS: // After params can come TSlow or more params
+                if ((midiByte & 0x80) == 0x80)
+                {
+                  bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                }
+                break
+
+              case BLE_HANDLER_STATE.SYSEX:
+                if ((midiByte & 0x80) == 0x80)
+                { // Sysex end and interrupting RT bytes is preceded with a TSLow
+                  bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                }
+                break
+
+              case BLE_HANDLER_STATE.SYSEX_INT:
+                if ((midiByte & 0xF7) == 0xF7)
+                { // Sysex end
+                  bleSysExHasFinished = true
+                  bleHandlerState = BLE_HANDLER_STATE.SYSEX_END
+                }
+                else
+                {
+                    bleHandlerState = BLE_HANDLER_STATE.SYSTEM_RT
+                }
+                break;
+
+              case BLE_HANDLER_STATE.SYSTEM_RT:
+                if (!bleSysExHasFinished)
+                { // Continue incomplete Sysex
+                  bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                }
+                else
+                {
+                  bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP // Always a timestamp after a realtime message
+                }
+                break
+
+              default:
+                print ("Unhandled state \(bleHandlerState)")
+                break
+              }
+
+                print ("\(bleHandlerState) - \(midiByte)")
+
+              // Data handling
+              switch (bleHandlerState)
+              {
+              case BLE_HANDLER_STATE.TIMESTAMP:
+                print ("set timestamp")
+                let tsHigh = header & 0x3f
+                let tsLow = midiByte & 0x7f
+                timestamp = UInt16(tsHigh << 7) | UInt16(tsLow)
+                print ("timestamp is \(timestamp)")
+                break
+
+              case BLE_HANDLER_STATE.STATUS:
+                print ("set status")
+                statusByte = midiByte
+//                bleMidiBufferPos = 0
+                //                bleMidiBuffer[bleMidiBufferPos] = statusByte
+                bleMidiBuffer.removeAll()
+                bleMidiBuffer.append(statusByte)
+
+                processMessageOfType(statusByte)
+                break
+
+              case BLE_HANDLER_STATE.STATUS_RUNNING:
+                print("set running status")
+//                bleMidiBufferPos = 0
+//                bleMidiBuffer[bleMidiBufferPos] = statusByte
+                bleMidiBuffer.removeAll()
+                               bleMidiBuffer.append(statusByte)
+                processMessageOfType(statusByte)
+                break
+
+              case BLE_HANDLER_STATE.PARAMS:
+                print ("add param \(midiByte)")
+                // Serial.println(midiByte, HEX);
+//                bleMidiBufferPos += 1
+//                bleMidiBuffer[bleMidiBufferPos] = midiByte
+                
+                bleMidiBuffer.append(midiByte)
+                processMessageOfType(statusByte)
+                break
+
+              case BLE_HANDLER_STATE.SYSTEM_RT:
+                print("handle RT")
+//                bleMidiBufferPos = 0
+//                bleMidiBuffer[bleMidiBufferPos] = midiByte
+                bleMidiBuffer.removeAll()
+                bleMidiBuffer.append(midiByte)
+                processMessageOfType(midiByte)
+                break
+
+              case BLE_HANDLER_STATE.SYSEX:
+                print("add sysex")
+                addToSysexBuffer(midiByte)
+                break
+
+              case BLE_HANDLER_STATE.SYSEX_INT:
+                print("add sysex int")
+                addToSysexBuffer(midiByte)
+                break
+
+              case BLE_HANDLER_STATE.SYSEX_END:
+                print("finalize sysex")
+                finalizeSysexBuffer(midiByte)
+                break
+
+              default:
+                print ("Unhandled state (data) \(bleHandlerState)")
+                break
+              }
+            }
+          }
+        }
+
+    func processMessageOfType(_ type:UInt8)
+        {
+          print("Process type \(type) \(bleMidiBuffer)")
+          // Serial.print(F("Buffer pos ")); Serial.println(bleMidiBufferPos);
+            if (bleMidiBuffer.count == 1)
+          {
+            switch (type)
+            {
+            case 0xF6:
+                print (" onTuneRequest")
+                //onTuneRequest();
+              break
+            case 0xF8:
+                print( "clock")
+//              onClock();
+              break
+            case 0xFA:
+                print ("onStart")
+//              onStart();
+              break
+            case 0xFB:
+                print( "onContinue")
+//              onContinue();
+              break
+            case 0xFC:
+                print( "onStop")
+//              onStop();
+              break
+            case 0xFF:
+                print ("onActiveSensing")
+//              onActiveSensing();
+              break
+            case 0xFE:
+                print ("onSystemReset")
+//              onSystemReset();
+              break
+                
+            default:
+                break
+            }
+            
+          }
+          else
+          {
+            let channel:UInt8 = type & 0xF
+            let midiType:UInt8 = type & 0xF0
+
+            // Serial.print(F("Process miditype ")); Serial.println(midiType, HEX);
+
+            if (bleMidiBuffer.count == 2)
+            {
+              if (type == 0xF1)
+              {
+                print ("onTimeCodeQuarterFrame \(bleMidiBuffer[1])")
+//                onTimeCodeQuarterFrame(bleMidiBuffer[1]);
+              }
+              else if (type == 0xF3)
+              {
+                print ("onSongSelect \(bleMidiBuffer[1])")
+//                onSongSelect(bleMidiBuffer[1]);
+              }
+              else if (midiType == 0xC0)
+              {
+                print ("onProgramChange \(bleMidiBuffer[1])")
+//                onProgramChange(channel, bleMidiBuffer[1]);
+              }
+              else if (midiType == 0xD0)
+              {
+                print ("onAfterTouchChannel \(bleMidiBuffer[1])")
+//                onAfterTouchChannel(channel, bleMidiBuffer[1]);
+              }
+            }
+            else if (bleMidiBuffer.count == 3)
+            {
+              if (type == 0xF2)
+              {
+//                onSongPosition(bleMidiBuffer[1] + (bleMidiBuffer[2] << 7));
+                print ("onSongPosition \(bleMidiBuffer[1] + (bleMidiBuffer[2] << 7))")
+              }
+              else if (midiType == 0x80)
+              {
+                print( "onNoteOff \(channel) \(bleMidiBuffer[1]) \(bleMidiBuffer[2])")
+//                onNoteOff(channel, bleMidiBuffer[1], bleMidiBuffer[2]);
+              }
+              else if (midiType == 0x90)
+              {
+                print ("onNoteOn \(channel) \(bleMidiBuffer[1]) \(bleMidiBuffer[2])")
+//                onNoteOn(channel, bleMidiBuffer[1], bleMidiBuffer[2]);
+              }
+              else if (midiType == 0xA0)
+              {
+                print( "onAfterTouchPoly \(channel) \(bleMidiBuffer[1]) \(bleMidiBuffer[2])")
+//                onAfterTouchPoly(channel, bleMidiBuffer[1], bleMidiBuffer[2]);
+              }
+              else if (midiType == 0xB0)
+              {
+                print ("onControlChange \(channel) \(bleMidiBuffer[1]) \(bleMidiBuffer[2])")
+//                onControlChange(channel, bleMidiBuffer[1], bleMidiBuffer[2]);
+              }
+              else if (midiType == 0xE0)
+              {
+                print ("onPitchChange \(channel) \(UInt16(bleMidiBuffer[1]) + UInt16(bleMidiBuffer[2] << 7) - 8192)")
+//                onPitchChange(channel, bleMidiBuffer[1] + (bleMidiBuffer[2] << 7) - 8192);
+              }
+            }
+          }
+        }
+
+    func addToSysexBuffer(_ sysexByte:UInt8)
+    {
+        if (sysExBuffer.count == 128)
+          {
+            onSystemExclusiveChunk(sysExBuffer, false)
+//            sysExBufferPos = 0
+            sysExBuffer.removeAll()
+          }
+        sysExBuffer.append(sysexByte)
+    }
+
+    func finalizeSysexBuffer(_ sysexByte:UInt8)
+    {
+        if (sysExBuffer.count > 0)
+      {
+        sysExBuffer.insert(sysexByte, at: sysExBuffer.count-1)
+        onSystemExclusiveChunk(sysExBuffer, true)
+      }
+    }
+    
+    func onSystemExclusiveChunk(_ bytes:[UInt8], _ final:Bool) {
+        print("Sysex \(bytes) \(bytes.count) \(final)")
+    }
+    
 }
 
 class StreamHandler : NSObject, FlutterStreamHandler {
@@ -896,44 +1201,4 @@ class ConnectedDevice {
         self.id = id
         self.type = type
     }
-}
-
-extension Date {
-	func toMillis() -> Int64! {
-		return Int64(self.timeIntervalSince1970 * 1000)
-	}
-}
-
-extension Int64 {
-	var data: NSData {
-		var int = self
-		return NSData(bytes: &int, length:MemoryLayout.size(ofValue:int))
-		//sizeof(UInt64))
-	}
-}
-
-extension String {
-	func appendLineToURL(fileURL: URL) throws {
-		try (self + "\n").appendToURL(fileURL: fileURL)
-	}
-	
-	func appendToURL(fileURL: URL) throws {
-		let data = self.data(using: String.Encoding.utf8)!
-		try data.append(fileURL: fileURL)
-	}
-}
-
-extension Data {
-	func append(fileURL: URL) throws {
-		if let fileHandle = FileHandle(forWritingAtPath: fileURL.path) {
-			defer {
-				fileHandle.closeFile()
-			}
-			fileHandle.seekToEndOfFile()
-			fileHandle.write(self)
-		}
-		else {
-			try write(to: fileURL, options: .atomic)
-		}
-	}
 }
