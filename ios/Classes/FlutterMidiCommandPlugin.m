@@ -1,4 +1,4 @@
-#import "FluttermidicommandPlugin.h"
+#import "FlutterMidiCommandPlugin.h"
 #if __has_include(<flutter_midi_command/flutter_midi_command-Swift.h>)
 #import <flutter_midi_command/flutter_midi_command-Swift.h>
 #else
@@ -8,7 +8,7 @@
 #import "flutter_midi_command-Swift.h"
 #endif
 
-@implementation FluttermidicommandPlugin
+@implementation FlutterMidiCommandPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   [SwiftFlutterMidiCommandPlugin registerWithRegistrar:registrar];
 }
