@@ -1,6 +1,6 @@
-# example
+# fluttermidicommand_example
 
-A new Flutter project.
+Demonstrates how to use the fluttermidicommand plugin.
 
 ## Getting Started
 

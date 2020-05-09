@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
-import 'package:meta/meta.dart' show visibleForTesting;
+import 'dart:typed_data';
 
 class MidiCommand {
   factory MidiCommand() {
@@ -15,7 +14,6 @@ class MidiCommand {
     return _instance;
   }
 
-  @visibleForTesting
   MidiCommand.private(this._channel, this._rxChannel, this._setupChannel) {
     print("private construct $_rxChannel ${this._rxChannel}");
   }
