@@ -12,10 +12,8 @@ import Foundation
 /// http://www.gneuron.com/?p=96
 /// https://learn.sparkfun.com/tutorials/midi-ble-tutorial/all
 
-
-public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, FlutterPlugin {
-
-    // MIDI
+public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate, CBPeripheralDelegate {
+ // MIDI
     var midiClient = MIDIClientRef()
     var outputPort = MIDIPortRef()
     var inputPort = MIDIPortRef()
@@ -30,12 +28,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     // BLE
     var manager:CBCentralManager!
-//    var connectedPeripheral:CBPeripheral?
-//    var connectedCharacteristic:CBCharacteristic?
     var discoveredDevices:Set<CBPeripheral> = []
-
-    // General
-//    var endPointType:String?
 
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
 
@@ -141,9 +134,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     func connectToDevice(deviceId:String, type:String) {
 //        endPointType = type
         print("connect \(deviceId) \(type)")
-        
+
         let conDev = ConnectedDevice(id: deviceId, type: type)
-        
+
         if type == "BLE" {
             if let periph = discoveredDevices.filter({ (p) -> Bool in
                 p.identifier.uuidString == deviceId
@@ -204,7 +197,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             })
         }
     }
-    
+
     func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
 //        print("send data \(data) to device \(device.id)")
         if (device.type == "BLE") {
@@ -212,51 +205,51 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if (device.peripheral != nil && device.characteristic != nil) {
                 var bytes = [UInt8](data.data)
                 let packetSize = 20
-                
+
                 if bytes.first == 0xF0 && bytes.last == 0xF7 { //  this is a sysex message, handle carefully
                     if bytes.count > 17 { // Split into multiple messages of 20 bytes total
                         var dataBytes = data.data
-                        
+
                         // First packet
                         var packet = dataBytes.subdata(in: 0..<packetSize-2)
-                        
+
                         print("count \(dataBytes.count)")
-                        
+
                         // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
                         packet.insert(0x80, at: 0)
                         packet.insert(0x80, at: 0)
-                        
+
 //                        print("packet \(packet)")
                         print("packet \(hexEncodedString(packet))")
-                        
+
                         device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
-                        
-                        
+
+
                         dataBytes = dataBytes.advanced(by: packetSize-2)
-                        
+
                         // More packets
                         while dataBytes.count > 0 {
-                            
+
                             print("count \(dataBytes.count)")
-                            
+
                             let pickCount = min(dataBytes.count, packetSize-1)
 //                            print("pickCount \(pickCount)")
                             packet = dataBytes.subdata(in: 0..<pickCount) // Pick bytes for packet
-                            
+
                             // Insert header
                             packet.insert(0x80, at: 0)
-                            
+
                             if (packet.count < packetSize) { // Last packet
                                 // Timestamp before Sysex End byte
                                 print("insert end")
                                 packet.insert(0x80, at: packet.count-1)
                             }
-                            
+
                             print("packet \(hexEncodedString(packet))")
-                            
+
 
                             device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
-                            
+
                             if (dataBytes.count > packetSize-2) {
                                 dataBytes = dataBytes.advanced(by: pickCount) // Advance buffer
                             }
@@ -268,20 +261,20 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                     } else {
                         // Insert timestamp low in front of Sysex End-byte
                         bytes.insert(0x80, at: bytes.count-1)
-                        
+
                         // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                         bytes.insert(0x80, at: 0)
                         bytes.insert(0x80, at: 0)
-                        
+
                         device.peripheral?.writeValue(Data(bytes), for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
                     }
                     return
                 }
-                
+
                 // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                 bytes.insert(0x80, at: 0)
                 bytes.insert(0x80, at: 0)
-                
+
                 device.peripheral?.writeValue(Data(bytes), for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
             } else {
                 print("No peripheral/characteristic in device")
@@ -304,16 +297,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-    
+
         public func hexEncodedString(_ data:Data) -> String {
            let hexAlphabet = "0123456789abcdef".unicodeScalars.map { $0 }
-            
+
             return String(data.reduce(into: "".unicodeScalars, { (result, value) in
                 result.append(hexAlphabet[Int(value/16)])
                 result.append(hexAlphabet[Int(value%16)])
             }))
         }
-    
+
 
     func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
         var param: Unmanaged<CFString>?
@@ -592,7 +585,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
-        
+
 //        connectedPeripheral = nil
 //        connectedCharacteristic = nil
         setupStreamHandler.send(data: "deviceDisconnected")
@@ -623,10 +616,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-	
+
 	//some debug functions
 	/*
-	
+
 	func getDocumentsDirectory() -> URL {
 		let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
 		return paths[0]
@@ -636,56 +629,56 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 		let str = d.map { String(format: "%d\n", $0) }.joined()
 		do {
 			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-			
+
 		} catch {
 			print("nope")
 			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
 		}
 	}
-	
+
 	func dumpBadMidiPacket(_ d:Data){
 		let filename = getDocumentsDirectory().appendingPathComponent("bad_midi_log.txt")
 		let str = d.map { String(format: "%d\n", $0) }.joined()
 		do {
 			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-			
+
 		} catch {
 			print("nope")
 			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
 		}
 	}
-	
+
 	func dumpSentMidiPacket(_ d:Data){
 		let filename = getDocumentsDirectory().appendingPathComponent("sent_midi_log.txt")
 		let str = d.map { String(format: "%d\n", $0) }.joined()
 		do {
 			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-			
+
 		} catch {
 			print("nope")
 			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
 		}
 	}*/
-	
-	
-	
+
+
+
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
 		func sendMidiMsg(message:Data){
 			//dumpSentMidiPacket(message)
 			rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
 		}
-		
+
 		/**
 		Searches for sys.ex end command without timestamp
-		
+
 		In case the packet starts as sys.ex additional message,
 		it will have:
 		 - header,
 		 - data
 		 - sys.ex end (0b11110111)
 		- THEN it will have timestamp low and then a normal packet continues
-		
+
 		*/
 		func findSysExEndIdx(packet:Data) -> Int? {
 			for i in 0...packet.count-1{
@@ -698,10 +691,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
 		/**
 		 Searches for sys.ex end command with timestamp
-		
+
 		 In case we got timestamp low (as 2nd byte), this
 		 timestamp will preceed sys.ex en cmd
-		
+
 	    */
 		func findSysExEndIdx(packet:Data, tsLow:UInt8) -> Int? {
 			for i in 0...packet.count-2{
@@ -712,7 +705,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 			}
 			return nil
 		}
-		
+
         if let value = characteristic.value {
 			/*
 			dumpMidiPacket(value)
@@ -726,7 +719,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 				var tsLow : UInt8?;
 				var runningMidiStatus : UInt8?
 				var remainingPacket : Data?
-				
+
 				/**
 				Handles sysex end message sending, which is used in 2 cases below,
 				hence the helper function
@@ -749,7 +742,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 						remainingPacket = nil
 					}
 				}
-				
+
 				remainingPacket = value
 				while remainingPacket != nil && remainingPacket!.count >= 2{
 					//print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
@@ -778,9 +771,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 						//however, after sys.ex end message, apparently
 						//there can be a timestamp and normal massages (got such packets from my controller)
 						//print("handling sys.ex additional msg")
-						
+
 						runningMidiStatus = nil
-						
+
 						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!)
 
 						if sysexEnd == nil{
@@ -799,7 +792,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 						runningMidiStatus = nil
 
 						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!, tsLow: tsLow!)
-						
+
 						if sysexEnd == nil{
 							//no sysexend message, return complete remaining packet
 							sendMidiMsg(message: remainingPacket!.advanced(by: 1))
@@ -891,7 +884,7 @@ class ConnectedDevice {
     var endPoint:MIDIEndpointRef = 0
     var peripheral:CBPeripheral?
     var characteristic:CBCharacteristic?
-    
+
     init(id:String, type:String) {
         self.id = id
         self.type = type
@@ -916,7 +909,7 @@ extension String {
 	func appendLineToURL(fileURL: URL) throws {
 		try (self + "\n").appendToURL(fileURL: fileURL)
 	}
-	
+
 	func appendToURL(fileURL: URL) throws {
 		let data = self.data(using: String.Encoding.utf8)!
 		try data.append(fileURL: fileURL)
