@@ -27,6 +27,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var rxStreamHandler = StreamHandler()
     var midiSetupChannel:FlutterEventChannel?
     var setupStreamHandler = StreamHandler()
+    
+    var session:MIDINetworkSession?
 
     // BLE
     var manager:CBCentralManager!
@@ -95,9 +97,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             self.handlePacketList(packetList)
         }
 
-        let session = MIDINetworkSession.default()
-        session.isEnabled = true
-        session.connectionPolicy = MIDINetworkConnectionPolicy.anyone
+        session = MIDINetworkSession.default()
+        session?.isEnabled = true
+        session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
 
         NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationSessionDidChange), object: nil)
 //        NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkContactsChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationContactsDidChange), object: nil)
@@ -154,9 +156,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
             }
             break
+        case "teardown":
+            teardown()
+            break
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+    
+    func teardown() {
+        for device in connectedDevices {
+            disconnectDevice(deviceId: device.value.id)
+        }
+        session?.isEnabled = false
     }
 
 
@@ -647,7 +659,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
     
     func createMessageEvent(_ bytes:[UInt8]) {
-        print("send rx event \(bytes)")
+//        print("send rx event \(bytes)")
         let data = Data(bytes: bytes, count: Int(bytes.count))
         rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
     }
@@ -768,13 +780,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 let tsHigh = header & 0x3f
                 let tsLow = midiByte & 0x7f
                 timestamp = UInt16(tsHigh << 7) | UInt16(tsLow)
-                print ("timestamp is \(timestamp)")
+//                print ("timestamp is \(timestamp)")
                 break
 
               case BLE_HANDLER_STATE.STATUS:
 
                 bleMidiPacketLength = lengthOfMessageType(midiByte)
-                print("message length \(bleMidiPacketLength)")
+//                print("message length \(bleMidiPacketLength)")
                 bleMidiBuffer.removeAll()
                 bleMidiBuffer.append(midiByte)
                 
