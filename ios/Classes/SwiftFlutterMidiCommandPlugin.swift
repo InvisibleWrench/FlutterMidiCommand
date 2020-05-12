@@ -12,8 +12,10 @@ import Foundation
 /// http://www.gneuron.com/?p=96
 /// https://learn.sparkfun.com/tutorials/midi-ble-tutorial/all
 
-public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate, CBPeripheralDelegate {
- // MIDI
+
+public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, FlutterPlugin {
+
+    // MIDI
     var midiClient = MIDIClientRef()
     var outputPort = MIDIPortRef()
     var inputPort = MIDIPortRef()
@@ -29,6 +31,33 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
     // BLE
     var manager:CBCentralManager!
     var discoveredDevices:Set<CBPeripheral> = []
+    
+    // BLE MIDI parsing
+    enum BLE_HANDLER_STATE
+    {
+        case HEADER
+        case TIMESTAMP
+        case STATUS
+        case STATUS_RUNNING
+        case PARAMS
+        case SYSTEM_RT
+        case SYSEX
+        case SYSEX_END
+        case SYSEX_INT
+    }
+
+    var bleHandlerState = BLE_HANDLER_STATE.HEADER
+
+    var sysExBuffer: [UInt8] = []
+    var timestamp: UInt16 = 0
+//    uint8_t tsHigh;
+//    uint8_t tsLow;
+    var bleMidiBuffer:[UInt8] = []
+    var bleMidiPacketLength:UInt8 = 0
+    var bleSysExHasFinished = true
+
+    // General
+//    var endPointType:String?
 
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
 
@@ -134,9 +163,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
     func connectToDevice(deviceId:String, type:String) {
 //        endPointType = type
         print("connect \(deviceId) \(type)")
-
+        
         let conDev = ConnectedDevice(id: deviceId, type: type)
-
+        
         if type == "BLE" {
             if let periph = discoveredDevices.filter({ (p) -> Bool in
                 p.identifier.uuidString == deviceId
@@ -197,7 +226,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
             })
         }
     }
-
+    
     func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
 //        print("send data \(data) to device \(device.id)")
         if (device.type == "BLE") {
@@ -205,51 +234,51 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
             if (device.peripheral != nil && device.characteristic != nil) {
                 var bytes = [UInt8](data.data)
                 let packetSize = 20
-
+                
                 if bytes.first == 0xF0 && bytes.last == 0xF7 { //  this is a sysex message, handle carefully
                     if bytes.count > 17 { // Split into multiple messages of 20 bytes total
                         var dataBytes = data.data
-
+                        
                         // First packet
                         var packet = dataBytes.subdata(in: 0..<packetSize-2)
-
+                        
                         print("count \(dataBytes.count)")
-
+                        
                         // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
                         packet.insert(0x80, at: 0)
                         packet.insert(0x80, at: 0)
-
+                        
 //                        print("packet \(packet)")
                         print("packet \(hexEncodedString(packet))")
-
+                        
                         device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
-
-
+                        
+                        
                         dataBytes = dataBytes.advanced(by: packetSize-2)
-
+                        
                         // More packets
                         while dataBytes.count > 0 {
-
+                            
                             print("count \(dataBytes.count)")
-
+                            
                             let pickCount = min(dataBytes.count, packetSize-1)
 //                            print("pickCount \(pickCount)")
                             packet = dataBytes.subdata(in: 0..<pickCount) // Pick bytes for packet
-
+                            
                             // Insert header
                             packet.insert(0x80, at: 0)
-
+                            
                             if (packet.count < packetSize) { // Last packet
                                 // Timestamp before Sysex End byte
                                 print("insert end")
                                 packet.insert(0x80, at: packet.count-1)
                             }
-
+                            
                             print("packet \(hexEncodedString(packet))")
-
+                            
 
                             device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
-
+                            
                             if (dataBytes.count > packetSize-2) {
                                 dataBytes = dataBytes.advanced(by: pickCount) // Advance buffer
                             }
@@ -261,20 +290,20 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
                     } else {
                         // Insert timestamp low in front of Sysex End-byte
                         bytes.insert(0x80, at: bytes.count-1)
-
+                        
                         // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                         bytes.insert(0x80, at: 0)
                         bytes.insert(0x80, at: 0)
-
+                        
                         device.peripheral?.writeValue(Data(bytes), for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
                     }
                     return
                 }
-
+                
                 // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                 bytes.insert(0x80, at: 0)
                 bytes.insert(0x80, at: 0)
-
+                
                 device.peripheral?.writeValue(Data(bytes), for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
             } else {
                 print("No peripheral/characteristic in device")
@@ -297,16 +326,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
             }
         }
     }
-
+    
         public func hexEncodedString(_ data:Data) -> String {
            let hexAlphabet = "0123456789abcdef".unicodeScalars.map { $0 }
-
+            
             return String(data.reduce(into: "".unicodeScalars, { (result, value) in
                 result.append(hexAlphabet[Int(value/16)])
                 result.append(hexAlphabet[Int(value%16)])
             }))
         }
-
+    
 
     func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
         var param: Unmanaged<CFString>?
@@ -585,7 +614,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
-
+        
 //        connectedPeripheral = nil
 //        connectedCharacteristic = nil
         setupStreamHandler.send(data: "deviceDisconnected")
@@ -616,242 +645,218 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, CBCentralMa
             }
         }
     }
-
-	//some debug functions
-	/*
-
-	func getDocumentsDirectory() -> URL {
-		let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-		return paths[0]
-	}
-	func dumpMidiPacket(_ d:Data){
-		let filename = getDocumentsDirectory().appendingPathComponent("midi_log.txt")
-		let str = d.map { String(format: "%d\n", $0) }.joined()
-		do {
-			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-
-		} catch {
-			print("nope")
-			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
-		}
-	}
-
-	func dumpBadMidiPacket(_ d:Data){
-		let filename = getDocumentsDirectory().appendingPathComponent("bad_midi_log.txt")
-		let str = d.map { String(format: "%d\n", $0) }.joined()
-		do {
-			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-
-		} catch {
-			print("nope")
-			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
-		}
-	}
-
-	func dumpSentMidiPacket(_ d:Data){
-		let filename = getDocumentsDirectory().appendingPathComponent("sent_midi_log.txt")
-		let str = d.map { String(format: "%d\n", $0) }.joined()
-		do {
-			try (str + "\n").appendToURL(fileURL: filename) //write(to: filename, atomically: true, encoding: String.Encoding.utf8)
-
-		} catch {
-			print("nope")
-			// failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
-		}
-	}*/
-
-
+    
+    func createMessageEvent(_ bytes:[UInt8]) {
+        print("send rx event \(bytes)")
+        let data = Data(bytes: bytes, count: Int(bytes.count))
+        rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
+    }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
-		func sendMidiMsg(message:Data){
-			//dumpSentMidiPacket(message)
-			rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
-		}
-
-		/**
-		Searches for sys.ex end command without timestamp
-
-		In case the packet starts as sys.ex additional message,
-		it will have:
-		 - header,
-		 - data
-		 - sys.ex end (0b11110111)
-		- THEN it will have timestamp low and then a normal packet continues
-
-		*/
-		func findSysExEndIdx(packet:Data) -> Int? {
-			for i in 0...packet.count-1{
-				if (packet[i] & 0b11110111) == 0b11110111{
-					return i
-				}
-			}
-			return nil
-		}
-
-		/**
-		 Searches for sys.ex end command with timestamp
-
-		 In case we got timestamp low (as 2nd byte), this
-		 timestamp will preceed sys.ex en cmd
-
-	    */
-		func findSysExEndIdx(packet:Data, tsLow:UInt8) -> Int? {
-			for i in 0...packet.count-2{
-				if packet[i] == tsLow &&
-				   (packet[i+1] & 0b11110111) == 0b11110111{
-						return i+1
-				}
-			}
-			return nil
-		}
-
         if let value = characteristic.value {
-			/*
-			dumpMidiPacket(value)
-			print("\n\n")
-			print("-------------------------------------------")
-			print(value.map { String(format: "%d, ", $0) }.joined())
-			*/
-			//see specs here http://www.hangar42.nl/wp-content/uploads/2017/10/BLE-MIDI-spec.pdf
-			if value.count >= 2 { // We might have a valid packet
-				var header : UInt8?;
-				var tsLow : UInt8?;
-				var runningMidiStatus : UInt8?
-				var remainingPacket : Data?
+            parseBLEPacket(value)
+        }
+    }
+    
+    public func parseBLEPacket(_ packet:Data) -> Void {
+//        print("parse \(packet)")
+        
+        if (packet.count > 1)
+          {
+            // parse BLE message
+            bleHandlerState = BLE_HANDLER_STATE.HEADER
 
-				/**
-				Handles sysex end message sending, which is used in 2 cases below,
-				hence the helper function
-				*/
-				func handleSysexEnd(from:Int, sysexEnd:Int){
-					//send midi message starting at from to sysexEnd+1
-					sendMidiMsg(message: remainingPacket!.subdata(in: from..<sysexEnd+1))
-					if remainingPacket!.count>sysexEnd+1{
-						remainingPacket = remainingPacket!.advanced(by: sysexEnd+1)
-						//after sysExEnd we expect tsLow
-						//but if packet starts with additional msg data, ts is first
-						//presented here
-						//if tsLow == nil, ts will be processed on next while, so
-						//we assign there for consistency
-						if tsLow != nil && remainingPacket![0] != tsLow{
-							tsLow = remainingPacket![0]
-						}
-					} else {
-						//this should mean sysexEnd was the last byte
-						remainingPacket = nil
-					}
-				}
+            let header = packet[0]
+            var statusByte:UInt8 = 0
 
-				remainingPacket = value
-				while remainingPacket != nil && remainingPacket!.count >= 2{
-					//print(remainingPacket!.map { String(format: "%d, ", $0) }.joined())
-					switch (remainingPacket![0], remainingPacket![1]){
-					case let (b0,_) where header == nil
-									   && (b0 & 0b10000000) == 0b10000000 :
-						//packet header
-						//print("handling packet header")
-						header = b0
-						remainingPacket = remainingPacket?.advanced(by: 1)
-						runningMidiStatus = nil
-						break;
-					case let (b0,_) where tsLow == nil
-									   && (b0 & 0b10000000) == 0b10000000 :
-						//packet timestamp
-						//print("handling packet timestamp")
-						tsLow  = b0
-						//note, here we don't advance packet so that we can compare
-						//against this ts even on the first message, simplifying algo
-						runningMidiStatus = nil
-						break;
-					case let (b0,_) where header != nil
-						               && tsLow  == nil
-									   && (b0 & 0b10000000) == 0:
-						//sys.ex additional msg, starts with header but no timestamplow
-						//however, after sys.ex end message, apparently
-						//there can be a timestamp and normal massages (got such packets from my controller)
-						//print("handling sys.ex additional msg")
+            for i in 1...packet.count-1 {
+                let midiByte:UInt8 = packet[i]
+//              print ("bleHandlerState \(bleHandlerState) byte \(midiByte)")
+                
+                if ((midiByte & 0x80) == 0x80 && bleHandlerState != BLE_HANDLER_STATE.TIMESTAMP && bleHandlerState != BLE_HANDLER_STATE.SYSEX_INT) {
+                    if (!bleSysExHasFinished) {
+                        bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                    } else {
+                        bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                    }
+                } else {
 
-						runningMidiStatus = nil
+                  // State handling
+                  switch (bleHandlerState)
+                  {
+                  case BLE_HANDLER_STATE.HEADER:
+                    if (!bleSysExHasFinished)
+                    {
+                      if ((midiByte & 0x80) == 0x80)
+                      { // System messages can interrupt ongoing sysex
+                        bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                      }
+                      else
+                      {
+                        // Sysex continue
+                        print("sysex continue")
+                        bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                      }
+                    }
+                    break
 
-						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!)
+                  case BLE_HANDLER_STATE.TIMESTAMP:
+                    if ((midiByte & 0xFF) == 0xF0)
+                    { // Sysex start
+                      bleSysExHasFinished = false
+                        sysExBuffer.removeAll()
+                      bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                    }
+                    else if ((midiByte & 0x80) == 0x80)
+                    { // Status/System start
+                      bleHandlerState = BLE_HANDLER_STATE.STATUS
+                    }
+                    else
+                    {
+                      bleHandlerState = BLE_HANDLER_STATE.STATUS_RUNNING
+                    }
+                    break
 
-						if sysexEnd == nil{
-							//here we send ALL remaining packet, because we already are at b0
-							sendMidiMsg(message: remainingPacket!)
-							remainingPacket = nil
-						} else {
-							//we send sys.ex end along with additional msg
-							handleSysexEnd(from:0,sysexEnd:sysexEnd!)
-						}
-						break;
-					case let (b0,b1) where b0 == tsLow
-									    && (b1 & 0b11110000) == 0b11110000:
-						//sys.ex message
-						//print("handling sys.ex message")
-						runningMidiStatus = nil
+                  case BLE_HANDLER_STATE.STATUS:
+                      bleHandlerState = BLE_HANDLER_STATE.PARAMS
+                    break
 
-						let sysexEnd : Int? = findSysExEndIdx(packet: remainingPacket!, tsLow: tsLow!)
+                  case BLE_HANDLER_STATE.STATUS_RUNNING:
+                    bleHandlerState = BLE_HANDLER_STATE.PARAMS
+                    break;
 
-						if sysexEnd == nil{
-							//no sysexend message, return complete remaining packet
-							sendMidiMsg(message: remainingPacket!.advanced(by: 1))
-							remainingPacket = nil
-						} else {
-							//note here we skip timestamp byte
-							handleSysexEnd(from:1,sysexEnd:sysexEnd!)
-						}
-						break;
-					case let (b0,b1) where b0 == tsLow
-										&& (b1 & 0b10000000) == 0b10000000:
-						//midi message
-						//print("handling midi message")
-						runningMidiStatus = b1
-						sendMidiMsg(message: remainingPacket!.subdata(in: 1..<4))
-						if remainingPacket!.count>4{
-							remainingPacket = remainingPacket?.advanced(by: 4)
-						} else {
-							remainingPacket = nil
-						}
-						break;
-					case let (b0,b1) where runningMidiStatus != nil
-										&& (b0 & 0b10000000) == 0
-									    && (b1 & 0b10000000) == 0:
-						//running status midi
-						//print("handling running status midi message")
-						var message = Data(bytes:&runningMidiStatus!, count:MemoryLayout<UInt8>.size)
-						message.append(remainingPacket!.subdata(in: 0..<2))
-						sendMidiMsg(message: message)
-						remainingPacket = remainingPacket?.advanced(by: 2)
-						break;
-					case let (b0,b1) where runningMidiStatus != nil
-									    && b0 == tsLow
-										&& (b1 & 0b10000000) == 0:
-						//running status midi with timestamp
-						//print("handling running status midi message with ts")
-						var message = Data(bytes:&runningMidiStatus!, count:MemoryLayout<UInt8>.size)
-						message.append(remainingPacket!.subdata(in: 1..<3))
-						sendMidiMsg(message: message)
-						remainingPacket = remainingPacket?.advanced(by: 3)
-						break;
-					default:
-						print("unkown packet, ignoring")
-						print(value.map { String(format: "%d, ", $0) }.joined())
-						//dumpBadMidiPacket(value)
-						remainingPacket = nil
-						break;
-					}
-				}//while
-				if(!(remainingPacket == nil || (remainingPacket!.count==0))){
-					print("packet not finished correctly")
-					print(value.map { String(format: "%d, ", $0) }.joined())
-					//dumpBadMidiPacket(value)
-				}
-			} else {
-				print("packet too short to be a valid midi ble packet, ignoring")
-				//dumpBadMidiPacket(value)
-			}//if value.count >= 2
-        } // let value = characteristic.value
+                  case BLE_HANDLER_STATE.PARAMS: // After params can come TSlow or more params
+                    break
+
+                  case BLE_HANDLER_STATE.SYSEX:
+                    break
+
+                  case BLE_HANDLER_STATE.SYSEX_INT:
+                    if ((midiByte & 0xF7) == 0xF7)
+                    { // Sysex end
+//                        print("sysex end")
+                      bleSysExHasFinished = true
+                      bleHandlerState = BLE_HANDLER_STATE.SYSEX_END
+                    }
+                    else
+                    {
+                        bleHandlerState = BLE_HANDLER_STATE.SYSTEM_RT
+                    }
+                    break;
+
+                  case BLE_HANDLER_STATE.SYSTEM_RT:
+                    if (!bleSysExHasFinished)
+                    { // Continue incomplete Sysex
+                      bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                    }
+                    break
+
+                  default:
+                    print ("Unhandled state \(bleHandlerState)")
+                    break
+                  }
+                }
+
+//                print ("\(bleHandlerState) - \(midiByte) [\(String(format:"%02X", midiByte))]")
+
+              // Data handling
+              switch (bleHandlerState)
+              {
+              case BLE_HANDLER_STATE.TIMESTAMP:
+//                print ("set timestamp")
+                let tsHigh = header & 0x3f
+                let tsLow = midiByte & 0x7f
+                timestamp = UInt16(tsHigh << 7) | UInt16(tsLow)
+                print ("timestamp is \(timestamp)")
+                break
+
+              case BLE_HANDLER_STATE.STATUS:
+
+                bleMidiPacketLength = lengthOfMessageType(midiByte)
+                print("message length \(bleMidiPacketLength)")
+                bleMidiBuffer.removeAll()
+                bleMidiBuffer.append(midiByte)
+                
+                if bleMidiPacketLength == 1 {
+                    createMessageEvent(bleMidiBuffer)
+                } else {
+//                    print ("set status")
+                    statusByte = midiByte
+                }
+                break
+
+              case BLE_HANDLER_STATE.STATUS_RUNNING:
+//                print("set running status")
+                bleMidiPacketLength = lengthOfMessageType(statusByte)
+                bleMidiBuffer.removeAll()
+                bleMidiBuffer.append(statusByte)
+                bleMidiBuffer.append(midiByte)
+                
+                if bleMidiPacketLength == 2 {
+                    createMessageEvent(bleMidiBuffer)
+                }
+                break
+
+              case BLE_HANDLER_STATE.PARAMS:
+//                print ("add param \(midiByte)")
+                bleMidiBuffer.append(midiByte)
+                
+                if bleMidiPacketLength == bleMidiBuffer.count {
+                    createMessageEvent(bleMidiBuffer)
+                    bleMidiBuffer.removeLast(Int(bleMidiPacketLength)-1) // Remove all but status, which might be used for running msgs
+                }
+                break
+
+              case BLE_HANDLER_STATE.SYSTEM_RT:
+//                print("handle RT")
+                createMessageEvent([midiByte])
+                break
+
+              case BLE_HANDLER_STATE.SYSEX:
+//                print("add sysex")
+                sysExBuffer.append(midiByte)
+                break
+
+              case BLE_HANDLER_STATE.SYSEX_INT:
+//                print("sysex int")
+                break
+
+              case BLE_HANDLER_STATE.SYSEX_END:
+//                print("finalize sysex")
+                sysExBuffer.append(midiByte)
+                createMessageEvent(sysExBuffer)
+                break
+
+              default:
+                print ("Unhandled state (data) \(bleHandlerState)")
+                break
+              }
+            }
+          }
+        }
+    
+    func lengthOfMessageType(_ type:UInt8) -> UInt8 {
+        let midiType:UInt8 = type & 0xF0
+        
+        switch (type) {
+            case 0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE:
+                return 1
+            case 0xF1, 0xF3:
+                    return 2
+            default:
+                break
+        }
+        
+        switch (midiType) {
+            case 0xC0, 0xD0:
+                return 2
+            case 0xF2, 0x80, 0x90, 0xA0, 0xB0, 0xE0:
+                return 3
+            default:
+                break
+        }
+        return 0
     }
 }
 
@@ -884,7 +889,7 @@ class ConnectedDevice {
     var endPoint:MIDIEndpointRef = 0
     var peripheral:CBPeripheral?
     var characteristic:CBCharacteristic?
-
+    
     init(id:String, type:String) {
         self.id = id
         self.type = type

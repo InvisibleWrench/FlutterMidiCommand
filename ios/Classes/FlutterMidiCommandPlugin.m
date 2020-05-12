@@ -8,6 +8,8 @@
 #import "flutter_midi_command-Swift.h"
 #endif
 
+
+
 @implementation FlutterMidiCommandPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   [SwiftFlutterMidiCommandPlugin registerWithRegistrar:registrar];
