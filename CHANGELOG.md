@@ -2,6 +2,8 @@
 
 Updated Android plugin structure
 Fixed iOS compilation error, with latest Dart
+Fixed BLE Midi parsing on iOS
+
 
 ## 0.1.4
 
