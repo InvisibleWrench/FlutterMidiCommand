@@ -30,8 +30,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     // BLE
     var manager:CBCentralManager!
-//    var connectedPeripheral:CBPeripheral?
-//    var connectedCharacteristic:CBCharacteristic?
     var discoveredDevices:Set<CBPeripheral> = []
     
     // BLE MIDI parsing
@@ -50,13 +48,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     var bleHandlerState = BLE_HANDLER_STATE.HEADER
 
-//    var sysExBufferPos:UInt16
     var sysExBuffer: [UInt8] = []
     var timestamp: UInt16 = 0
 //    uint8_t tsHigh;
 //    uint8_t tsLow;
     var bleMidiBuffer:[UInt8] = []
-//    var bleMidiBufferPos:Int
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
 
@@ -649,11 +645,23 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
+    
+    func createMessageEvent(_ bytes:[UInt8]) {
+        let data = Data(bytes: bytes, count: Int(bytes.count))
+        rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
+    }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
+        
+        if let value = characteristic.value {
+        parseBLEPacket(value)
+        }
+        
+        return
+        
+        
 		func sendMidiMsg(message:Data){
-			//dumpSentMidiPacket(message)
 			rxStreamHandler.send(data: FlutterStandardTypedData(bytes: message))
 		}
 		
@@ -853,11 +861,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let header = packet[0]
             var statusByte:UInt8 = 0
 
-            print ("bleHeader \(header)")
+//            print ("bleHeader \(header)")
 
-//            for (size_t i = 1; i < length; i++)
-                for i in 1...packet.count-1 {
-                    print("index \(i)")
+            for i in 1...packet.count-1 {
                 let midiByte:UInt8 = packet[i]
 //              print ("bleHandlerState \(bleHandlerState) byte \(midiByte)")
 
@@ -958,7 +964,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 break
               }
 
-                print ("\(bleHandlerState) - \(midiByte)")
+                print ("\(bleHandlerState) - \(midiByte) [\(String(format:"%02X", midiByte))]")
 
               // Data handling
               switch (bleHandlerState)
@@ -974,40 +980,48 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
               case BLE_HANDLER_STATE.STATUS:
                 print ("set status")
                 statusByte = midiByte
-//                bleMidiBufferPos = 0
-                //                bleMidiBuffer[bleMidiBufferPos] = statusByte
+                bleMidiPacketLength = lengthOfMessageType(statusByte)
+                print("message length \(bleMidiPacketLength)")
                 bleMidiBuffer.removeAll()
                 bleMidiBuffer.append(statusByte)
-
-                processMessageOfType(statusByte)
+                
+                if bleMidiPacketLength == 1 {
+                    print("return msg event \(bleMidiBuffer)")
+                    createMessageEvent(bleMidiBuffer)
+                    bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                }
                 break
 
               case BLE_HANDLER_STATE.STATUS_RUNNING:
                 print("set running status")
-//                bleMidiBufferPos = 0
-//                bleMidiBuffer[bleMidiBufferPos] = statusByte
+                bleMidiPacketLength = lengthOfMessageType(statusByte)
+                print("message length \(bleMidiPacketLength)")
                 bleMidiBuffer.removeAll()
-                               bleMidiBuffer.append(statusByte)
-                processMessageOfType(statusByte)
+                bleMidiBuffer.append(statusByte)
+                
+                if bleMidiPacketLength == 1 {
+                    print("return msg event \(bleMidiBuffer)")
+                    createMessageEvent(bleMidiBuffer)
+                    bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                }
                 break
 
               case BLE_HANDLER_STATE.PARAMS:
                 print ("add param \(midiByte)")
-                // Serial.println(midiByte, HEX);
-//                bleMidiBufferPos += 1
-//                bleMidiBuffer[bleMidiBufferPos] = midiByte
-                
                 bleMidiBuffer.append(midiByte)
-                processMessageOfType(statusByte)
+//                processMessageOfType(statusByte)
+                
+                if bleMidiPacketLength == bleMidiBuffer.count {
+                    print("return msg event \(bleMidiBuffer)")
+                    createMessageEvent(bleMidiBuffer)
+                    bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
+                }
                 break
 
               case BLE_HANDLER_STATE.SYSTEM_RT:
                 print("handle RT")
-//                bleMidiBufferPos = 0
-//                bleMidiBuffer[bleMidiBufferPos] = midiByte
                 bleMidiBuffer.removeAll()
                 bleMidiBuffer.append(midiByte)
-                processMessageOfType(midiByte)
                 break
 
               case BLE_HANDLER_STATE.SYSEX:
@@ -1032,6 +1046,29 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
           }
         }
+    
+    func lengthOfMessageType(_ type:UInt8) -> UInt8 {
+        let midiType:UInt8 = type & 0xF0
+        
+        switch (type) {
+            case 0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE:
+                return 1
+            case 0xF1, 0xF3:
+                    return 2
+            default:
+                break
+        }
+        
+        switch (midiType) {
+            case 0xC0, 0xD0:
+                return 2
+            case 0xF2, 0x80, 0x90, 0xA0, 0xB0, 0xE0:
+                return 3
+            default:
+                break
+        }
+        return 0
+    }
 
     func processMessageOfType(_ type:UInt8)
         {
@@ -1162,7 +1199,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
     
     func onSystemExclusiveChunk(_ bytes:[UInt8], _ final:Bool) {
-        print("Sysex \(bytes) \(bytes.count) \(final)")
+        print("Sysex event \(bytes) \(bytes.count) \(final)")
     }
     
 }
