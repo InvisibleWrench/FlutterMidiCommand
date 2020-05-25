@@ -1,3 +1,8 @@
+
+## 0.1.6
+
+Bugfix, android setup/plugin init
+
 ## 0.1.5
 
 Updated Android plugin structure

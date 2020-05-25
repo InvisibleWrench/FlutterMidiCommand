@@ -108,6 +108,8 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       var instance = FlutterMidiCommandPlugin()
       instance.messenger = registrar.messenger()
       instance.context = registrar.activeContext()
+      instance.activity = registrar.activity()
+      instance.setup()
     }
   }
 
