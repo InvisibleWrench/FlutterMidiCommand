@@ -342,11 +342,13 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       it?.also {
 
         val id = it.info.id.toString()
+        Log.d("FlutterMIDICommand", "Opened\n${it.info.toString()}")
+
         val device = ConnectedDevice(it)
         device.connectWithReceiver(RXReceiver(rxStreamHandler))
         connectedDevices[id] = device
 
-        Log.d("FlutterMIDICommand", "Opened\n${it.info.toString()}")
+
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceOpened")
       }
     }
@@ -392,7 +394,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       super.onDeviceAdded(device)
       device?.also {
         Log.d("FlutterMIDICommand", "device added $it")
-        this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceAdded")
+        this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
       }
     }
 
@@ -404,7 +406,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
           Log.d("FlutterMIDICommand","remove removed device $it")
           connectedDevices.remove(it.id)
         }
-        this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceRemoved")
+        this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceLost")
       }
     }
 
@@ -485,9 +487,11 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 //        Log.d("FlutterMIDICommand", "is binder alive? ${this.midiDevice?.info?.properties?.getBinder(null)?.isBinderAlive}")
 
         if(it.inputPortCount > 0) {
+          Log.d("FlutterMIDICommand", "Open input port")
           this.inputPort = this.midiDevice?.openInputPort(0)
         }
         if (it.outputPortCount > 0) {
+          Log.d("FlutterMIDICommand", "Open output port")
           this.outputPort = this.midiDevice?.openOutputPort(0)
         }
       }
