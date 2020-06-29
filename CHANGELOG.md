@@ -1,3 +1,5 @@
+## 0.1.7
+Bugfix - sending cabled MIDI on iOS 
 
 ## 0.1.6
 

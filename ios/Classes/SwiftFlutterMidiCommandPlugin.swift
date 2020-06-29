@@ -58,9 +58,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
 
-    // General
-//    var endPointType:String?
-
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -173,7 +170,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
 
     func connectToDevice(deviceId:String, type:String) {
-//        endPointType = type
         print("connect \(deviceId) \(type)")
         
         let conDev = ConnectedDevice(id: deviceId, type: type)
@@ -200,7 +196,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         conDev.endPoint = src
                         connectedDevices[deviceId] = conDev
                         setupStreamHandler.send(data: "deviceConnected")
-                        print("Connected MIDI for \(conDev)")
+                       // print("Connected MIDI for \(conDev) @ \(deviceId) \(src)")
                     } else {
                         print("error connecting to device \(deviceId) [\(type)]")
                     }
@@ -240,7 +236,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
     
     func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
-//        print("send data \(data) to device \(device.id)")
+        print("send data \(data.elementCount) to device \(device.id)")
         if (device.type == "BLE") {
 //            print("BLE")
             if (device.peripheral != nil && device.characteristic != nil) {
@@ -261,7 +257,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         packet.insert(0x80, at: 0)
                         
 //                        print("packet \(packet)")
-                        print("packet \(hexEncodedString(packet))")
+//                        print("packet \(hexEncodedString(packet))")
                         
                         device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
                         
@@ -286,7 +282,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                                 packet.insert(0x80, at: packet.count-1)
                             }
                             
-                            print("packet \(hexEncodedString(packet))")
+//                            print("packet \(hexEncodedString(packet))")
                             
 
                             device.peripheral?.writeValue(packet, for: device.characteristic!, type: CBCharacteristicWriteType.withoutResponse)
@@ -321,17 +317,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("No peripheral/characteristic in device")
             }
         } else {
-            print("MIDI")
+            print("MIDI to \(device.id)")
             let dest = MIDIGetDestination(Int(device.id) ?? 0)
             if (dest != 0) {
                 let bytes = [UInt8](data.data)
                 let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
-                var packet = MIDIPacketListInit(packetList);
+                var packet = MIDIPacketListInit(packetList)
                 let time = mach_absolute_time()
-                packet = MIDIPacketListAdd(packetList, bytes.count, packet, time, bytes.count, bytes);
+                packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
-                MIDISend(outputPort, dest, packetList);
-
+                let status = MIDISend(outputPort, dest, packetList)
+//                print("send bytes \(bytes) on port \(outputPort) \(dest) status \(status)")
                 packetList.deallocate()
             } else {
                 print("No MIDI destination for id \(device.id)")
@@ -339,14 +335,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
     
-        public func hexEncodedString(_ data:Data) -> String {
-           let hexAlphabet = "0123456789abcdef".unicodeScalars.map { $0 }
-            
-            return String(data.reduce(into: "".unicodeScalars, { (result, value) in
-                result.append(hexAlphabet[Int(value/16)])
-                result.append(hexAlphabet[Int(value%16)])
-            }))
-        }
+//        public func hexEncodedString(_ data:Data) -> String {
+//           let hexAlphabet = "0123456789abcdef".unicodeScalars.map { $0 }
+//
+//            return String(data.reduce(into: "".unicodeScalars, { (result, value) in
+//                result.append(hexAlphabet[Int(value/16)])
+//                result.append(hexAlphabet[Int(value%16)])
+//            }))
+//        }
     
 
     func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
@@ -395,7 +391,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-//            print("RX data \(data)")
+            print("data \(data)")
             rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
             ap = MIDIPacketNext(ap)
         }
@@ -426,17 +422,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         setupStreamHandler.send(data: "\(#function) \(notification)")
     }
 
-    @objc func midiNetworkContactsChanged(notification:NSNotification) {
-        print("\(#function)")
-        print("\(notification)")
-        if let session = notification.object as? MIDINetworkSession {
-            print("session \(session)")
-            for con in session.contacts() {
-                print("contact \(con)")
-            }
-        }
-        setupStreamHandler.send(data: "\(#function) \(notification)")
-    }
+//    @objc func midiNetworkContactsChanged(notification:NSNotification) {
+//        print("\(#function)")
+//        print("\(notification)")
+//        if let session = notification.object as? MIDINetworkSession {
+//            print("session \(session)")
+//            for con in session.contacts() {
+//                print("contact \(con)")
+//            }
+//        }
+//        setupStreamHandler.send(data: "\(#function) \(notification)")
+//    }
 
     func handleMIDINotification(_ midiNotification: UnsafePointer<MIDINotification>) {
         print("\ngot a MIDINotification!")

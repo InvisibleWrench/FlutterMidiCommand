@@ -6,9 +6,12 @@ import 'dart:typed_data';
 class MidiCommand {
   factory MidiCommand() {
     if (_instance == null) {
-      final MethodChannel methodChannel = const MethodChannel('plugins.invisiblewrench.com/flutter_midi_command');
-      final EventChannel rxChannel = EventChannel('plugins.invisiblewrench.com/flutter_midi_command/rx_channel');
-      final EventChannel setupChannel = EventChannel('plugins.invisiblewrench.com/flutter_midi_command/setup_channel');
+      final MethodChannel methodChannel = const MethodChannel(
+          'plugins.invisiblewrench.com/flutter_midi_command');
+      final EventChannel rxChannel = EventChannel(
+          'plugins.invisiblewrench.com/flutter_midi_command/rx_channel');
+      final EventChannel setupChannel = EventChannel(
+          'plugins.invisiblewrench.com/flutter_midi_command/setup_channel');
       _instance = MidiCommand.private(methodChannel, rxChannel, setupChannel);
     }
     return _instance;
@@ -32,7 +35,8 @@ class MidiCommand {
     var devs = await _channel.invokeMethod('getDevices');
     return devs.map<MidiDevice>((m) {
       var map = m.cast<String, Object>();
-      return MidiDevice(map["id"], map["name"], map["type"], map["connected"] == "true");
+      return MidiDevice(
+          map["id"], map["name"], map["type"], map["connected"] == "true");
     }).toList();
   }
 
