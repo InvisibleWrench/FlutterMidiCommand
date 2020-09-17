@@ -1,8 +1,10 @@
+## 0.2.0
+Migrated to federated plugin using platform interface
+
 ## 0.1.7
 Bugfix - sending cabled MIDI on iOS 
 
 ## 0.1.6
-
 Bugfix, android setup/plugin init
 
 ## 0.1.5
