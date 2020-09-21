@@ -19,6 +19,15 @@
       <excludeFolder url="file://$MODULE_DIR$/example/ios/.symlinks/plugins/flutter_midi_command/example/build" />
       <excludeFolder url="file://$MODULE_DIR$/example/ios/.symlinks/plugins/flutter_midi_command/example/ios/Flutter/App.framework/flutter_assets/packages" />
       <excludeFolder url="file://$MODULE_DIR$/example/ios/Flutter/App.framework/flutter_assets/packages" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/build" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Dart SDK" level="project" />
