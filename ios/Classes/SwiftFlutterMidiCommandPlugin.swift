@@ -1,5 +1,10 @@
-import Flutter
-import UIKit
+
+#if os(macOS)
+    import FlutterMacOS
+ #else
+    import Flutter
+ #endif
+
 import CoreMIDI
 import os.log
 import CoreBluetooth
@@ -27,8 +32,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var rxStreamHandler = StreamHandler()
     var midiSetupChannel:FlutterEventChannel?
     var setupStreamHandler = StreamHandler()
-    
-    var session:MIDINetworkSession?
 
     // BLE
     var manager:CBCentralManager!
@@ -61,7 +64,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
 
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger())
+        #if os(macOS)
+            let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger)
+        #else
+            let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger())
+        #endif
         let instance = SwiftFlutterMidiCommandPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
 
@@ -75,10 +82,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     func setup(_ registrar: FlutterPluginRegistrar) {
         // Stream setup
-        midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger())
+        #if os(macOS)
+            midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger)
+        #else
+            midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger())
+        #endif
         midiRXChannel?.setStreamHandler(rxStreamHandler)
 
-        midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger())
+
+        #if os(macOS)
+            midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger)
+        #else
+            midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger())
+        #endif
         midiSetupChannel?.setStreamHandler(setupStreamHandler)
 
         // MIDI client with notification handler
@@ -93,13 +109,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         MIDIInputPortCreateWithBlock(midiClient, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
             self.handlePacketList(packetList)
         }
-
-        session = MIDINetworkSession.default()
-        session?.isEnabled = true
-        session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
-
-        NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationSessionDidChange), object: nil)
-//        NotificationCenter.default.addObserver(self, selector: #selector(midiNetworkContactsChanged(notification:)), name: Notification.Name(rawValue: MIDINetworkNotificationContactsDidChange), object: nil)
 
         manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
     }
@@ -165,7 +174,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         for device in connectedDevices {
             disconnectDevice(deviceId: device.value.id)
         }
-        session?.isEnabled = false
     }
 
 
@@ -326,7 +334,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 let time = mach_absolute_time()
                 packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
-                let status = MIDISend(outputPort, dest, packetList)
+                MIDISend(outputPort, dest, packetList)
 //                print("send bytes \(bytes) on port \(outputPort) \(dest) status \(status)")
                 packetList.deallocate()
             } else {
@@ -396,43 +404,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             ap = MIDIPacketNext(ap)
         }
     }
-
-    @objc func midiNetworkChanged(notification:NSNotification) {
-        print("\(#function)")
-        print("\(notification)")
-        if let session = notification.object as? MIDINetworkSession {
-            print("session \(session)")
-            for con in session.connections() {
-                print("con \(con)")
-            }
-            print("isEnabled \(session.isEnabled)")
-            print("sourceEndpoint \(session.sourceEndpoint())")
-            print("destinationEndpoint \(session.destinationEndpoint())")
-            print("networkName \(session.networkName)")
-            print("localName \(session.localName)")
-
-            //            if let name = getDeviceName(session.sourceEndpoint()) {
-            //                print("source name \(name)")
-            //            }
-            //
-            //            if let name = getDeviceName(session.destinationEndpoint()) {
-            //                print("destination name \(name)")
-            //            }
-        }
-        setupStreamHandler.send(data: "\(#function) \(notification)")
-    }
-
-//    @objc func midiNetworkContactsChanged(notification:NSNotification) {
-//        print("\(#function)")
-//        print("\(notification)")
-//        if let session = notification.object as? MIDINetworkSession {
-//            print("session \(session)")
-//            for con in session.contacts() {
-//                print("contact \(con)")
-//            }
-//        }
-//        setupStreamHandler.send(data: "\(#function) \(notification)")
-//    }
 
     func handleMIDINotification(_ midiNotification: UnsafePointer<MIDINotification>) {
         print("\ngot a MIDINotification!")

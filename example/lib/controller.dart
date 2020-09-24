@@ -32,7 +32,7 @@ class MidiControls extends StatefulWidget {
 }
 
 class MidiControlsState extends State<MidiControls> {
-  var _channel = 1;
+  var _channel = 0;
   var _controller = 0;
   var _value = 0;
 
@@ -55,7 +55,7 @@ class MidiControlsState extends State<MidiControls> {
         var d1 = data[1];
         var d2 = data[2];
         var rawStatus = status & 0xF0; // without channel
-        var channel = (status & 0x0F) + 1;
+        var channel = (status & 0x0F);
         if (rawStatus == 0xB0 && channel == _channel && d1 == _controller) {
           setState(() {
             _value = d2;
@@ -76,7 +76,7 @@ class MidiControlsState extends State<MidiControls> {
     return Container(
       child: Column(
         children: <Widget>[
-          SteppedSelector('Channel', _channel, 1, 16, _onChannelChanged),
+          SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
           SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
           SlidingSelector('Value', _value, 0, 127, _onValueChanged),
         ],
@@ -86,7 +86,7 @@ class MidiControlsState extends State<MidiControls> {
 
   _onChannelChanged(int newValue) {
     setState(() {
-      _channel = newValue;
+      _channel = newValue - 1;
     });
   }
 

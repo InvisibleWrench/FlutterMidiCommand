@@ -1,5 +1,9 @@
+## 0.2.1
+Added macOS implementation.
+Cleaned iOS code (shared with macOS).
+
 ## 0.2.0
-Migrated to federated plugin using platform interface
+Migrated to federated plugin using platform interface. 
 
 ## 0.1.7
 Bugfix - sending cabled MIDI on iOS 

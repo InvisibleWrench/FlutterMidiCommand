@@ -1,26 +1,20 @@
 PODS:
   - flutter_midi_command (0.0.1):
     - FlutterMacOS
-  - flutter_midi_command_macos (0.0.1):
-    - FlutterMacOS
   - FlutterMacOS (1.0.0)
 
 DEPENDENCIES:
   - flutter_midi_command (from `Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/macos`)
-  - flutter_midi_command_macos (from `Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/macos`)
   - FlutterMacOS (from `Flutter/ephemeral/.symlinks/flutter/darwin-x64`)
 
 EXTERNAL SOURCES:
   flutter_midi_command:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/macos
-  flutter_midi_command_macos:
-    :path: Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/macos
   FlutterMacOS:
     :path: Flutter/ephemeral/.symlinks/flutter/darwin-x64
 
 SPEC CHECKSUMS:
-  flutter_midi_command: 241a616808b8aee5b537b512762c266e422beaf0
-  flutter_midi_command_macos: 1ee2ed49eb50d7f1a5f73f436fb66eb3757d05ab
+  flutter_midi_command: c1a74de594e48e8fffd195a2ed5746161d507a48
   FlutterMacOS: 15bea8a44d2fa024068daa0140371c020b4b6ff9
 
 PODFILE CHECKSUM: 882fce9150893cd66c23bbd28a572b3439b8ac6d
