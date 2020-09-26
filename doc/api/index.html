@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="generator" content="made with love by dartdoc 0.29.1">
+  <meta name="description" content="flutter_midi_command API docs, for the Dart programming language.">
+  <title>flutter_midi_command - Dart API docs</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500,400i,400,300|Source+Sans+Pro:400,300,700" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="static-assets/github.css">
+  <link rel="stylesheet" href="static-assets/styles.css">
+  <link rel="icon" href="static-assets/favicon.png">
+  <!-- header placeholder -->
+</head>
+
+<body>
+
+<div id="overlay-under-drawer"></div>
+
+<header id="title">
+  <button id="sidenav-left-toggle" type="button">&nbsp;</button>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="https://github.com/InvisibleWrench/FlutterMidiCommand">flutter_midi_command package</a></li>
+  </ol>
+  <div class="self-name">flutter_midi_command</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+
+<main>
+
+  <div id="dartdoc-sidebar-left" class="col-xs-6 col-sm-3 col-md-2 sidebar sidebar-offcanvas-left">
+    <header id="header-search-sidebar" class="hidden-l">
+      <form class="search-sidebar" role="search">
+        <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+      </form>
+    </header>
+    
+    <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+      <li><a href="https://github.com/InvisibleWrench/FlutterMidiCommand">flutter_midi_command package</a></li>
+    </ol>
+    
+    <h5 class="hidden-xs"><span class="package-name">flutter_midi_command</span> <span class="package-kind">package</span></h5>
+    <ol>
+          <li class="section-title">Libraries</li>
+          <li><a href="flutter_midi_command/flutter_midi_command-library.html">flutter_midi_command</a></li>
+          <li><a href="flutter_midi_command_messages/flutter_midi_command_messages-library.html">flutter_midi_command_messages</a></li>
+          <li class="section-title">Dart</li>
+          <li><a href="dart-io_network_policy/dart-io_network_policy-library.html">dart:io/network_policy.dart</a></li>
+          <li><a href="dart-ui/dart-ui-library.html">dart:ui</a></li>
+          <li class="section-subtitle">Core</li>
+            <li class="section-subitem"><a href="dart-async/dart-async-library.html">dart:async</a></li>
+            <li class="section-subitem"><a href="dart-collection/dart-collection-library.html">dart:collection</a></li>
+            <li class="section-subitem"><a href="dart-convert/dart-convert-library.html">dart:convert</a></li>
+            <li class="section-subitem"><a href="dart-core/dart-core-library.html">dart:core</a></li>
+            <li class="section-subitem"><a href="dart-developer/dart-developer-library.html">dart:developer</a></li>
+            <li class="section-subitem"><a href="dart-math/dart-math-library.html">dart:math</a></li>
+            <li class="section-subitem"><a href="dart-typed_data/dart-typed_data-library.html">dart:typed_data</a></li>
+          <li class="section-subtitle">VM</li>
+            <li class="section-subitem"><a href="dart-ffi/dart-ffi-library.html">dart:ffi</a></li>
+            <li class="section-subitem"><a href="dart-io/dart-io-library.html">dart:io</a></li>
+            <li class="section-subitem"><a href="dart-isolate/dart-isolate-library.html">dart:isolate</a></li>
+          <li class="section-subtitle">Web</li>
+            <li class="section-subitem"><a href="dart-html/dart-html-library.html">dart:html</a></li>
+            <li class="section-subitem"><a href="dart-js/dart-js-library.html">dart:js</a></li>
+            <li class="section-subitem"><a href="dart-js_util/dart-js_util-library.html">dart:js_util</a></li>
+    </ol>
+  </div>
+
+  <div id="dartdoc-main-content" class="col-xs-12 col-sm-9 col-md-8 main-content">
+      <section class="desc markdown">
+        <h1 id="flutter_midi_command">flutter_midi_command</h1>
+<p>A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices. </p>
+<p>Wraps CoreMIDI and android.media.midi in a thin dart/flutter layer.
+Works with USB and BLE MIDI connections on Android, and USB, network(session) and BLE MIDI connections on iOS.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>This plugin is build using Swift and Kotlin on the native side, so make sure your project supports this.</p>
+<p>Import flutter_midi_command</p>
+<p><code>import 'package:flutter_midi_command/flutter_midi_command.dart';</code></p>
+<ul>
+<li>Get a list of available MIDI devices by calling <code>MidiCommand().devices</code> which returns a list of <code>MidiDevice</code></li>
+<li>Start scanning for BLE MIDI devices by calling <code>MidiCommand().startScanningForBluetoothDevices()</code></li>
+<li>Connect to a specific <code>MidiDevice</code> by calling <code>MidiCommand.connectToDevice(selectedDevice)</code></li>
+<li>Stop scanning for BLE MIDI devices by calling <code>MidiCommand().stopScanningForBluetoothDevices()</code></li>
+<li>Disconnect from the current device by calling <code>MidiCommand.disconnectDevice()</code></li>
+<li>Listen for updates in the MIDI setup by subscribing to <code>MidiCommand().onMidiSetupChanged</code></li>
+<li>Listen for incoming MIDI messages on from the current device by subscribing to <code>MidiCommand().onMidiDataReceived</code>, after which the listener will recieve inbound MIDI messages as an UInt8List of variable length.</li>
+<li>Send a MIDI message by calling <code>MidiCommand.sendData(data)</code>, where data is an UInt8List of bytes following the MIDI spec.</li>
+<li>Or use the various <code>MidiCommand</code> subtypes to send PC, CC, NoteOn and NoteOff messsages.</li>
+</ul>
+<p>See example folder for how to use.</p>
+<p>For help getting started with Flutter, view our online
+<a href="https://flutter.io/">documentation</a>.</p>
+<p>For help on editing plugin code, view the <a href="https://flutter.io/developing-packages/#edit-plugin-package">documentation</a>.</p>
+      </section>
+      
+        <section class="summary">
+            <h2>Libraries</h2>
+          <dl>
+            <dt id="flutter_midi_command">
+              <span class="name"><a href="flutter_midi_command/flutter_midi_command-library.html">flutter_midi_command</a></span>             
+            </dt>
+            <dd>
+              
+            </dd>            <dt id="flutter_midi_command_messages">
+              <span class="name"><a href="flutter_midi_command_messages/flutter_midi_command_messages-library.html">flutter_midi_command_messages</a></span>             
+            </dt>
+            <dd>
+              
+            </dd>          </dl>
+        </section>
+        <section class="summary">
+            <h2>Dart</h2>
+          <dl>
+            <dt id="dart:io&#x2F;network_policy.dart">
+              <span class="name"><a href="dart-io_network_policy/dart-io_network_policy-library.html">dart:io/network_policy.dart</a></span>             
+            </dt>
+            <dd>
+              
+            </dd>            <dt id="dart:ui">
+              <span class="name"><a href="dart-ui/dart-ui-library.html">dart:ui</a></span>             
+            </dt>
+            <dd>
+              Built-in types and core primitives for a Flutter application. <a href="dart-ui/dart-ui-library.html">[...]</a>
+            </dd>            <h3>Core</h3>
+              <dt id="dart:async">
+                <span class="name"><a href="dart-async/dart-async-library.html">dart:async</a></span>               
+              </dt>
+              <dd>
+                Support for asynchronous programming,
+with classes such as Future and Stream. <a href="dart-async/dart-async-library.html">[...]</a>
+              </dd>              <dt id="dart:collection">
+                <span class="name"><a href="dart-collection/dart-collection-library.html">dart:collection</a></span>               
+              </dt>
+              <dd>
+                Classes and utilities that supplement the collection support in dart:core. <a href="dart-collection/dart-collection-library.html">[...]</a>
+              </dd>              <dt id="dart:convert">
+                <span class="name"><a href="dart-convert/dart-convert-library.html">dart:convert</a></span>               
+              </dt>
+              <dd>
+                Encoders and decoders for converting between different data representations,
+including JSON and UTF-8. <a href="dart-convert/dart-convert-library.html">[...]</a>
+              </dd>              <dt id="dart:core">
+                <span class="name"><a href="dart-core/dart-core-library.html">dart:core</a></span>               
+              </dt>
+              <dd>
+                Built-in types, collections,
+and other core functionality for every Dart program. <a href="dart-core/dart-core-library.html">[...]</a>
+              </dd>              <dt id="dart:developer">
+                <span class="name"><a href="dart-developer/dart-developer-library.html">dart:developer</a></span>               
+              </dt>
+              <dd>
+                Interact with developer tools such as the debugger and inspector. <a href="dart-developer/dart-developer-library.html">[...]</a>
+              </dd>              <dt id="dart:math">
+                <span class="name"><a href="dart-math/dart-math-library.html">dart:math</a></span>               
+              </dt>
+              <dd>
+                Mathematical constants and functions, plus a random number generator. <a href="dart-math/dart-math-library.html">[...]</a>
+              </dd>              <dt id="dart:typed_data">
+                <span class="name"><a href="dart-typed_data/dart-typed_data-library.html">dart:typed_data</a></span>               
+              </dt>
+              <dd>
+                Lists that efficiently handle fixed sized data
+(for example, unsigned 8 byte integers) and SIMD numeric types. <a href="dart-typed_data/dart-typed_data-library.html">[...]</a>
+              </dd>            <h3>VM</h3>
+              <dt id="dart:ffi">
+                <span class="name"><a href="dart-ffi/dart-ffi-library.html">dart:ffi</a></span>               
+              </dt>
+              <dd>
+                Foreign Function Interface for interoperability with the C programming language. <a href="dart-ffi/dart-ffi-library.html">[...]</a>
+              </dd>              <dt id="dart:io">
+                <span class="name"><a href="dart-io/dart-io-library.html">dart:io</a></span>               
+              </dt>
+              <dd>
+                File, socket, HTTP, and other I/O support for non-web applications. <a href="dart-io/dart-io-library.html">[...]</a>
+              </dd>              <dt id="dart:isolate">
+                <span class="name"><a href="dart-isolate/dart-isolate-library.html">dart:isolate</a></span>               
+              </dt>
+              <dd>
+                Concurrent programming using <em>isolates</em>:
+independent workers that are similar to threads
+but don't share memory,
+communicating only via messages. <a href="dart-isolate/dart-isolate-library.html">[...]</a>
+              </dd>            <h3>Web</h3>
+              <dt id="dart:html">
+                <span class="name"><a href="dart-html/dart-html-library.html">dart:html</a></span>               
+              </dt>
+              <dd>
+                HTML elements and other resources for web-based applications that need to
+interact with the browser and the DOM (Document Object Model). <a href="dart-html/dart-html-library.html">[...]</a>
+              </dd>              <dt id="dart:js">
+                <span class="name"><a href="dart-js/dart-js-library.html">dart:js</a></span>               
+              </dt>
+              <dd>
+                Low-level support for interoperating with JavaScript. <a href="dart-js/dart-js-library.html">[...]</a>
+              </dd>              <dt id="dart:js_util">
+                <span class="name"><a href="dart-js_util/dart-js_util-library.html">dart:js_util</a></span>               
+              </dt>
+              <dd>
+                Utility methods to manipulate <code>package:js</code> annotated JavaScript interop
+objects in cases where the name to call is not known at runtime. <a href="dart-js_util/dart-js_util-library.html">[...]</a>
+              </dd>          </dl>
+        </section>
+
+  </div> <!-- /.main-content -->
+
+  <div id="dartdoc-sidebar-right" class="col-xs-6 col-sm-6 col-md-2 sidebar sidebar-offcanvas-right">
+  </div>
+
+</main>
+
+<footer>
+  <span class="no-break">
+    flutter_midi_command
+      0.2.1
+  </span>
+
+  <!-- footer-text placeholder -->
+</footer>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="static-assets/typeahead.bundle.min.js"></script>
+<script src="static-assets/highlight.pack.js"></script>
+<script src="static-assets/URI.js"></script>
+<script src="static-assets/script.js"></script>
+<!-- footer placeholder -->
+
+</body>
+
+</html>

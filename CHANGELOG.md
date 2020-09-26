@@ -1,3 +1,6 @@
+## 0.2.2
+Cleanup and docs
+
 ## 0.2.1
 Added macOS implementation.
 Cleaned iOS code (shared with macOS).
