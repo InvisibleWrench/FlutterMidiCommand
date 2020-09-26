@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'dart:typed_data';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
-export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice;
+export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
+    show MidiDevice;
 
 class MidiCommand {
   factory MidiCommand() {

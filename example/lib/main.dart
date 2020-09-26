@@ -53,7 +53,9 @@ class _MyAppState extends State<MyApp> {
           actions: <Widget>[
             IconButton(
                 onPressed: () {
-                  _midiCommand.startScanningForBluetoothDevices().catchError((err) {
+                  _midiCommand
+                      .startScanningForBluetoothDevices()
+                      .catchError((err) {
                     print("Error $err");
                   });
                   setState(() {});
@@ -80,7 +82,9 @@ class _MyAppState extends State<MyApp> {
                             device.name,
                             style: Theme.of(context).textTheme.headline,
                           ),
-                          trailing: device.type == "BLE" ? Icon(Icons.bluetooth) : null,
+                          trailing: device.type == "BLE"
+                              ? Icon(Icons.bluetooth)
+                              : null,
                           onTap: () {
                             _midiCommand.connectToDevice(device);
                             Navigator.of(context).push(MaterialPageRoute<Null>(
