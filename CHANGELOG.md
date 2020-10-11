@@ -1,3 +1,6 @@
+## 0.2.3
+Android compile fix
+
 ## 0.2.2
 Cleanup and docs
 
