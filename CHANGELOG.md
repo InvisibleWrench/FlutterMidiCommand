@@ -1,3 +1,6 @@
+## 0.2.4
+iOS Pod fix
+
 ## 0.2.3
 Android compile fix
 
