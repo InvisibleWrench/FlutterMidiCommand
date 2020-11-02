@@ -1,3 +1,6 @@
+## 0.2.5
+Added MIDI timestamp support
+
 ## 0.2.4
 iOS Pod fix
 
