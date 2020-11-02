@@ -54,7 +54,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var bleHandlerState = BLE_HANDLER_STATE.HEADER
 
     var sysExBuffer: [UInt8] = []
-    var timestamp: UInt16 = 0
+    var timestamp: UInt64 = 0
 //    uint8_t tsHigh;
 //    uint8_t tsLow;
     var bleMidiBuffer:[UInt8] = []
@@ -154,13 +154,21 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(nil)
             break
         case "sendData":
-            if let data = call.arguments as? FlutterStandardTypedData {
-//                let deviceId =
-                sendData(data, deviceId: nil)
+            if let packet = call.arguments as? Dictionary<String, Any> {
+                sendData(packet["data"] as! FlutterStandardTypedData, deviceId: packet["deviceId"] as? String, timestamp: packet["timestamp"] as? UInt64)
                 result(nil)
             } else {
-                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not form midi packet", details: call.arguments))
             }
+            result(nil)
+            
+//            if let data = call.arguments as? FlutterStandardTypedData {
+////                let deviceId =
+//                sendData(data, deviceId: nil)
+//                result(nil)
+//            } else {
+//                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
+//            }
             break
         case "teardown":
             teardown()
@@ -231,20 +239,22 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
 
 
-    func sendData(_ data: FlutterStandardTypedData, deviceId: String?) {
+    func sendData(_ data:FlutterStandardTypedData, deviceId: String?, timestamp: UInt64?) {
         if let deviceId = deviceId {
             if let device = connectedDevices[deviceId] {
-                _sendDataToDevice(device: device, data: data)
+                _sendDataToDevice(device: device, data: data, timestamp: timestamp)
             }
         } else {
             connectedDevices.values.forEach({ (device) in
-                _sendDataToDevice(device: device, data: data)
+                _sendDataToDevice(device: device, data: data, timestamp: timestamp)
             })
         }
     }
     
-    func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
-        print("send data \(data.elementCount) to device \(device.id)")
+    func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData, timestamp: UInt64?) {
+//        print("send data \(data.data.count) to device \(device.id)")
+//        var data = Data(msgbytes)
+        
         if (device.type == "BLE") {
 //            print("BLE")
             if (device.peripheral != nil && device.characteristic != nil) {
@@ -258,9 +268,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         // First packet
                         var packet = dataBytes.subdata(in: 0..<packetSize-2)
                         
-                        print("count \(dataBytes.count)")
+//                        print("count \(dataBytes.count)")
                         
                         // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
+                        // TODO insert timestamp
                         packet.insert(0x80, at: 0)
                         packet.insert(0x80, at: 0)
                         
@@ -275,7 +286,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         // More packets
                         while dataBytes.count > 0 {
                             
-                            print("count \(dataBytes.count)")
+//                            print("count \(dataBytes.count)")
                             
                             let pickCount = min(dataBytes.count, packetSize-1)
 //                            print("pickCount \(pickCount)")
@@ -325,13 +336,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("No peripheral/characteristic in device")
             }
         } else {
-            print("MIDI to \(device.id)")
+//            print("MIDI to \(device.id)")
             let dest = MIDIGetDestination(Int(device.id) ?? 0)
             if (dest != 0) {
                 let bytes = [UInt8](data.data)
                 let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
                 var packet = MIDIPacketListInit(packetList)
-                let time = mach_absolute_time()
+                let time = timestamp ?? mach_absolute_time()
                 packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
                 MIDISend(outputPort, dest, packetList)
@@ -399,8 +410,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-            print("data \(data)")
-            rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
+            let timestamp = p.timeStamp
+            print("data \(data) timestamp \(timestamp)")
+            rxStreamHandler.send(data: ["data": data, "timestamp":timestamp])// FlutterStandardTypedData(bytes: data))
             ap = MIDIPacketNext(ap)
         }
     }
@@ -625,10 +637,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
     
-    func createMessageEvent(_ bytes:[UInt8]) {
+    func createMessageEvent(_ bytes:[UInt8], timestamp:UInt64) {
 //        print("send rx event \(bytes)")
         let data = Data(bytes: bytes, count: Int(bytes.count))
-        rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
+        rxStreamHandler.send(data: ["data":data, "timestamp":timestamp])// FlutterStandardTypedData(bytes: data))
     }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
@@ -746,7 +758,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //                print ("set timestamp")
                 let tsHigh = header & 0x3f
                 let tsLow = midiByte & 0x7f
-                timestamp = UInt16(tsHigh << 7) | UInt16(tsLow)
+                timestamp = UInt64(tsHigh << 7) | UInt64(tsLow)
 //                print ("timestamp is \(timestamp)")
                 break
 
@@ -758,7 +770,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 bleMidiBuffer.append(midiByte)
                 
                 if bleMidiPacketLength == 1 {
-                    createMessageEvent(bleMidiBuffer)
+                    createMessageEvent(bleMidiBuffer, timestamp: timestamp) // TODO Add timestamp
                 } else {
 //                    print ("set status")
                     statusByte = midiByte
@@ -773,7 +785,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 bleMidiBuffer.append(midiByte)
                 
                 if bleMidiPacketLength == 2 {
-                    createMessageEvent(bleMidiBuffer)
+                    createMessageEvent(bleMidiBuffer, timestamp: timestamp)
                 }
                 break
 
@@ -782,14 +794,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 bleMidiBuffer.append(midiByte)
                 
                 if bleMidiPacketLength == bleMidiBuffer.count {
-                    createMessageEvent(bleMidiBuffer)
+                    createMessageEvent(bleMidiBuffer, timestamp: timestamp)
                     bleMidiBuffer.removeLast(Int(bleMidiPacketLength)-1) // Remove all but status, which might be used for running msgs
                 }
                 break
 
               case BLE_HANDLER_STATE.SYSTEM_RT:
 //                print("handle RT")
-                createMessageEvent([midiByte])
+                createMessageEvent([midiByte], timestamp: timestamp)
                 break
 
               case BLE_HANDLER_STATE.SYSEX:
@@ -804,7 +816,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
               case BLE_HANDLER_STATE.SYSEX_END:
 //                print("finalize sysex")
                 sysExBuffer.append(midiByte)
-                createMessageEvent(sysExBuffer)
+                createMessageEvent(sysExBuffer, timestamp: 0)
                 break
 
               default:
