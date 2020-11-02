@@ -12,7 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_midi_command_platform_interface: ^0.2.0
-#  flutter_midi_command_linux: ^0.0.1
+  flutter_midi_command_linux: #^0.0.1
+    path: '../flutter_midi_command_linux'
 
 
 dev_dependencies:
@@ -37,10 +38,10 @@ flutter:
         pluginClass: FlutterMidiCommandPlugin
       macos:
         pluginClass: SwiftFlutterMidiCommandPlugin
-#      linux:
-#        default_package: flutter_midi_command_linux
+      linux:
+        default_package: flutter_midi_command_linux
 
-  # To add assets to your plugin package, add an assets section, like this:
+  # Toadd assets to your plugin package, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
