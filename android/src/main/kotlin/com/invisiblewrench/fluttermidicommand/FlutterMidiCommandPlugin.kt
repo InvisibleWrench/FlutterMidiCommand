@@ -138,8 +138,8 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
     when (call.method) {
       "sendData" -> {
-        val data = call.arguments<ByteArray>()
-        sendData(data, null)
+        var args = call.arguments<Map<String, Any>>()
+        sendData(args["data"] as ByteArray, args["timestamp"] as? Long, args["deviceId"]?.toString())
         result.success(null)
       }
       "getDevices" -> {
@@ -362,18 +362,17 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
   }
 
-  fun sendData(data: ByteArray, deviceId: String?) {
+  fun sendData(data: ByteArray, timestamp: Long?, deviceId: String?) {
     if (deviceId != null && connectedDevices.containsKey(deviceId)) {
       connectedDevices[deviceId]?.let {
-        it.send(data)
+        it.send(data, timestamp)
       }
     } else {
       connectedDevices.values.forEach {
-        it.send(data)
+        it.send(data, timestamp)
       }
     }
   }
-
 
   fun listOfDevices() : List<Map<String, Any>> {
     var list = mutableListOf<Map<String, Any>>()
@@ -431,7 +430,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
 //      Log.d("FlutterMIDICommand","RXReceiver onSend(receive) ${this}")
       msg?.also {
-        stream.send( it.slice(IntRange(offset, offset+count-1)))
+        stream.send( mapOf("data" to it.slice(IntRange(offset, offset+count-1)), "timestamp" to timestamp) )
       }
     }
   }
@@ -500,8 +499,8 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       this.outputPort?.connect(receiver)
     }
 
-    fun send(data: ByteArray) {
-      this.inputPort?.send(data, 0, data.count())
+    fun send(data: ByteArray, timestamp: Long?) {
+      this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0);
     }
 
     fun close() {
