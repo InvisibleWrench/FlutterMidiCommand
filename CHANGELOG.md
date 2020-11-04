@@ -1,5 +1,6 @@
 ## 0.2.5
 Added MIDI timestamp support
+Added MidiDevice info in received packets
 
 ## 0.2.4
 iOS Pod fix

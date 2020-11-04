@@ -46,7 +46,8 @@ class MidiControlsState extends State<MidiControls> {
       print('received packet $packet');
       var data = packet.data;
       var timestamp = packet.timestamp;
-      print("data $data @ time $timestamp");
+      var device = packet.device;
+      print("data $data @ time $timestamp from device ${device.name}:${device.id}");
 
       var status = data[0];
 
