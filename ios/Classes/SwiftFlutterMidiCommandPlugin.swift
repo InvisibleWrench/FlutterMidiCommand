@@ -169,15 +169,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             } else {
                 result(FlutterError.init(code: "MESSAGEERROR", message: "Could not form midi packet", details: call.arguments))
             }
-            result(nil)
-            
-//            if let data = call.arguments as? FlutterStandardTypedData {
-////                let deviceId =
-//                sendData(data, deviceId: nil)
-//                result(nil)
-//            } else {
-//                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
-//            }
             break
         case "teardown":
             teardown()
@@ -418,17 +409,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         ap.initialize(to:packet)
 
         let id = srcConnRefCon!.load(as: Int.self)
-       // let id = Int(srcRef)
         print("id \(id) \(type(of:id))")
         let source = MIDIGetSource(id)
         print("source \(source) \(type(of:source))")
         
-        print("id \(id)")
-        if let device = connectedDevices[String(id)] {
-            print("device \(device) \(type(of:device)) \(device.type)")
-        } else {
-            print("failed to lookup device")
-        }
+  //      print("id \(id)")
+    //    if let device = connectedDevices[String(id)] {
+    //        print("device \(device) \(type(of:device)) \(device.type)")
+  //      } else {
+  //          print("failed to lookup device")
+  //      }
         
         let deviceInfo = ["name" : getMIDIProperty(kMIDIPropertyDisplayName, fromObject: source),
                           "id": String(id),
