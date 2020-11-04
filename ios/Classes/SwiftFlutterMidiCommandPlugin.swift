@@ -59,7 +59,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var bleHandlerState = BLE_HANDLER_STATE.HEADER
 
     var sysExBuffer: [UInt8] = []
-    var timestamp: UInt16 = 0
+    var timestamp: UInt64 = 0
     var bleMidiBuffer:[UInt8] = []
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
@@ -110,7 +110,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
         // MIDI Input with handler
         MIDIInputPortCreateWithBlock(midiClient, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
-            self.handlePacketList(packetList)
+            self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
         }
 
         manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
@@ -146,8 +146,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(destinations)
             break
         case "connectToDevice":
-            if let deviceInfo = call.arguments as? Dictionary<String, String> {
-                connectToDevice(deviceId: deviceInfo["id"]!, type: deviceInfo["type"]!)
+            if let deviceInfo = call.arguments as? Dictionary<String, Any> {
+                connectToDevice(deviceId: deviceInfo["id"] as! String, type: deviceInfo["type"] as! String)
                 result(nil)
             } else {
                 result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse device id", details: call.arguments))
@@ -163,13 +163,21 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(nil)
             break
         case "sendData":
-            if let data = call.arguments as? FlutterStandardTypedData {
-//                let deviceId =
-                sendData(data, deviceId: nil)
+            if let packet = call.arguments as? Dictionary<String, Any> {
+                sendData(packet["data"] as! FlutterStandardTypedData, deviceId: packet["deviceId"] as? String, timestamp: packet["timestamp"] as? UInt64)
                 result(nil)
             } else {
-                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not form midi packet", details: call.arguments))
             }
+            result(nil)
+            
+//            if let data = call.arguments as? FlutterStandardTypedData {
+////                let deviceId =
+//                sendData(data, deviceId: nil)
+//                result(nil)
+//            } else {
+//                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse data", details: call.arguments))
+//            }
             break
         case "teardown":
             teardown()
@@ -211,7 +219,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("setup endpoint \(src)")
                 if (src != 0) {
 //                    var devId = deviceId
-                    let status:OSStatus =   MIDIPortConnectSource(inputPort, src, &conDev.idInt)
+                    let status:OSStatus =   MIDIPortConnectSource(inputPort, src, &conDev.idValue)
                     if (status == noErr) {
                         conDev.endPoint = src
                         connectedDevices[deviceId] = conDev
@@ -243,20 +251,22 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
 
 
-    func sendData(_ data: FlutterStandardTypedData, deviceId: String?) {
+    func sendData(_ data:FlutterStandardTypedData, deviceId: String?, timestamp: UInt64?) {
         if let deviceId = deviceId {
             if let device = connectedDevices[deviceId] {
-                _sendDataToDevice(device: device, data: data)
+                _sendDataToDevice(device: device, data: data, timestamp: timestamp)
             }
         } else {
             connectedDevices.values.forEach({ (device) in
-                _sendDataToDevice(device: device, data: data)
+                _sendDataToDevice(device: device, data: data, timestamp: timestamp)
             })
         }
     }
     
-    func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData) {
-        print("send data \(data.elementCount) to device \(device.id)")
+    func _sendDataToDevice(device:ConnectedDevice, data:FlutterStandardTypedData, timestamp: UInt64?) {
+//        print("send data \(data.data.count) to device \(device.id)")
+//        var data = Data(msgbytes)
+        
         if (device.type == "BLE") {
 //            print("BLE")
             if (device.peripheral != nil && device.characteristic != nil) {
@@ -337,13 +347,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("No peripheral/characteristic in device")
             }
         } else {
-            print("MIDI to \(device.id)")
+//            print("MIDI to \(device.id)")
             let dest = MIDIGetDestination(Int(device.id) ?? 0)
             if (dest != 0) {
                 let bytes = [UInt8](data.data)
                 let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
                 var packet = MIDIPacketListInit(packetList)
-                let time = mach_absolute_time()
+                let time = timestamp ?? mach_absolute_time()
                 packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
                 MIDISend(outputPort, dest, packetList)
@@ -401,18 +411,37 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         return destinations;
     }
 
-    func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>) {
+    func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
         let packets = packetList.pointee
         let packet:MIDIPacket = packets.packet
         var ap = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 1)
         ap.initialize(to:packet)
 
+        let id = srcConnRefCon!.load(as: Int.self)
+       // let id = Int(srcRef)
+        print("id \(id) \(type(of:id))")
+        let source = MIDIGetSource(id)
+        print("source \(source) \(type(of:source))")
+        
+        print("id \(id)")
+        if let device = connectedDevices[String(id)] {
+            print("device \(device) \(type(of:device)) \(device.type)")
+        } else {
+            print("failed to lookup device")
+        }
+        
+        let deviceInfo = ["name" : getMIDIProperty(kMIDIPropertyDisplayName, fromObject: source),
+                          "id": String(id),
+                          "type":"native"]
+        
         for _ in 0 ..< packets.numPackets {
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-            print("data \(data)")
-            rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
+            let timestamp = p.timeStamp
+            print("data \(data) timestamp \(timestamp)")
+            rxStreamHandler.send(data: ["data": data, "timestamp":timestamp, "device":deviceInfo
+            ])
             ap = MIDIPacketNext(ap)
         }
     }
@@ -677,20 +706,23 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
     
-    func createMessageEvent(_ bytes:[UInt8]) {
+    func createMessageEvent(_ bytes:[UInt8], timestamp:UInt64, peripheral:CBPeripheral) {
 //        print("send rx event \(bytes)")
         let data = Data(bytes: bytes, count: Int(bytes.count))
-        rxStreamHandler.send(data: FlutterStandardTypedData(bytes: data))
+        rxStreamHandler.send(data: ["data": data, "timestamp":timestamp, "device":[
+                                                            "name" : peripheral.name ?? "-",
+                                        "id":peripheral.identifier.uuidString,
+                                                                    "type":"BLE"]])
     }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
 //        print("perif didUpdateValueFor  \(String(describing: characteristic))")
         if let value = characteristic.value {
-            parseBLEPacket(value)
+            parseBLEPacket(value, peripheral:peripheral)
         }
     }
     
-    public func parseBLEPacket(_ packet:Data) -> Void {
+    public func parseBLEPacket(_ packet:Data, peripheral:CBPeripheral) -> Void {
 //        print("parse \(packet)")
         
         if (packet.count > 1)
@@ -798,7 +830,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //                print ("set timestamp")
                 let tsHigh = header & 0x3f
                 let tsLow = midiByte & 0x7f
-                timestamp = UInt16(tsHigh << 7) | UInt16(tsLow)
+                timestamp = UInt64(tsHigh << 7) | UInt64(tsLow)
 //                print ("timestamp is \(timestamp)")
                 break
 
@@ -810,7 +842,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 bleMidiBuffer.append(midiByte)
                 
                 if bleMidiPacketLength == 1 {
-                    createMessageEvent(bleMidiBuffer)
+                    createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral) // TODO Add timestamp
                 } else {
 //                    print ("set status")
                     statusByte = midiByte
@@ -825,7 +857,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 bleMidiBuffer.append(midiByte)
                 
                 if bleMidiPacketLength == 2 {
-                    createMessageEvent(bleMidiBuffer)
+                    createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral)
                 }
                 break
 
@@ -834,14 +866,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 bleMidiBuffer.append(midiByte)
                 
                 if bleMidiPacketLength == bleMidiBuffer.count {
-                    createMessageEvent(bleMidiBuffer)
+                    createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral)
                     bleMidiBuffer.removeLast(Int(bleMidiPacketLength)-1) // Remove all but status, which might be used for running msgs
                 }
                 break
 
               case BLE_HANDLER_STATE.SYSTEM_RT:
 //                print("handle RT")
-                createMessageEvent([midiByte])
+                createMessageEvent([midiByte], timestamp: timestamp, peripheral:peripheral)
                 break
 
               case BLE_HANDLER_STATE.SYSEX:
@@ -856,7 +888,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
               case BLE_HANDLER_STATE.SYSEX_END:
 //                print("finalize sysex")
                 sysExBuffer.append(midiByte)
-                createMessageEvent(sysExBuffer)
+                createMessageEvent(sysExBuffer, timestamp: 0, peripheral:peripheral)
                 break
 
               default:
@@ -916,7 +948,7 @@ class StreamHandler : NSObject, FlutterStreamHandler {
 
 class ConnectedDevice {
     var id:String
-    var idInt:Int
+    var idValue:Int
     var type:String
     var endPoint:MIDIEndpointRef = 0
     var peripheral:CBPeripheral?
@@ -924,7 +956,7 @@ class ConnectedDevice {
     
     init(id:String, type:String) {
         self.id = id
-        self.idInt = Int(self.id)
+        self.idValue = Int(self.id) ?? -1
         self.type = type
     }
 }
