@@ -1,3 +1,6 @@
+## 0.2.6
+Fix example app on macos
+
 ## 0.2.5
 Fix MIDI Session Support on iOS Simulator
 
