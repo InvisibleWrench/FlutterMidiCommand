@@ -41,6 +41,11 @@ class MidiCommand {
     _platform.connectToDevice(device);
   }
 
+  /// Opens a port on a connected device.
+  void openPortsOnDevice(MidiDevice device, List<MidiPort> ports) {
+    _platform.openPortsOnDevice(device, ports);
+  }
+
   /// Disconnects from the device.
   void disconnectDevice(MidiDevice device) {
     _platform.disconnectDevice(device);

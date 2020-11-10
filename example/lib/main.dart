@@ -29,10 +29,10 @@ class _MyAppState extends State<MyApp> {
         case "deviceFound":
           setState(() {});
           break;
-        case "deviceOpened":
-          break;
+        // case "deviceOpened":
+        //   break;
         default:
-          print("Unhandled setup change: $data");
+          // print("Unhandled setup change: $data");
           break;
       }
     });
@@ -75,20 +75,21 @@ class _MyAppState extends State<MyApp> {
                       // Provide a builder function. This is where the magic happens! We'll
                       // convert each item into a Widget based on the type of item it is.
                       itemBuilder: (context, index) {
-                        final device = devices[index];
+                        MidiDevice device = devices[index];
 
                         return ListTile(
                           title: Text(
                             device.name,
                             style: Theme.of(context).textTheme.headline,
                           ),
+                          subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
                           trailing: device.type == "BLE"
                               ? Icon(Icons.bluetooth)
                               : null,
                           onTap: () {
                             _midiCommand.connectToDevice(device);
                             Navigator.of(context).push(MaterialPageRoute<Null>(
-                              builder: (_) => ControllerPage(),
+                              builder: (_) => ControllerPage(device),
                             ));
                           },
                         );

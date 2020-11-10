@@ -162,6 +162,18 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
         connectToDevice(args["id"].toString(), args["type"].toString())
         result.success(null)
       }
+      "openPortsOnDevice" -> {
+        var args = call.arguments<Map<String, Any>>()
+//        Log.d("FlutterMIDICommand","openPortsOnDevice ${args}")
+        var deviceId = (args["device"] as Map<String, Any>)["id"].toString()
+        var portList = (args["ports"] as List<Map<String, Any>>).map{
+          Port(if (it["id"].toString() is String) it["id"].toString().toInt() else 0 , it["type"].toString())
+        }
+        connectedDevices[deviceId]?.also {
+          it.openPorts(portList)
+        }
+        result.success(null)
+      }
       "disconnectDevice" -> {
         var args = call.arguments<Map<String, Any>>()
         disconnectDevice(args["id"].toString())
@@ -277,7 +289,6 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
   private fun connectToDevice(deviceId:String, type:String) {
     Log.d("FlutterMIDICommand", "connect to $type device: $deviceId")
 
-
     if (type == "BLE") {
       val bleDevices = discoveredDevices.filter { it.address == deviceId }
       if (bleDevices.count() == 0) {
@@ -342,12 +353,11 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       it?.also {
 
         val id = it.info.id.toString()
-        Log.d("FlutterMIDICommand", "Opened\n${it.info.toString()}")
+        Log.d("FlutterMIDICommand", "Opened\n${it.info}")
 
         val device = ConnectedDevice(it)
         device.connectWithReceiver(RXReceiver(rxStreamHandler, it))
         connectedDevices[id] = device
-
 
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceOpened")
       }
@@ -374,16 +384,39 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
   }
 
+  fun listOfPorts(count: Int) :  List<Map<String, Any>> {
+    Log.d("FlutterMIDICommand", "number of ports $count")
+    return (0..count-1).map { mapOf("id" to it, "connected" to false) }
+  }
+
   fun listOfDevices() : List<Map<String, Any>> {
     var list = mutableListOf<Map<String, Any>>()
 
     val devs:Array<MidiDeviceInfo> = midiManager.devices
     Log.d("FlutterMIDICommand", "devices $devs")
-    devs.forEach { d -> list.add(mapOf("name" to d.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "id" to d.id.toString(), "type" to "native", "connected" to if (connectedDevices.contains(d.id.toString())) "true" else "false" )) }
+    devs.forEach { d -> list.add(mapOf(
+            "name" to d.properties.getString(MidiDeviceInfo.PROPERTY_NAME),
+            "id" to d.id.toString(),
+            "type" to "native",
+            "connected" to if (connectedDevices.contains(d.id.toString())) "true" else "false",
+            "inputs" to listOfPorts(d.inputPortCount),
+            "outputs" to listOfPorts(d.outputPortCount)
+          )
+    )}
 
     discoveredDevices.forEach {
-      list.add(mapOf("name" to it.name, "id" to it.address, "type" to "BLE", "connected" to if (connectedDevices.contains(it.address)) "true" else "false"))
+      list.add(mapOf(
+              "name" to it.name,
+              "id" to it.address,
+              "type" to "BLE",
+              "connected" to if (connectedDevices.contains(it.address)) "true" else "false",
+              "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
+              "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+              ))
     }
+
+    Log.d("FlutterMIDICommand", "list $list")
+
     return list.toList()
   }
 
@@ -458,10 +491,20 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
   }
 
+  class Port {
+    var id:Int
+    var type:String
+
+    constructor(id:Int, type:String) {
+      this.id = id
+      this.type = type
+    }
+  }
+
   class ConnectedDevice {
     var id:String
     var type:String
-    var midiDevice:MidiDevice? = null
+    lateinit var midiDevice:MidiDevice
     var inputPort:MidiInputPort? = null
     var outputPort:MidiOutputPort? = null
     var status:MidiDeviceStatus? = null
@@ -471,32 +514,42 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       this.midiDevice = device
       this.id = device.info.id.toString()
       this.type = device.info.type.toString()
+      device.info.ports.forEach {
+        Log.d("FlutterMIDICommand", "port on device: ${it.name} ${it.type} ${it.portNumber}")
+      }
     }
 
     fun connectWithReceiver(receiver: MidiReceiver) {
       Log.d("FlutterMIDICommand","connectWithHandler")
+      this.receiver = receiver
+    }
 
-      this.midiDevice?.info?.let {
-        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
+    fun openPorts(ports: List<Port>) {
+      this.midiDevice.info?.let { deviceInfo ->
+        Log.d("FlutterMIDICommand","inputPorts ${deviceInfo.inputPortCount} outputPorts ${deviceInfo.outputPortCount}")
 
-//        it.ports.forEach {
-//          Log.d("FlutterMIDICommand", "${it.name} ${it.type} ${it.portNumber}")
-//        }
-
-//        Log.d("FlutterMIDICommand", "is binder alive? ${this.midiDevice?.info?.properties?.getBinder(null)?.isBinderAlive}")
-
-        if(it.inputPortCount > 0) {
-          Log.d("FlutterMIDICommand", "Open input port")
-          this.inputPort = this.midiDevice?.openInputPort(0)
-        }
-        if (it.outputPortCount > 0) {
-          Log.d("FlutterMIDICommand", "Open output port")
-          this.outputPort = this.midiDevice?.openOutputPort(0)
+        ports.forEach { port ->
+          Log.d("FlutterMIDICommand", "Open port ${port.type} ${port.id}")
+          when (port.type) {
+            "MidiPortType.IN" -> {
+              if (deviceInfo.inputPortCount > port.id) {
+                Log.d("FlutterMIDICommand", "Open input port ${port.id}")
+                this.inputPort = this.midiDevice.openInputPort(port.id)
+              }
+            }
+            "MidiPortType.OUT" -> {
+              if (deviceInfo.outputPortCount > port.id) {
+                Log.d("FlutterMIDICommand", "Open output port ${port.id}")
+                this.outputPort = this.midiDevice.openOutputPort(port.id)
+                this.outputPort?.connect(receiver)
+              }
+            }
+            else -> {
+              Log.d("FlutterMIDICommand", "Unknown MIDI port type ${port.type}. Not opening.")
+            }
+          }
         }
       }
-
-      this.receiver = receiver
-      this.outputPort?.connect(receiver)
     }
 
     fun send(data: ByteArray, timestamp: Long?) {
