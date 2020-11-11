@@ -52,18 +52,23 @@ class MidiControlsState extends State<MidiControls> {
 
   @override
   void initState() {
-    print('init controller');
+    // print('init controller');
     _rxSubscription = _midiCommand.onMidiDataReceived.listen((packet) {
-      print('received packet $packet');
+      // print('received packet $packet');
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+      // print("data $data @ time $timestamp from device ${device.name}:${device.id}");
 
       var status = data[0];
 
       if (status == 0xF8) {
-        print('beat');
+        // Beat
+        return;
+      }
+
+      if (status == 0xFE) {
+        // Active sense;
         return;
       }
 

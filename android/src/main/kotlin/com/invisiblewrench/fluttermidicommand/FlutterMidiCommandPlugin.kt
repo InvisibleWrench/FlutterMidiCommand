@@ -451,9 +451,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
           it.status = status
         }
       }
-
       this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceStatusChanged")
-
     }
   }
 
