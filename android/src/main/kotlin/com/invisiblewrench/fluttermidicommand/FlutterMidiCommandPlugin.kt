@@ -345,7 +345,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
         Log.d("FlutterMIDICommand", "Opened\n${it.info.toString()}")
 
         val device = ConnectedDevice(it)
-        device.connectWithReceiver(RXReceiver(rxStreamHandler))
+        device.connectWithReceiver(RXReceiver(rxStreamHandler, it))
         connectedDevices[id] = device
 
 
@@ -387,7 +387,6 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     return list.toList()
   }
 
-
   private val deviceConnectionCallback = object : MidiManager.DeviceCallback() {
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
@@ -425,12 +424,13 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
   }
 
-  class RXReceiver(stream: FlutterStreamHandler) : MidiReceiver() {
+  class RXReceiver(stream: FlutterStreamHandler, device: MidiDevice) : MidiReceiver() {
     val stream = stream
+    val deviceInfo = mapOf("id" to device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(device.info.type == MidiDeviceInfo.TYPE_BLUETOOTH) "BLE" else "native")
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
 //      Log.d("FlutterMIDICommand","RXReceiver onSend(receive) ${this}")
       msg?.also {
-        stream.send( mapOf("data" to it.slice(IntRange(offset, offset+count-1)), "timestamp" to timestamp) )
+        stream.send( mapOf("data" to it.slice(IntRange(offset, offset+count-1)), "timestamp" to timestamp, "device" to deviceInfo) )
       }
     }
   }
