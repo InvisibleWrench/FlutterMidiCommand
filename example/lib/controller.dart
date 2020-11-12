@@ -5,6 +5,11 @@ import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 
 class ControllerPage extends StatelessWidget {
+
+  MidiDevice device;
+
+  ControllerPage(this.device);
+
   Future<bool> _save() {
     print('close and disconnect all');
     MidiCommand().teardown();
@@ -19,12 +24,17 @@ class ControllerPage extends StatelessWidget {
           appBar: AppBar(
             title: Text('Controls'),
           ),
-          body: MidiControls(),
+          body: MidiControls(device),
         ));
   }
 }
 
 class MidiControls extends StatefulWidget {
+
+  MidiDevice device;
+
+  MidiControls(this.device);
+
   @override
   MidiControlsState createState() {
     return new MidiControlsState();
@@ -36,23 +46,29 @@ class MidiControlsState extends State<MidiControls> {
   var _controller = 0;
   var _value = 0;
 
+  // StreamSubscription<String> _setupSubscription;
   StreamSubscription<MidiPacket> _rxSubscription;
   MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
-    print('init controller');
+    // print('init controller');
     _rxSubscription = _midiCommand.onMidiDataReceived.listen((packet) {
-      print('received packet $packet');
+      // print('received packet $packet');
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+      // print("data $data @ time $timestamp from device ${device.name}:${device.id}");
 
       var status = data[0];
 
       if (status == 0xF8) {
-        print('beat');
+        // Beat
+        return;
+      }
+
+      if (status == 0xFE) {
+        // Active sense;
         return;
       }
 
@@ -68,11 +84,20 @@ class MidiControlsState extends State<MidiControls> {
         }
       }
     });
+
+
+    // Open ports
+    var ports = [widget.device.inputPorts.isEmpty ? null : widget.device.inputPorts.first, widget.device.outputPorts.isEmpty ? null : widget.device.outputPorts.first];
+    ports.removeWhere((value) => value == null);
+    print("open ports $ports");
+    _midiCommand.openPortsOnDevice(widget.device, ports);
+
     super.initState();
   }
 
   void dispose() {
-    _rxSubscription.cancel();
+    // _setupSubscription?.cancel();
+    _rxSubscription?.cancel();
     super.dispose();
   }
 

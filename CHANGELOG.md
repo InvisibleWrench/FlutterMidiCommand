@@ -1,6 +1,5 @@
-
-Added MIDI timestamp support
-Added MidiDevice info in received packets=
+## 0.2.6
+Fix example app on macos
 
 ## 0.2.5
 Fix MIDI Session Support on iOS Simulator
