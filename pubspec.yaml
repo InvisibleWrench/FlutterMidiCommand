@@ -11,12 +11,15 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_midi_command_platform_interface: #^0.2.0
-    #git:
-     # url: https://github.com/InvisibleWrench/flutter_midi_command_platform_interface
-      #ref: ports
-    path: ./../flutter_midi_command_platform_interface
+    git:
+      url: https://github.com/InvisibleWrench/flutter_midi_command_platform_interface
+      ref: ports
+    #path: ./../flutter_midi_command_platform_interface
   flutter_midi_command_linux: #^0.0.1
-    path: ./../flutter_midi_command_linux
+    git:
+      url: https://github.com/mortenboye/flutter_midi_command_linux
+      ref: master
+    #path: ./../flutter_midi_command_linux
 
 dev_dependencies:
   flutter_test:
