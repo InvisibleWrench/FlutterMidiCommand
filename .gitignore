@@ -7,4 +7,4 @@
 pubspec.lock
 
 build/
-.idea/FlutterMidiCommand.iml
+/.idea*
