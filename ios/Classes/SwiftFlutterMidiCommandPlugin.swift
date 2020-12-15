@@ -33,6 +33,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     var midiSetupChannel:FlutterEventChannel?
     var setupStreamHandler = StreamHandler()
 
+    #if os(iOS)
+    // Network Session
+    var session:MIDINetworkSession?
+    #endif
+
     // BLE
     var manager:CBCentralManager!
     var discoveredDevices:Set<CBPeripheral> = []
@@ -55,8 +60,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     var sysExBuffer: [UInt8] = []
     var timestamp: UInt16 = 0
-//    uint8_t tsHigh;
-//    uint8_t tsLow;
     var bleMidiBuffer:[UInt8] = []
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
@@ -111,6 +114,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
 
         manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
+
+#if os(iOS)
+         session = MIDINetworkSession.default()
+         session?.isEnabled = true
+         session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
+         #endif
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -174,6 +183,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         for device in connectedDevices {
             disconnectDevice(deviceId: device.value.id)
         }
+        #if os(iOS)
+        session?.isEnabled = false
+        #endif
     }
 
 
@@ -562,6 +574,46 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
 
     }
+
+    #if os(iOS)
+    /// MIDI Network Session
+     @objc func midiNetworkChanged(notification:NSNotification) {
+            print("\(#function)")
+            print("\(notification)")
+            if let session = notification.object as? MIDINetworkSession {
+                print("session \(session)")
+                for con in session.connections() {
+                    print("con \(con)")
+                }
+                print("isEnabled \(session.isEnabled)")
+                print("sourceEndpoint \(session.sourceEndpoint())")
+                print("destinationEndpoint \(session.destinationEndpoint())")
+                print("networkName \(session.networkName)")
+                print("localName \(session.localName)")
+
+                //            if let name = getDeviceName(session.sourceEndpoint()) {
+                //                print("source name \(name)")
+                //            }
+                //
+                //            if let name = getDeviceName(session.destinationEndpoint()) {
+                //                print("destination name \(name)")
+                //            }
+            }
+            setupStreamHandler.send(data: "\(#function) \(notification)")
+        }
+
+        @objc func midiNetworkContactsChanged(notification:NSNotification) {
+            print("\(#function)")
+            print("\(notification)")
+            if let session = notification.object as? MIDINetworkSession {
+                print("session \(session)")
+                for con in session.contacts() {
+                    print("contact \(con)")
+                }
+            }
+            setupStreamHandler.send(data: "\(#function) \(notification)")
+        }
+        #endif
 
     /// BLE handling
 
