@@ -10,7 +10,7 @@ Works with USB and BLE MIDI connections on Android, and USB, network(session) an
 
 - Make sure your project is created with Kotlin and Swift support.
 - Add flutter_midi_command: ^0.2.6 to your pubspec.yaml file.
-- In ios/Podfile uncomment and change the platform to 10.0 'platform :ios, '10.0''
+- In ios/Podfile uncomment and change the platform to 10.0 `platform :ios, '10.0'`
 - After building, Add a NSBluetoothAlwaysUsageDescription to info.plist in the generated Xcode project.
 
 
