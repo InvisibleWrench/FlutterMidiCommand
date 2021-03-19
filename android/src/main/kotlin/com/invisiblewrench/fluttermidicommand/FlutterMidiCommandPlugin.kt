@@ -478,7 +478,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       Log.d("FlutterMIDICommand","connectWithHandler")
 
       this.midiDevice?.info?.let {
-        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
+//        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
 
 //        it.ports.forEach {
 //          Log.d("FlutterMIDICommand", "${it.name} ${it.type} ${it.portNumber}")
