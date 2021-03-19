@@ -519,6 +519,26 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
     fun connectWithReceiver(receiver: MidiReceiver) {
       Log.d("FlutterMIDICommand","connectWithHandler")
+
+      this.midiDevice?.info?.let {
+//        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
+
+//        it.ports.forEach {
+//          Log.d("FlutterMIDICommand", "${it.name} ${it.type} ${it.portNumber}")
+//        }
+
+//        Log.d("FlutterMIDICommand", "is binder alive? ${this.midiDevice?.info?.properties?.getBinder(null)?.isBinderAlive}")
+
+        if(it.inputPortCount > 0) {
+          Log.d("FlutterMIDICommand", "Open input port")
+          this.inputPort = this.midiDevice?.openInputPort(0)
+        }
+        if (it.outputPortCount > 0) {
+          Log.d("FlutterMIDICommand", "Open output port")
+          this.outputPort = this.midiDevice?.openOutputPort(0)
+        }
+      }
+
       this.receiver = receiver
     }
 

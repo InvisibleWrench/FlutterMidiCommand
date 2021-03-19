@@ -19,6 +19,8 @@ class MidiCommand {
 
   static MidiCommandPlatform get _platform => MidiCommandPlatform.instance;
 
+  StreamController<Uint8List> _txStreamCtrl = StreamController.broadcast();
+
   /// Gets a list of available MIDI devices and returns it.
   Future<List<MidiDevice>> get devices async {
     return _platform.devices;
@@ -60,6 +62,7 @@ class MidiCommand {
   /// Data is an UInt8List of individual MIDI command bytes.
   void sendData(Uint8List data, {String deviceId, int timestamp}) {
     _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
+    _txStreamCtrl.add(data);
   }
 
   /// Stream firing events whenever a midi package is received.
@@ -74,5 +77,12 @@ class MidiCommand {
   /// For example, when a new BLE devices is discovered.
   Stream<String> get onMidiSetupChanged {
     return _platform.onMidiSetupChanged;
+  }
+
+  /// Stream firing events whenever a midi package is sent.
+  ///
+  /// The event contains the raw bytes contained in the MIDI package.
+  Stream<Uint8List> get onMidiDataSent {
+    return _txStreamCtrl.stream;
   }
 }
