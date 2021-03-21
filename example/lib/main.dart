@@ -80,9 +80,10 @@ class _MyAppState extends State<MyApp> {
                         return ListTile(
                           title: Text(
                             device.name,
-                            style: Theme.of(context).textTheme.headline,
+                            style: Theme.of(context).textTheme.headline2,
                           ),
-                          subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
+                          subtitle: Text(
+                              "ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
                           trailing: device.type == "BLE"
                               ? Icon(Icons.bluetooth)
                               : null,

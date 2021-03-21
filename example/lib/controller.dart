@@ -5,8 +5,7 @@ import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 
 class ControllerPage extends StatelessWidget {
-
-  MidiDevice device;
+  final MidiDevice device;
 
   ControllerPage(this.device);
 
@@ -30,8 +29,7 @@ class ControllerPage extends StatelessWidget {
 }
 
 class MidiControls extends StatefulWidget {
-
-  MidiDevice device;
+  final MidiDevice device;
 
   MidiControls(this.device);
 
@@ -85,9 +83,11 @@ class MidiControlsState extends State<MidiControls> {
       }
     });
 
-
     // Open ports
-    var ports = [widget.device.inputPorts.isEmpty ? null : widget.device.inputPorts.first, widget.device.outputPorts.isEmpty ? null : widget.device.outputPorts.first];
+    var ports = [
+      widget.device.inputPorts.isEmpty ? null : widget.device.inputPorts.first,
+      widget.device.outputPorts.isEmpty ? null : widget.device.outputPorts.first
+    ];
     ports.removeWhere((value) => value == null);
     print("open ports $ports");
     _midiCommand.openPortsOnDevice(widget.device, ports);
