@@ -159,19 +159,11 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       }
       "connectToDevice" -> {
         var args = call.arguments<Map<String, Any>>()
-        connectToDevice(args["id"].toString(), args["type"].toString())
-        result.success(null)
-      }
-      "openPortsOnDevice" -> {
-        var args = call.arguments<Map<String, Any>>()
-//        Log.d("FlutterMIDICommand","openPortsOnDevice ${args}")
-        var deviceId = (args["device"] as Map<String, Any>)["id"].toString()
-        var portList = (args["ports"] as List<Map<String, Any>>).map{
-          Port(if (it["id"].toString() is String) it["id"].toString().toInt() else 0 , it["type"].toString())
-        }
-        connectedDevices[deviceId]?.also {
-          it.openPorts(portList)
-        }
+        var device = (args["device"] as Map<String, Any>)
+//        var portList = (args["ports"] as List<Map<String, Any>>).map{
+//          Port(if (it["id"].toString() is String) it["id"].toString().toInt() else 0 , it["type"].toString())
+//        }
+        connectToDevice(device["id"].toString(), device["type"].toString())
         result.success(null)
       }
       "disconnectDevice" -> {
@@ -536,39 +528,40 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
         if (it.outputPortCount > 0) {
           Log.d("FlutterMIDICommand", "Open output port")
           this.outputPort = this.midiDevice?.openOutputPort(0)
+          this.outputPort?.connect(receiver)
         }
       }
 
       this.receiver = receiver
     }
 
-    fun openPorts(ports: List<Port>) {
-      this.midiDevice.info?.let { deviceInfo ->
-        Log.d("FlutterMIDICommand","inputPorts ${deviceInfo.inputPortCount} outputPorts ${deviceInfo.outputPortCount}")
-
-        ports.forEach { port ->
-          Log.d("FlutterMIDICommand", "Open port ${port.type} ${port.id}")
-          when (port.type) {
-            "MidiPortType.IN" -> {
-              if (deviceInfo.inputPortCount > port.id) {
-                Log.d("FlutterMIDICommand", "Open input port ${port.id}")
-                this.inputPort = this.midiDevice.openInputPort(port.id)
-              }
-            }
-            "MidiPortType.OUT" -> {
-              if (deviceInfo.outputPortCount > port.id) {
-                Log.d("FlutterMIDICommand", "Open output port ${port.id}")
-                this.outputPort = this.midiDevice.openOutputPort(port.id)
-                this.outputPort?.connect(receiver)
-              }
-            }
-            else -> {
-              Log.d("FlutterMIDICommand", "Unknown MIDI port type ${port.type}. Not opening.")
-            }
-          }
-        }
-      }
-    }
+//    fun openPorts(ports: List<Port>) {
+//      this.midiDevice.info?.let { deviceInfo ->
+//        Log.d("FlutterMIDICommand","inputPorts ${deviceInfo.inputPortCount} outputPorts ${deviceInfo.outputPortCount}")
+//
+//        ports.forEach { port ->
+//          Log.d("FlutterMIDICommand", "Open port ${port.type} ${port.id}")
+//          when (port.type) {
+//            "MidiPortType.IN" -> {
+//              if (deviceInfo.inputPortCount > port.id) {
+//                Log.d("FlutterMIDICommand", "Open input port ${port.id}")
+//                this.inputPort = this.midiDevice.openInputPort(port.id)
+//              }
+//            }
+//            "MidiPortType.OUT" -> {
+//              if (deviceInfo.outputPortCount > port.id) {
+//                Log.d("FlutterMIDICommand", "Open output port ${port.id}")
+//                this.outputPort = this.midiDevice.openOutputPort(port.id)
+//                this.outputPort?.connect(receiver)
+//              }
+//            }
+//            else -> {
+//              Log.d("FlutterMIDICommand", "Unknown MIDI port type ${port.type}. Not opening.")
+//            }
+//          }
+//        }
+//      }
+//    }
 
     fun send(data: ByteArray, timestamp: Long?) {
       this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0);

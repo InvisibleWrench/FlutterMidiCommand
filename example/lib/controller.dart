@@ -5,7 +5,6 @@ import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 
 class ControllerPage extends StatelessWidget {
-
   MidiDevice device;
 
   ControllerPage(this.device);
@@ -30,7 +29,6 @@ class ControllerPage extends StatelessWidget {
 }
 
 class MidiControls extends StatefulWidget {
-
   MidiDevice device;
 
   MidiControls(this.device);
@@ -85,13 +83,6 @@ class MidiControlsState extends State<MidiControls> {
       }
     });
 
-
-    // Open ports
-    var ports = [widget.device.inputPorts.isEmpty ? null : widget.device.inputPorts.first, widget.device.outputPorts.isEmpty ? null : widget.device.outputPorts.first];
-    ports.removeWhere((value) => value == null);
-    print("open ports $ports");
-    _midiCommand.openPortsOnDevice(widget.device, ports);
-
     super.initState();
   }
 
@@ -107,8 +98,7 @@ class MidiControlsState extends State<MidiControls> {
       child: Column(
         children: <Widget>[
           SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
-          SteppedSelector(
-              'Controller', _controller, 0, 127, _onControllerChanged),
+          SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
           SlidingSelector('Value', _value, 0, 127, _onValueChanged),
         ],
       ),
@@ -130,8 +120,7 @@ class MidiControlsState extends State<MidiControls> {
   _onValueChanged(int newValue) {
     setState(() {
       _value = newValue;
-      CCMessage(channel: _channel, controller: _controller, value: _value)
-          .send();
+      CCMessage(channel: _channel, controller: _controller, value: _value).send();
     });
   }
 }
@@ -143,8 +132,7 @@ class SteppedSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SteppedSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback);
+  SteppedSelector(this.label, this.value, this.minValue, this.maxValue, this.callback);
 
   @override
   Widget build(BuildContext context) {
@@ -179,8 +167,7 @@ class SlidingSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SlidingSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback);
+  SlidingSelector(this.label, this.value, this.minValue, this.maxValue, this.callback);
 
   @override
   Widget build(BuildContext context) {

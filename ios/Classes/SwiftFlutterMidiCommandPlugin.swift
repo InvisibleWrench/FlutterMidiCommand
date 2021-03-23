@@ -114,27 +114,23 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(devices)
             break
         case "connectToDevice":
-            if let deviceInfo = call.arguments as? Dictionary<String, Any> {
-                connectToDevice(deviceId: deviceInfo["id"] as! String, type: deviceInfo["type"] as! String)
-                result(nil)
-            } else {
-                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse device id", details: call.arguments))
-            }
-            break
-        case "openPortsOnDevice":
             if let args = call.arguments as? Dictionary<String, Any> {
-                let deviceId = (args["device"] as! Dictionary<String, Any>)["id"] as! String
-                let portList = (args["ports"] as! Array<Dictionary<String, Any>>).map{
-                    Port(id:$0["id"] as! Int, type:$0["type"] as! String)
-                }
-                if let device = connectedDevices[deviceId] {
-                    device.openPorts(ports: portList)
+                if let deviceInfo = args["device"] as? Dictionary<String, Any> {
+                    if let deviceId = deviceInfo["id"] as? String {
+                        if connectedDevices[deviceId] != nil {
+                            result(FlutterError.init(code: "MESSAGEERROR", message: "Device already connected", details: call.arguments))
+                        } else {
+                            connectToDevice(deviceId: deviceInfo["id"] as! String, type: deviceInfo["type"] as! String, ports: nil)
+                        }
+                        result(nil)
+                    } else {
+                        result(FlutterError.init(code: "MESSAGEERROR", message: "No device Id", details: deviceInfo))
+                    }
                 } else {
-                    print("device not found \(deviceId)")
+                    result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse deviceInfo", details: call.arguments))
                 }
-                result(nil)
             } else {
-                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse ports info", details: call.arguments))
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse args", details: call.arguments))
             }
             break
         case "disconnectDevice":
@@ -172,14 +168,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
 
 
-    func connectToDevice(deviceId:String, type:String) {
+    func connectToDevice(deviceId:String, type:String, ports:[Port]?) {
         print("connect \(deviceId) \(type)")
                 
         if type == "BLE" {
-            if let periph = discoveredDevices.filter({ (p) -> Bool in
-                p.identifier.uuidString == deviceId
-            }).first {
-                let device = ConnectedBLEDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, peripheral: periph)
+            if let periph = discoveredDevices.filter({ (p) -> Bool in p.identifier.uuidString == deviceId }).first {
+                let device = ConnectedBLEDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, peripheral: periph, ports:ports)
                 connectedDevices[deviceId] = device
                 manager.stopScan()
                 manager.connect(periph, options: nil)
@@ -187,7 +181,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("error connecting to device \(deviceId) [\(type)]")
             }
         } else if type == "native" {
-            let device = ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient)
+            let device = ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             connectedDevices[deviceId] = device
             setupStreamHandler.send(data: "deviceConnected")
         }
@@ -642,7 +636,7 @@ class ConnectedDevice : NSObject {
         self.streamHandler = streamHandler
     }
     
-    func openPorts(ports: [Port]) {}
+    func openPorts() {}
     
     func send(bytes:[UInt8], timestamp: UInt64?) {}
     
@@ -657,9 +651,11 @@ class ConnectedNativeDevice : ConnectedDevice {
     var outEndpoint : MIDIEndpointRef?
     var inSource : MIDIEndpointRef?
     var entity : MIDIEntityRef?
+    var ports:[Port]?
     
-    init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef) {
+    init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
         self.client = client
+        self.ports = ports
         let idParts = id.split(separator: ":")
         
         // Store entity and get device/entity name
@@ -693,6 +689,8 @@ class ConnectedNativeDevice : ConnectedDevice {
         
         // MIDI output
         MIDIOutputPortCreate(client, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
+
+        openPorts()
     }
         
     override func send(bytes: [UInt8], timestamp: UInt64?) {
@@ -703,35 +701,39 @@ class ConnectedNativeDevice : ConnectedDevice {
             packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
             let status = MIDISend(outputPort, ep, packetList)
-//                print("send bytes \(bytes) on port \(outputPort) \(ep) status \(status)")
+            //print("send bytes \(bytes) on port \(outputPort) \(ep) status \(status)")
             packetList.deallocate()
         } else {
             print("No MIDI destination for id \(name!)")
         }
     }
     
-    override func openPorts(ports: [Port]) {
-        
-//        print("open native ports \(ports)")
-        
-//        print("entity \(String(describing: entity))")
+    override func openPorts() {
+        print("open native ports")
         
         if let e = entity {
-                    
-            for port in ports {
-                inSource = MIDIEntityGetSource(e, port.id)
-                
-                switch port.type {
-                case "MidiPortType.IN":
-                    let status = MIDIPortConnectSource(inputPort, inSource!, &name)
-                    print("port open status \(status)")
-                case "MidiPortType.OUT":
-                    outEndpoint = MIDIEntityGetDestination(e, port.id)
-//                    print("port endpoint \(endpoint)")
-                    break
-                default:
-                    print("unknown port type \(port.type)")
+
+            if let ps = ports {
+                for port in ps {
+                    inSource = MIDIEntityGetSource(e, port.id)
+
+                    switch port.type {
+                    case "MidiPortType.IN":
+                        let status = MIDIPortConnectSource(inputPort, inSource!, &name)
+                        print("port open status \(status)")
+                    case "MidiPortType.OUT":
+                        outEndpoint = MIDIEntityGetDestination(e, port.id)
+    //                    print("port endpoint \(endpoint)")
+                        break
+                    default:
+                        print("unknown port type \(port.type)")
+                    }
                 }
+            } else {
+                print("open default ports")
+                inSource = MIDIEntityGetSource(e, 0)
+                let status = MIDIPortConnectSource(inputPort, inSource!, &name)
+                outEndpoint = MIDIEntityGetDestination(e, 0)
             }
         }
     }
@@ -799,7 +801,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
     
-    init(id:String, type:String, streamHandler:StreamHandler, peripheral:CBPeripheral) {
+    init(id:String, type:String, streamHandler:StreamHandler, peripheral:CBPeripheral, ports:[Port]?) {
         self.peripheral = peripheral
         super.init(id: id, type: type, streamHandler: streamHandler)
     }
@@ -814,7 +816,6 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         CBCentralManager().cancelPeripheralConnection(peripheral)
         characteristic = nil
     }
-    
     
     override func send(bytes:[UInt8], timestamp: UInt64?) {
 //        print("ble send \(id) \(bytes)")
