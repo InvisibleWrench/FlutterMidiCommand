@@ -1,3 +1,6 @@
+## 0.3.0
+Added linux support
+
 ## 0.2.6
 Fix example app on macos
 

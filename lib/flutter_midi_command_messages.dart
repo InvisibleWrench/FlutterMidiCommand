@@ -4,7 +4,7 @@ import 'flutter_midi_command.dart';
 enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, SYSEX, Beat }
 
 class MidiMessage {
-  Uint8List data;
+  Uint8List data = Uint8List(0);
 
   MidiMessage();
 
@@ -87,7 +87,7 @@ class SysExMessage extends MidiMessage {
 
   @override
   void send() {
-    data = headerData;
+    data = Uint8List.fromList(headerData);
     data.insert(0, 0xF0); // Start byte
     data.addAll(_bytesForValue(value));
     data.add(0xF7); // End byte

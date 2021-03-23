@@ -7,3 +7,4 @@ pubspec.lock
 
 build/
 .last_build_id
+Podfile.lock

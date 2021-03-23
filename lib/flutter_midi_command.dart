@@ -1,28 +1,40 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'dart:typed_data';
+import 'package:flutter_midi_command_linux/flutter_midi_command_linux.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
-export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
-    show MidiDevice;
+export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice, MidiPacket, MidiPort;
 
 class MidiCommand {
   factory MidiCommand() {
     if (_instance == null) {
       _instance = MidiCommand._();
     }
-    return _instance;
+    return _instance!;
   }
 
   MidiCommand._();
 
-  static MidiCommand _instance;
+  static MidiCommand? _instance;
 
-  static MidiCommandPlatform get _platform => MidiCommandPlatform.instance;
+  static MidiCommandPlatform? __platform;
 
   StreamController<Uint8List> _txStreamCtrl = StreamController.broadcast();
 
+  static MidiCommandPlatform get _platform {
+    if (__platform != null) return __platform!;
+
+    if (Platform.isLinux) {
+      __platform = FlutterMidiCommandLinux();
+    } else {
+      __platform = MidiCommandPlatform.instance;
+    }
+    return __platform!;
+  }
+
   /// Gets a list of available MIDI devices and returns it.
-  Future<List<MidiDevice>> get devices async {
+  Future<List<MidiDevice>?> get devices async {
     return _platform.devices;
   }
 
@@ -55,22 +67,22 @@ class MidiCommand {
   /// Sends data to the currently connected device.
   ///
   /// Data is an UInt8List of individual MIDI command bytes.
-  void sendData(Uint8List data) {
-    _platform.sendData(data);
+  void sendData(Uint8List data, {String? deviceId, int? timestamp}) {
+    _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
     _txStreamCtrl.add(data);
   }
 
   /// Stream firing events whenever a midi package is received.
   ///
   /// The event contains the raw bytes contained in the MIDI package.
-  Stream<Uint8List> get onMidiDataReceived {
+  Stream<MidiPacket>? get onMidiDataReceived {
     return _platform.onMidiDataReceived;
   }
 
   /// Stream firing events whenever a change in the MIDI setup occurs.
   ///
   /// For example, when a new BLE devices is discovered.
-  Stream<String> get onMidiSetupChanged {
+  Stream<String>? get onMidiSetupChanged {
     return _platform.onMidiSetupChanged;
   }
 

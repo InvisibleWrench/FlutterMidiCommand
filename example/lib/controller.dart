@@ -5,6 +5,10 @@ import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 
 class ControllerPage extends StatelessWidget {
+  MidiDevice device;
+
+  ControllerPage(this.device);
+
   Future<bool> _save() {
     print('close and disconnect all');
     MidiCommand().teardown();
@@ -19,12 +23,16 @@ class ControllerPage extends StatelessWidget {
           appBar: AppBar(
             title: Text('Controls'),
           ),
-          body: MidiControls(),
+          body: MidiControls(device),
         ));
   }
 }
 
 class MidiControls extends StatefulWidget {
+  MidiDevice device;
+
+  MidiControls(this.device);
+
   @override
   MidiControlsState createState() {
     return new MidiControlsState();
@@ -36,18 +44,29 @@ class MidiControlsState extends State<MidiControls> {
   var _controller = 0;
   var _value = 0;
 
-  StreamSubscription<List<int>> _rxSubscription;
+  // StreamSubscription<String> _setupSubscription;
+  StreamSubscription<MidiPacket> _rxSubscription;
   MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
-    print('init controller');
-    _rxSubscription = _midiCommand.onMidiDataReceived.listen((data) {
-      print('on data $data');
+    // print('init controller');
+    _rxSubscription = _midiCommand.onMidiDataReceived.listen((packet) {
+      // print('received packet $packet');
+      var data = packet.data;
+      var timestamp = packet.timestamp;
+      var device = packet.device;
+      // print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+
       var status = data[0];
 
       if (status == 0xF8) {
-        print('beat');
+        // Beat
+        return;
+      }
+
+      if (status == 0xFE) {
+        // Active sense;
         return;
       }
 
@@ -63,11 +82,13 @@ class MidiControlsState extends State<MidiControls> {
         }
       }
     });
+
     super.initState();
   }
 
   void dispose() {
-    _rxSubscription.cancel();
+    // _setupSubscription?.cancel();
+    _rxSubscription?.cancel();
     super.dispose();
   }
 
@@ -77,8 +98,7 @@ class MidiControlsState extends State<MidiControls> {
       child: Column(
         children: <Widget>[
           SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
-          SteppedSelector(
-              'Controller', _controller, 0, 127, _onControllerChanged),
+          SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
           SlidingSelector('Value', _value, 0, 127, _onValueChanged),
         ],
       ),
@@ -100,8 +120,7 @@ class MidiControlsState extends State<MidiControls> {
   _onValueChanged(int newValue) {
     setState(() {
       _value = newValue;
-      CCMessage(channel: _channel, controller: _controller, value: _value)
-          .send();
+      CCMessage(channel: _channel, controller: _controller, value: _value).send();
     });
   }
 }
@@ -113,8 +132,7 @@ class SteppedSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SteppedSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback);
+  SteppedSelector(this.label, this.value, this.minValue, this.maxValue, this.callback);
 
   @override
   Widget build(BuildContext context) {
@@ -149,8 +167,7 @@ class SlidingSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SlidingSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback);
+  SlidingSelector(this.label, this.value, this.minValue, this.maxValue, this.callback);
 
   @override
   Widget build(BuildContext context) {
