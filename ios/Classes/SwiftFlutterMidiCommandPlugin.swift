@@ -198,10 +198,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         print("disconnect \(String(describing: device)) for id \(deviceId)")
         if let device = device {
             if device.deviceType == "BLE" {
-                let p = (device as! ConnectedBLEDevice).peripheral
-                manager.cancelPeripheralConnection(p)
+                //let p = (device as! ConnectedBLEDevice).peripheral
+                //manager.cancelPeripheralConnection(p)
+                device.close()
             } else {
                 print("disconmmected MIDI")
+                device.close()
+                setupStreamHandler.send(data: "deviceDisconnected")
             }
             connectedDevices.removeValue(forKey: deviceId)
         }
