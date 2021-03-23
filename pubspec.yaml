@@ -16,11 +16,7 @@ dependencies:
       url: https://github.com/InvisibleWrench/flutter_midi_command_platform_interface
       ref: ports
     #path: ./../flutter_midi_command_platform_interface
-  flutter_midi_command_linux: #^0.0.1
-    git:
-      url: https://github.com/invisiblewrench/flutter_midi_command_linux
-      ref: master
-    #path: ./../flutter_midi_command_linux
+  flutter_midi_command_linux: ^0.1.0
 
 dev_dependencies:
   flutter_test:
