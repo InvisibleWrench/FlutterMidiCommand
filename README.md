@@ -5,6 +5,15 @@ A Flutter plugin for sending and receiving MIDI messages between Flutter and phy
 Wraps CoreMIDI and android.media.midi in a thin dart/flutter layer.
 Works with USB and BLE MIDI connections on Android, and USB, network(session) and BLE MIDI connections on iOS and macOS.
 
+
+## To install
+
+- Make sure your project is created with Kotlin and Swift support.
+- Add flutter_midi_command: ^0.2.6 to your pubspec.yaml file.
+- In ios/Podfile uncomment and change the platform to 10.0 `platform :ios, '10.0'`
+- After building, Add a NSBluetoothAlwaysUsageDescription to info.plist in the generated Xcode project.
+
+
 ## Getting Started
 
 This plugin is build using Swift and Kotlin on the native side, so make sure your project supports this.

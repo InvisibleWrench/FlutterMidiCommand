@@ -60,14 +60,6 @@ class MidiCommand {
     _platform.openPortsOnDevice(device, ports);
   }
 
-  /// Sends data to the currently connected device.
-  ///
-  /// Data is an UInt8List of individual MIDI command bytes.
-  void sendData(Uint8List data) {
-    _platform.sendData(data);
-    _txStreamCtrl.add(data);
-  }
-
   /// Disconnects from the device.
   void disconnectDevice(MidiDevice device) {
     _platform.disconnectDevice(device);
@@ -80,9 +72,10 @@ class MidiCommand {
   /// Sends data to the currently connected device.
   ///
   /// Data is an UInt8List of individual MIDI command bytes.
-  // void sendData(Uint8List data, {String deviceId, int timestamp}) {
-  //   _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
-  // }
+  void sendData(Uint8List data, {String deviceId, int timestamp}) {
+    _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
+    _txStreamCtrl.add(data);
+  }
 
   /// Stream firing events whenever a midi package is received.
   ///
