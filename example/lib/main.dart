@@ -82,7 +82,8 @@ class _MyAppState extends State<MyApp> {
                             device.name,
                             style: Theme.of(context).textTheme.headline,
                           ),
-                          subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
+                          subtitle: Text(
+                              "ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
                           trailing: device.type == "BLE"
                               ? Icon(Icons.bluetooth)
                               : null,

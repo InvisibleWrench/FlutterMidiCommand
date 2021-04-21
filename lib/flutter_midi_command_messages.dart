@@ -3,16 +3,20 @@ import 'flutter_midi_command.dart';
 
 enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, SYSEX, Beat }
 
+/// Base class for MIDI message types
 class MidiMessage {
+  /// Byte data of the message
   Uint8List data = Uint8List(0);
 
   MidiMessage();
 
+  /// Send the message bytes to all connected devices
   void send() {
     MidiCommand().sendData(data);
   }
 }
 
+/// Continuous Control Message
 class CCMessage extends MidiMessage {
   int channel = 0;
   int controller = 0;
@@ -30,6 +34,7 @@ class CCMessage extends MidiMessage {
   }
 }
 
+/// Program Change Message
 class PCMessage extends MidiMessage {
   int channel = 0;
   int program = 0;
@@ -45,6 +50,7 @@ class PCMessage extends MidiMessage {
   }
 }
 
+/// Note On Message
 class NoteOnMessage extends MidiMessage {
   int channel = 0;
   int note = 0;
@@ -62,6 +68,7 @@ class NoteOnMessage extends MidiMessage {
   }
 }
 
+/// Note Off Message
 class NoteOffMessage extends MidiMessage {
   int channel = 0;
   int note = 0;
@@ -79,6 +86,7 @@ class NoteOffMessage extends MidiMessage {
   }
 }
 
+/// System Exclusive Message
 class SysExMessage extends MidiMessage {
   List<int> headerData = [];
   int value = 0;
@@ -121,6 +129,7 @@ class SysExMessage extends MidiMessage {
   }
 }
 
+/// NRPN Message
 class NRPNMessage extends MidiMessage {
   int channel = 0;
   int parameter = 0;
@@ -155,6 +164,7 @@ class NRPNMessage extends MidiMessage {
   }
 }
 
+/// NRPN Message with data separated in MSB, LSB
 class NRPNHexMessage extends MidiMessage {
   int channel = 0;
   int parameterMSB = 0;

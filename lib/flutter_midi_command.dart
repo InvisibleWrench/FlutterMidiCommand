@@ -22,6 +22,7 @@ class MidiCommand {
 
   StreamController<Uint8List> _txStreamCtrl = StreamController.broadcast();
 
+  /// Get the platform specific implementation
   static MidiCommandPlatform get _platform {
     if (__platform != null) return __platform!;
 
@@ -33,62 +34,63 @@ class MidiCommand {
     return __platform!;
   }
 
-  /// Gets a list of available MIDI devices and returns it.
+  /// Gets a list of available MIDI devices and returns it
   Future<List<MidiDevice>?> get devices async {
     return _platform.devices;
   }
 
-  /// Starts scanning for BLE MIDI devices.
+  /// Starts scanning for BLE MIDI devices
   ///
-  /// Found devices will be included in the list returned by [devices].
+  /// Found devices will be included in the list returned by [devices]
   Future<void> startScanningForBluetoothDevices() async {
     return _platform.startScanningForBluetoothDevices();
   }
 
-  /// Stop scanning for BLE MIDI devices.
+  /// Stop scanning for BLE MIDI devices
   void stopScanningForBluetoothDevices() {
     _platform.stopScanningForBluetoothDevices();
   }
 
-  /// Connects to the device.
+  /// Connects to the device
   void connectToDevice(MidiDevice device) {
     _platform.connectToDevice(device);
   }
 
-  /// Disconnects from the device.
+  /// Disconnects from the device
   void disconnectDevice(MidiDevice device) {
     _platform.disconnectDevice(device);
   }
 
+  /// Disconnects from all devices
   void teardown() {
     _platform.teardown();
   }
 
-  /// Sends data to the currently connected device.
+  /// Sends data to the currently connected device
   ///
-  /// Data is an UInt8List of individual MIDI command bytes.
+  /// Data is an UInt8List of individual MIDI command bytes
   void sendData(Uint8List data, {String? deviceId, int? timestamp}) {
     _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
     _txStreamCtrl.add(data);
   }
 
-  /// Stream firing events whenever a midi package is received.
+  /// Stream firing events whenever a midi package is received
   ///
-  /// The event contains the raw bytes contained in the MIDI package.
+  /// The event contains the raw bytes contained in the MIDI package
   Stream<MidiPacket>? get onMidiDataReceived {
     return _platform.onMidiDataReceived;
   }
 
-  /// Stream firing events whenever a change in the MIDI setup occurs.
+  /// Stream firing events whenever a change in the MIDI setup occurs
   ///
-  /// For example, when a new BLE devices is discovered.
+  /// For example, when a new BLE devices is discovered
   Stream<String>? get onMidiSetupChanged {
     return _platform.onMidiSetupChanged;
   }
 
-  /// Stream firing events whenever a midi package is sent.
+  /// Stream firing events whenever a midi package is sent
   ///
-  /// The event contains the raw bytes contained in the MIDI package.
+  /// The event contains the raw bytes contained in the MIDI package
   Stream<Uint8List> get onMidiDataSent {
     return _txStreamCtrl.stream;
   }
