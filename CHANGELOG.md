@@ -1,3 +1,6 @@
+## 0.3.1
+Fixed device disconnect on iOS
+
 ## 0.3.0
 Added linux support
 

@@ -10,8 +10,9 @@ class ControllerPage extends StatelessWidget {
   ControllerPage(this.device);
 
   Future<bool> _save() {
-    print('close and disconnect all');
-    MidiCommand().teardown();
+    print('close and disconnect');
+    // MidiCommand().teardown();
+    MidiCommand().disconnectDevice(device);
     return Future.value(true);
   }
 
@@ -56,7 +57,7 @@ class MidiControlsState extends State<MidiControls> {
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      // print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+      print("data $data @ time $timestamp from device ${device.name}:${device.id}");
 
       var status = data[0];
 

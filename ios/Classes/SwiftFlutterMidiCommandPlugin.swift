@@ -134,14 +134,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
             break
         case "disconnectDevice":
-            if let deviceInfo = call.arguments as? Dictionary<String, String> {
-                disconnectDevice(deviceId: deviceInfo["id"]!)
+            if let deviceInfo = call.arguments as? Dictionary<String, Any> {
+                if let deviceId = deviceInfo["id"] as? String {
+                    disconnectDevice(deviceId: deviceId)
+                } else {
+                    result(FlutterError.init(code: "MESSAGEERROR", message: "No device Id", details: call.arguments))
+                }
                 result(nil)
             } else {
                 result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse device id", details: call.arguments))
             }
             result(nil)
             break
+
         case "sendData":
             if let packet = call.arguments as? Dictionary<String, Any> {
                 sendData(packet["data"] as! FlutterStandardTypedData, deviceId: packet["deviceId"] as? String, timestamp: packet["timestamp"] as? UInt64)
