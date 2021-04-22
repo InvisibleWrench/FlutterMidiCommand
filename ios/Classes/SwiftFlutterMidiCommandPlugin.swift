@@ -1045,7 +1045,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
 //                print ("set timestamp")
                 let tsHigh = header & 0x3f
                 let tsLow = midiByte & 0x7f
-                timestamp = UInt64(tsHigh << 7) | UInt64(tsLow)
+                timestamp = UInt64(tsHigh) << 7 | UInt64(tsLow)
 //                print ("timestamp is \(timestamp)")
                 break
 

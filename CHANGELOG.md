@@ -1,3 +1,6 @@
+## 0.3.2
+Fixed BLE timestamp on iOS
+
 ## 0.3.1
 Fixed device disconnect on iOS
 
