@@ -378,7 +378,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
   fun listOfPorts(count: Int) :  List<Map<String, Any>> {
     Log.d("FlutterMIDICommand", "number of ports $count")
-    return (0..count-1).map { mapOf("id" to it, "connected" to false) }
+    return (0 until count).map { mapOf("id" to it, "connected" to false) }
   }
 
   fun listOfDevices() : List<Map<String, Any>> {
@@ -386,13 +386,14 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
     val devs:Array<MidiDeviceInfo> = midiManager.devices
     Log.d("FlutterMIDICommand", "devices $devs")
-    devs.forEach { d -> list.add(mapOf(
-            "name" to d.properties.getString(MidiDeviceInfo.PROPERTY_NAME),
-            "id" to d.id.toString(),
+    devs.forEach {
+      list.add(mapOf(
+            "name" to (it.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"),
+            "id" to it.id.toString(),
             "type" to "native",
-            "connected" to if (connectedDevices.contains(d.id.toString())) "true" else "false",
-            "inputs" to listOfPorts(d.inputPortCount),
-            "outputs" to listOfPorts(d.outputPortCount)
+            "connected" to if (connectedDevices.contains(it.id.toString())) "true" else "false",
+            "inputs" to listOfPorts(it.inputPortCount),
+            "outputs" to listOfPorts(it.outputPortCount)
           )
     )}
 

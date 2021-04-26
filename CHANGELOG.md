@@ -1,3 +1,6 @@
+## 0.3.3
+Fixed nullable error in kotlin
+
 ## 0.3.2
 Fixed BLE timestamp on iOS
 
