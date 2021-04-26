@@ -49,7 +49,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
   lateinit var bluetoothAdapter:BluetoothAdapter
   var bluetoothScanner:BluetoothLeScanner? = null
-  private val PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 95453 // arbitrary
+  private val PERMISSIONS_REQUEST_ACCESS_LOCATION = 95453 // arbitrary
 
   var discoveredDevices = mutableSetOf<BluetoothDevice>()
 
@@ -185,15 +185,15 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     Log.d("FlutterMIDICommand", "tryToInitBT")
 
     if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
       if (activity != null) {
         var activity = activity!!
-        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
           Log.d("FlutterMIDICommand", "Show rationale for Location")
           return "showRationaleForPermission"
         } else {
-          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_COARSE_LOCATION), PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION)
+          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION), PERMISSIONS_REQUEST_ACCESS_LOCATION)
         }
       }
     } else {
@@ -271,7 +271,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
   fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>,
                                  grantResults: IntArray) {
     Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
-    if (requestCode == PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+    if (requestCode == PERMISSIONS_REQUEST_ACCESS_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
       startScanningLeDevices()
     } else {
       Log.d("FlutterMIDICommand", "Perms failed")

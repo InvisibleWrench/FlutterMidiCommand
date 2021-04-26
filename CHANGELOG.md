@@ -1,3 +1,6 @@
+## 0.3.4
+Changed permissions to fine location for BLE on Android, required when targeting sdk 29+
+
 ## 0.3.3
 Fixed nullable error in kotlin
 
