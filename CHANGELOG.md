@@ -1,3 +1,7 @@
+## 0.3.5
+Fixed an issue with BLE device IDs on Android
+Fixed an issue where BLE devices would appear in device list as native devices as well as bluetooth devices after being connected
+
 ## 0.3.4
 Changed permissions to fine location for BLE on Android, required when targeting sdk 29+
 

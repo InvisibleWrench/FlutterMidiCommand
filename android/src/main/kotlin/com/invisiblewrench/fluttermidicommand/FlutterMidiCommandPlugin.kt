@@ -386,7 +386,14 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
     val devs:Array<MidiDeviceInfo> = midiManager.devices
     Log.d("FlutterMIDICommand", "devices $devs")
+
+    var connectedBleDeviceIds = mutableListOf<String>()
+
     devs.forEach {
+      if (it.type == MidiDeviceInfo.TYPE_BLUETOOTH) {
+        connectedBleDeviceIds.add(it.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString())
+      }
+
       list.add(mapOf(
             "name" to (it.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"),
             "id" to it.id.toString(),
@@ -398,14 +405,16 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     )}
 
     discoveredDevices.forEach {
-      list.add(mapOf(
-              "name" to it.name,
-              "id" to it.address,
-              "type" to "BLE",
-              "connected" to if (connectedDevices.contains(it.address)) "true" else "false",
-              "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
-              "outputs" to listOf(mapOf("id" to 0, "connected" to false))
-              ))
+      if (!connectedBleDeviceIds.contains(it.address)) {
+        list.add(mapOf(
+                "name" to it.name,
+                "id" to it.address,
+                "type" to "BLE",
+                "connected" to if (connectedDevices.contains(it.address)) "true" else "false",
+                "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
+                "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+        ))
+      }
     }
 
     Log.d("FlutterMIDICommand", "list $list")
@@ -450,9 +459,9 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
   class RXReceiver(stream: FlutterStreamHandler, device: MidiDevice) : MidiReceiver() {
     val stream = stream
-    val deviceInfo = mapOf("id" to device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(device.info.type == MidiDeviceInfo.TYPE_BLUETOOTH) "BLE" else "native")
+    var isBluetoothDevice = device.info.type == MidiDeviceInfo.TYPE_BLUETOOTH
+    val deviceInfo = mapOf("id" to if(isBluetoothDevice) device.info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(isBluetoothDevice) "BLE" else "native")
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
-//      Log.d("FlutterMIDICommand","RXReceiver onSend(receive) ${this}")
       msg?.also {
         stream.send( mapOf("data" to it.slice(IntRange(offset, offset+count-1)), "timestamp" to timestamp, "device" to deviceInfo) )
       }
@@ -475,7 +484,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
 
     fun send(data: Any) {
-//      Log.d("FlutterMIDICommand","FlutterStreamHandler send ${data}")
+      Log.d("FlutterMIDICommand","FlutterStreamHandler send ${data}")
       handler.post {
         eventSink?.success(data)
       }
