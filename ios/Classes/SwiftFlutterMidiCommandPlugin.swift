@@ -973,7 +973,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                       else
                       {
                         // Sysex continue
-                        print("sysex continue")
+                        //print("sysex continue")
                         bleHandlerState = BLE_HANDLER_STATE.SYSEX
                       }
                     }

@@ -1,5 +1,8 @@
+## 0.3.7
+Better workaround for an issue with receiving sysex messages on Android via BLE
+
 ## 0.3.6
-Workaround for an issue with receiving long sysex messages on Android
+Workaround for an issue with receiving long sysex messages on Android via BLE
 
 ## 0.3.5
 Fixed an issue with BLE device IDs on Android
