@@ -471,26 +471,57 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 //        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count first ${data.first()} last ${data.last()}")
 
         if (sysexPart.isNotEmpty()) {
-          if (data.first() == 0xF0.toByte()) { // new sysex incoming, cap old one
-            Log.d("FlutterMIDICommand", "cap incomplete sysex message, start new one")
-            sysexPart.add(0xF7.toByte());
-            stream.send( mapOf("data" to sysexPart.toList(), "timestamp" to timestamp, "device" to deviceInfo))
-            sysexPart.clear()
-          }
-          // add more data to part
-          sysexPart.addAll(data)
+          // does data contain a start byte?
+          var startIndex = data.indexOf(0xF0.toByte())
+          if (startIndex > -1) { // new sysex incoming, cap old one
+//            Log.d("FlutterMIDICommand", "new sysex message starting, ending last one from startindex $startIndex")
 
-          if (data.last() == 0xF7.toByte()) { // complete sysex message
-            stream.send(mapOf("data" to sysexPart.toList(), "timestamp" to timestamp, "device" to deviceInfo))
+            var tailEnd = data.subList(0, startIndex)
+            sysexPart.addAll(tailEnd)
+            if (sysexPart.indexOf(0xF7.toByte()) == -1) {
+              sysexPart.add(0xF7.toByte()) // Sometimes android drops the last byte of a BLE Midi message, so this workaround tries to save that situation
+            }
+            stream.send( mapOf("data" to sysexPart.toList(), "timestamp" to timestamp, "device" to deviceInfo))
+
+            // insert start of new message
             sysexPart.clear()
+            sysexPart.addAll(data.subList(startIndex, data.size))
+          } else {
+            // add more data to part
+            sysexPart.addAll(data)
+          }
+
+//          Log.d("FlutterMIDICommand", "data $sysexPart")
+
+          // is the message complete
+          var endIndex = sysexPart.indexOf(0xF7.toByte())
+          if (endIndex > -1) {
+            var sysexData = sysexPart.subList(0, endIndex+1)
+//            Log.d("FlutterMIDICommand", "complete sysex message, send to app")
+            stream.send(mapOf("data" to sysexData, "timestamp" to timestamp, "device" to deviceInfo))
+            sysexPart = sysexPart.subList(endIndex+1, sysexPart.size)
+//            Log.d("FlutterMIDICommand", "remainng sysex part, $sysexPart")
           }
 
         } else {
-          if (data.first() == 0xF0.toByte() && data.last() != 0xF7.toByte()) {
-            // uncomplete sysex message
-            Log.d("FlutterMIDICommand", "incomplete sysex message, stitch with next one")
-            sysexPart.clear()
-            sysexPart.addAll(data)
+          // Start of new sysex message
+          if (data.first() == 0xF0.toByte()) {
+            var endIndex = data.indexOf(0xF7.toByte())
+//            Log.d("FlutterMIDICommand", "sysex end index $endIndex")
+            if (endIndex > -1) { // Has end byte
+                var sysexData = data.subList(0, endIndex+1);
+//              Log.d("FlutterMIDICommand", "complete sysex message $sysexData, send to app")
+                stream.send(mapOf("data" to sysexData, "timestamp" to timestamp, "device" to deviceInfo))
+
+                if (endIndex < data.size-1) {
+//                  Log.d("FlutterMIDICommand", "start of new sysex message in tail, save...")
+                  sysexPart.clear()
+                  sysexPart.addAll(data.subList(endIndex+1, data.size))
+                }
+            } else { // no end byte, save for later
+              sysexPart.clear()
+              sysexPart.addAll(data)
+            }
           } else {
             // regular midi message
             stream.send(mapOf("data" to data, "timestamp" to timestamp, "device" to deviceInfo))
