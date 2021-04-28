@@ -343,7 +343,6 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     override fun onDeviceOpened(it: MidiDevice?) {
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
-
         val id = it.info.id.toString()
         Log.d("FlutterMIDICommand", "Opened\n${it.info}")
 
@@ -460,10 +459,43 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
   class RXReceiver(stream: FlutterStreamHandler, device: MidiDevice) : MidiReceiver() {
     val stream = stream
     var isBluetoothDevice = device.info.type == MidiDeviceInfo.TYPE_BLUETOOTH
+
     val deviceInfo = mapOf("id" to if(isBluetoothDevice) device.info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(isBluetoothDevice) "BLE" else "native")
+
+    var sysexPart:MutableList<Byte> = mutableListOf()
+
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
       msg?.also {
-        stream.send( mapOf("data" to it.slice(IntRange(offset, offset+count-1)), "timestamp" to timestamp, "device" to deviceInfo) )
+        var data = it.slice(IntRange(offset, offset+count-1))
+
+//        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count first ${data.first()} last ${data.last()}")
+
+        if (sysexPart.isNotEmpty()) {
+          if (data.first() == 0xF0.toByte()) { // new sysex incoming, cap old one
+            Log.d("FlutterMIDICommand", "cap incomplete sysex message, start new one")
+            sysexPart.add(0xF7.toByte());
+            stream.send( mapOf("data" to sysexPart.toList(), "timestamp" to timestamp, "device" to deviceInfo))
+            sysexPart.clear()
+          }
+          // add more data to part
+          sysexPart.addAll(data)
+
+          if (data.last() == 0xF7.toByte()) { // complete sysex message
+            stream.send(mapOf("data" to sysexPart.toList(), "timestamp" to timestamp, "device" to deviceInfo))
+            sysexPart.clear()
+          }
+
+        } else {
+          if (data.first() == 0xF0.toByte() && data.last() != 0xF7.toByte()) {
+            // uncomplete sysex message
+            Log.d("FlutterMIDICommand", "incomplete sysex message, stitch with next one")
+            sysexPart.clear()
+            sysexPart.addAll(data)
+          } else {
+            // regular midi message
+            stream.send(mapOf("data" to data, "timestamp" to timestamp, "device" to deviceInfo))
+          }
+        }
       }
     }
   }
@@ -484,7 +516,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
 
     fun send(data: Any) {
-      Log.d("FlutterMIDICommand","FlutterStreamHandler send ${data}")
+//      Log.d("FlutterMIDICommand","FlutterStreamHandler send ${data}")
       handler.post {
         eventSink?.success(data)
       }
@@ -523,6 +555,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       Log.d("FlutterMIDICommand","connectWithHandler")
 
       this.midiDevice?.info?.let {
+
 //        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
 
 //        it.ports.forEach {

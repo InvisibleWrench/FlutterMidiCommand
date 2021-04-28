@@ -1,3 +1,6 @@
+## 0.3.6
+Workaround for an issue with receiving long sysex messages on Android
+
 ## 0.3.5
 Fixed an issue with BLE device IDs on Android
 Fixed an issue where BLE devices would appear in device list as native devices as well as bluetooth devices after being connected

@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_midi_command'
-  s.version          = '0.0.1'
+  s.version          = '0.3.6'
   s.summary          = 'A Flutter plugin for sending and receiving MIDI messages'
   s.description      = <<-DESC
   'A Flutter plugin for sending and receiving MIDI messages'
