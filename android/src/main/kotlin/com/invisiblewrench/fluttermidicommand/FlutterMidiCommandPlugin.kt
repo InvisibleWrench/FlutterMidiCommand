@@ -343,11 +343,11 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     override fun onDeviceOpened(it: MidiDevice?) {
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
-        val id = it.info.id.toString()
         Log.d("FlutterMIDICommand", "Opened\n${it.info}")
 
         val device = ConnectedDevice(it)
         device.connectWithReceiver(RXReceiver(rxStreamHandler, it))
+        val id = deviceIdForInfo(it.info)
         connectedDevices[id] = device
 
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceOpened")
@@ -389,14 +389,15 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     var connectedBleDeviceIds = mutableListOf<String>()
 
     devs.forEach {
-      if (it.type == MidiDeviceInfo.TYPE_BLUETOOTH) {
+      var isBluetooth = it.type == MidiDeviceInfo.TYPE_BLUETOOTH
+      if (isBluetooth) {
         connectedBleDeviceIds.add(it.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString())
       }
 
       list.add(mapOf(
             "name" to (it.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"),
-            "id" to it.id.toString(),
-            "type" to "native",
+            "id" to deviceIdForInfo(it),
+            "type" to if (isBluetooth) "BLE" else "native",
             "connected" to if (connectedDevices.contains(it.id.toString())) "true" else "false",
             "inputs" to listOfPorts(it.inputPortCount),
             "outputs" to listOfPorts(it.outputPortCount)
@@ -421,7 +422,14 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     return list.toList()
   }
 
+  fun deviceIdForInfo(info: MidiDeviceInfo) : String {
+    var isBluetoothDevice = info.type == MidiDeviceInfo.TYPE_BLUETOOTH
+    var deviceId:String = if(isBluetoothDevice) info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else info.id.toString()
+    return deviceId
+  }
+
   private val deviceConnectionCallback = object : MidiManager.DeviceCallback() {
+
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       device?.also {
@@ -434,7 +442,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       super.onDeviceRemoved(device)
       device?.also {
         Log.d("FlutterMIDICommand","device removed $it")
-        connectedDevices[it.id.toString()]?.also {
+        connectedDevices[deviceIdForInfo(it)]?.also {
           Log.d("FlutterMIDICommand","remove removed device $it")
           connectedDevices.remove(it.id)
         }
@@ -447,12 +455,12 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       Log.d("FlutterMIDICommand","device status changed ${status.toString()}")
 
       status?.also {
-        connectedDevices[status.deviceInfo.id.toString()]?.also {
-          Log.d("FlutterMIDICommand", "update device status")
+        connectedDevices[deviceIdForInfo(it.deviceInfo)]?.also {
+          Log.d("FlutterMIDICommand", "update device status ${status.toString()}")
           it.status = status
         }
       }
-      this@FlutterMidiCommandPlugin.setupStreamHandler.send("onDeviceStatusChanged")
+      this@FlutterMidiCommandPlugin.setupStreamHandler.send(status.toString())
     }
   }
 
