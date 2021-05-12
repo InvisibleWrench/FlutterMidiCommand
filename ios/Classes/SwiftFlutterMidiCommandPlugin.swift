@@ -110,7 +110,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             break
         case "getDevices":
             let devices = getDevices()
-            print("--- devices ---\n\(devices)")
+            print("--- devices ---")
+            for dev in devices { print(dev) }
             result(devices)
             break
         case "connectToDevice":
@@ -162,7 +163,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(FlutterMethodNotImplemented)
         }
     }
-    
+
     func teardown() {
         for device in connectedDevices {
             disconnectDevice(deviceId: device.value.id)
@@ -175,7 +176,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     func connectToDevice(deviceId:String, type:String, ports:[Port]?) {
         print("connect \(deviceId) \(type)")
-                
+
         if type == "BLE" {
             if let periph = discoveredDevices.filter({ (p) -> Bool in p.identifier.uuidString == deviceId }).first {
                 let device = ConnectedBLEDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, peripheral: periph, ports:ports)
@@ -201,7 +202,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 //manager.cancelPeripheralConnection(p)
                 device.close()
             } else {
-                print("disconmmected MIDI")
+                print("disconnected MIDI")
                 device.close()
                 setupStreamHandler.send(data: "deviceDisconnected")
             }
@@ -244,29 +245,28 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     
     func getDevices() -> [Dictionary<String, Any>] {
-        var devices:[Dictionary<String, Any>] = []
 
-        //  Native
-        var nativeDevices = Dictionary<MIDIEntityRef, Dictionary<String, Any>>()
-        
+        var devices:[Dictionary<String, Device>] = []
+        var nativeDevices = Dictionary<String, Device>()
+
         let destinationCount = MIDIGetNumberOfDestinations()
         for d in 0..<destinationCount {
             let destination = MIDIGetDestination(d)
 //            print("dest \(destination) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: destination))")
-            
+
             var entity : MIDIEntityRef = 0
             var status = MIDIEndpointGetEntity(destination, &entity)
             let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
 //            print("entity \(entity) status \(status) \(entityName)")
-            
+
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
             let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
 //            print("device \(device) status \(status) \(deviceName)")
-            
+
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 //            print("entityCount \(entityCount)")
-            
+
             var entityIndex = 0;
             for e in 0..<entityCount {
                 let ent = MIDIDeviceGetEntity(device, e)
@@ -276,38 +276,38 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 }
             }
 //            print("entityIndex \(entityIndex)")
-            
+
             let entityDestinationCount = MIDIEntityGetNumberOfDestinations(entity)
-//            print("entiry dest count \(entityDestinationCount)")
-            
-            nativeDevices[entity] = [
-                "name" : "\(deviceName) \(entityName)",
-                "id" : "\(device):\(entityIndex)",
-                "type" : "native",
-                "connected":(connectedDevices.keys.contains(String(entity)) ? "true" : "false"),
-                "outputs" : createPortDict(count: entityDestinationCount)
-                ]
+//            print("entity dest count \(entityDestinationCount)")
+
+            let id = "\(device):\(entityIndex)"
+            nativeDevices[String(entity)] = Device(id: id, name: "\(deviceName) \(entityName)",
+                    type: "native",
+                    connected: connectedDevices.keys.contains(id),
+                    inputs: nil,
+                    outputs: createPortDict(count: entityDestinationCount))
+
         }
-        
-        
+
+
         let sourceCount = MIDIGetNumberOfSources()
         for s in 0..<sourceCount {
             let source = MIDIGetSource(s)
 //            print("src \(source) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: source))")
-            
+
             var entity : MIDIEntityRef = 0
             var status = MIDIEndpointGetEntity(source, &entity)
             let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
 //            print("entity \(entity) status \(status) \(entityName)")
-            
+
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
             let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
 //            print("device \(device) status \(status) \(deviceName)")
-            
+
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 //            print("entityCount \(entityCount)")
-            
+
             var entityIndex = 0;
             for e in 0..<entityCount {
                 let ent = MIDIDeviceGetEntity(device, e)
@@ -317,43 +317,49 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 }
             }
 //            print("entityIndex \(entityIndex)")
-            
+
             let entitySourceCount = MIDIEntityGetNumberOfSources(entity)
-//            print("entiry source count \(entitySourceCount)")
-            
-            if var deviceDict = nativeDevices[entity] {
+//            print("entity source count \(entitySourceCount)")
+
+            if let deviceDict = nativeDevices[String(entity)] {
 //                print("add inputs to dict")
-                deviceDict["inputs"] = createPortDict(count: entitySourceCount)
+                deviceDict.inputs = createPortDict(count: entitySourceCount)
 //                print(type(of: createPortDict(count: entitySourceCount)))
-                nativeDevices[entity] = deviceDict
+                nativeDevices[String(entity)] = deviceDict
             } else {
 //                print("create inputs dict")
-                nativeDevices[entity] = [
-                    "name" : "\(deviceName) \(entityName)",
-                    "id" : "\(device):\(entityIndex)",
-                    "type" : "native",
-                    "connected":(connectedDevices.keys.contains(String(entity)) ? "true" : "false"),
-                    "inputs" : createPortDict(count: entitySourceCount)
-                    ]
+
+                let id = "\(device):\(entityIndex)"
+                nativeDevices[String(entity)] = Device(id: id, name: "\(deviceName) \(entityName)",
+                                type: "native",
+                                connected: connectedDevices.keys.contains(id),
+                                inputs: createPortDict(count: entitySourceCount),
+                                outputs: nil)
+
             }
         }
-        
-        devices.append(contentsOf: nativeDevices.values)
-        
+
+        for nd in nativeDevices {
+            devices.append([nd.key: nd.value])
+        }
+
         // BLE
         for periph:CBPeripheral in discoveredDevices {
             let id = periph.identifier.uuidString
-            devices.append([
-                "name" : periph.name ?? "Unknown",
-                "id" : id,
-                "type" : "BLE",
-                "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false]],
-                "outputs" : [["id":0, "connected":false]]
-                ])
+            devices.append( [id : Device(id: id, name: periph.name ?? "Unknown",
+                    type: "BLE",
+                    connected: connectedDevices.keys.contains(id),
+                    inputs: nil,
+                    outputs: nil)])
         }
 
-        return devices;
+        // Map Device to external interface requirement
+        var result:[Dictionary<String, Any>] = []
+        for device in devices {
+            result.append(device.values.first!.toDictionary())
+        }
+        return result;
+
     }
 
 
@@ -576,25 +582,25 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //        peripheral.delegate = self
 //        peripheral.discoverServices([CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")])
         setupStreamHandler.send(data: "deviceConnected")
-        
+
         (connectedDevices[peripheral.identifier.uuidString] as! ConnectedBLEDevice).setupBLE()
     }
 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("central did fail to connect state \(peripheral)")
 //        connectingDevice = nil
-        
+
         setupStreamHandler.send(data: "connectionFailed")
         connectedDevices.removeValue(forKey: peripheral.identifier.uuidString)
     }
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
-        
+
 //        connectedPeripheral = nil
 //        connectedCharacteristic = nil
         setupStreamHandler.send(data: "deviceDisconnected")
-    }    
+    }
 }
 
 class StreamHandler : NSObject, FlutterStreamHandler {
@@ -617,6 +623,38 @@ class StreamHandler : NSObject, FlutterStreamHandler {
 //        } else {
 //            print("no sink")
         }
+    }
+}
+
+
+class Device {
+    var id:String
+    var type: String
+    var name: String
+    var connected: Bool
+    var inputs: Array<Dictionary<String, Any>>
+    var outputs: Array<Dictionary<String, Any>>
+
+    init(id:String, name:String, type:String, connected:Bool,
+         inputs:Array<Dictionary<String, Any>>?,
+         outputs:Array<Dictionary<String, Any>>? ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.connected = connected
+        self.inputs = inputs ?? [["id":0, "connected":false]]
+        self.outputs = outputs ?? [["id":0, "connected":false]]
+    }
+
+    func toDictionary() -> Dictionary<String, Any> {
+        return [
+            "name" : name,
+            "id" : id,
+            "type" : type,
+            "connected": connected ? "true" : "false",
+            "inputs": inputs,
+            "outputs": outputs
+        ]
     }
 }
 

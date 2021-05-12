@@ -99,6 +99,10 @@ class MidiControlsState extends State<MidiControls> {
     return Container(
       child: Column(
         children: <Widget>[
+          Text(
+            widget.device.name,
+            style: Theme.of(context).textTheme.headline5,
+          ),
           SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
           SteppedSelector(
               'Controller', _controller, 0, 127, _onControllerChanged),
