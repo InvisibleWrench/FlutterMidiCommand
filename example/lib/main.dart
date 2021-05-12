@@ -27,14 +27,14 @@ class _MyAppState extends State<MyApp> {
 
       switch (data) {
         case "deviceFound":
-          setState(() {});
           break;
-        // case "deviceOpened":
-        //   break;
+      // case "deviceOpened":
+      //   break;
         default:
-          // print("Unhandled setup change: $data");
+        // print("Unhandled setup change: $data");
           break;
       }
+      setState(() {});
     });
   }
 
@@ -80,18 +80,26 @@ class _MyAppState extends State<MyApp> {
                         return ListTile(
                           title: Text(
                             device.name,
-                            style: Theme.of(context).textTheme.headline,
+                            style: Theme.of(context).textTheme.headline5,
                           ),
                           subtitle: Text(
                               "ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
-                          trailing: device.type == "BLE"
-                              ? Icon(Icons.bluetooth)
-                              : null,
+                          trailing:
+                                device.type == "BLE"
+                                    ? Icon(Icons.bluetooth, color: device.connected ? Colors.green : Colors.black)
+                                    : device.connected ? Icon(Icons.check, color: Colors.green) : null,
                           onTap: () {
-                            _midiCommand.connectToDevice(device);
+                            if (!device.connected) {
+                              _midiCommand.connectToDevice(device);
+                            }
                             Navigator.of(context).push(MaterialPageRoute<Null>(
                               builder: (_) => ControllerPage(device),
                             ));
+                          },
+                          onLongPress: () {
+                            device.connected ? _midiCommand.disconnectDevice(device) : _midiCommand.connectToDevice(device);
+                            setState(() {
+                            });
                           },
                         );
                       },

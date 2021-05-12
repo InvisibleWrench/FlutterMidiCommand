@@ -9,3 +9,5 @@ build/
 .last_build_id
 Podfile.lock
 local.properties
+
+.idea
