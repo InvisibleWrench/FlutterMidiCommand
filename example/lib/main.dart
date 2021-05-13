@@ -25,12 +25,17 @@ class _MyAppState extends State<MyApp> {
     _setupSubscription = _midiCommand.onMidiSetupChanged.listen((data) {
       print("setup changed $data");
 
+      setState(() {});
       switch (data) {
         case "deviceFound":
-          setState(() {});
+          print("device found");
           break;
-        // case "deviceOpened":
-        //   break;
+        case "deviceOpened":
+          print("device found");
+          break;
+        case "deviceLost":
+          print("device lost");
+          break;
         default:
           // print("Unhandled setup change: $data");
           break;
@@ -53,9 +58,7 @@ class _MyAppState extends State<MyApp> {
           actions: <Widget>[
             IconButton(
                 onPressed: () {
-                  _midiCommand
-                      .startScanningForBluetoothDevices()
-                      .catchError((err) {
+                  _midiCommand.startScanningForBluetoothDevices().catchError((err) {
                     print("Error $err");
                   });
                   setState(() {});
@@ -63,7 +66,14 @@ class _MyAppState extends State<MyApp> {
                 icon: Icon(Icons.refresh))
           ],
         ),
-        body: new Center(
+        bottomNavigationBar: Container(
+          padding: EdgeInsets.all(24.0),
+          child: Text(
+            "Tap to connnect/disconnect, long press to control.",
+            textAlign: TextAlign.center,
+          ),
+        ),
+        body: Center(
             child: FutureBuilder(
                 future: _midiCommand.devices,
                 builder: (BuildContext context, AsyncSnapshot snapshot) {
@@ -82,16 +92,23 @@ class _MyAppState extends State<MyApp> {
                             device.name,
                             style: Theme.of(context).textTheme.headline,
                           ),
-                          subtitle: Text(
-                              "ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
-                          trailing: device.type == "BLE"
-                              ? Icon(Icons.bluetooth)
-                              : null,
-                          onTap: () {
-                            _midiCommand.connectToDevice(device);
+                          subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
+                          leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),
+                          trailing: device.type == "BLE" ? Icon(Icons.bluetooth) : null,
+                          onLongPress: () {
+                            // _midiCommand.connectToDevice(device);
                             Navigator.of(context).push(MaterialPageRoute<Null>(
                               builder: (_) => ControllerPage(device),
                             ));
+                          },
+                          onTap: () {
+                            if (device.connected) {
+                              print("disconnect");
+                              _midiCommand.disconnectDevice(device);
+                            } else {
+                              print("connect");
+                              _midiCommand.connectToDevice(device);
+                            }
                           },
                         );
                       },
