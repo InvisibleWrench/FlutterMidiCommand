@@ -49,13 +49,13 @@ class MidiControlsState extends State<MidiControls> {
   var _value = 0;
 
   // StreamSubscription<String> _setupSubscription;
-  StreamSubscription<MidiPacket> _rxSubscription;
+  StreamSubscription<MidiPacket>? _rxSubscription;
   MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
     // print('init controller');
-    _rxSubscription = _midiCommand.onMidiDataReceived.listen((packet) {
+    _rxSubscription = _midiCommand.onMidiDataReceived?.listen((packet) {
       // print('received packet $packet');
       var data = packet.data;
       var timestamp = packet.timestamp;
