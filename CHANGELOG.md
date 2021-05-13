@@ -1,3 +1,7 @@
+## 0.3.8
+Updated example app
+Fixed device state handling on Android
+
 ## 0.3.7
 Better workaround for an issue with receiving sysex messages on Android via BLE
 
