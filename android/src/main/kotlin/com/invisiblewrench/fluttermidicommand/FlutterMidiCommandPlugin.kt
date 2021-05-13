@@ -292,7 +292,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       if (bleDevices.count() == 0) {
         Log.d("FlutterMIDICommand", "Device not found ${deviceId}")
       } else {
-        Log.d("FlutterMIDICommand", "Stop BLE Scan - Open device")
+        Log.d("FlutterMIDICommand", "Open device")
         midiManager.openBluetoothDevice(bleDevices.first(), deviceOpenedListener, handler)
       }
     } else if (type == "native") {
@@ -350,11 +350,12 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
         Log.d("FlutterMIDICommand", "Opened\n${it.info}")
+        Log.d("FlutterMIDICommand", "Opened ${it.info.id}")
 
         val device = ConnectedDevice(it)
         device.connectWithReceiver(RXReceiver(rxStreamHandler, it))
-        val id = deviceIdForInfo(it.info)
-        connectedDevices[id] = device
+        Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
+        connectedDevices[device.id] = device
 
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceOpened")
       }
@@ -370,11 +371,17 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
   }
 
   fun sendData(data: ByteArray, timestamp: Long?, deviceId: String?) {
-    if (deviceId != null && connectedDevices.containsKey(deviceId)) {
-      connectedDevices[deviceId]?.let {
-        it.send(data, timestamp)
+    if (deviceId != null) {
+      if (connectedDevices.containsKey(deviceId)) {
+        connectedDevices[deviceId]?.let {
+          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
+          it.send(data, timestamp)
+        }
+      } else {
+        Log.d("FlutterMIDICommand", "no device for id $deviceId")
       }
-    } else {
+    }
+     else {
       connectedDevices.values.forEach {
         it.send(data, timestamp)
       }
