@@ -197,11 +197,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         print("disconnect \(String(describing: device)) for id \(deviceId)")
         if let device = device {
             if device.deviceType == "BLE" {
-                //let p = (device as! ConnectedBLEDevice).peripheral
-                //manager.cancelPeripheralConnection(p)
-                device.close()
+                let p = (device as! ConnectedBLEDevice).peripheral
+                manager.cancelPeripheralConnection(p)
+                //device.close()
             } else {
-                print("disconmmected MIDI")
+                print("disconnected MIDI")
                 device.close()
                 setupStreamHandler.send(data: "deviceDisconnected")
             }
@@ -262,7 +262,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
             let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-//            print("device \(device) status \(status) \(deviceName)")
+            //print("device \(device) status \(status) \(deviceName)")
             
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 //            print("entityCount \(entityCount)")
@@ -572,17 +572,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print("central did connect \(peripheral)")
-//        connectedPeripheral = peripheral
-//        peripheral.delegate = self
-//        peripheral.discoverServices([CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")])
-        setupStreamHandler.send(data: "deviceConnected")
-        
-        (connectedDevices[peripheral.identifier.uuidString] as! ConnectedBLEDevice).setupBLE()
+        (connectedDevices[peripheral.identifier.uuidString] as! ConnectedBLEDevice).setupBLE(stream: setupStreamHandler)
     }
 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("central did fail to connect state \(peripheral)")
-//        connectingDevice = nil
         
         setupStreamHandler.send(data: "connectionFailed")
         connectedDevices.removeValue(forKey: peripheral.identifier.uuidString)
@@ -590,9 +584,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
-        
-//        connectedPeripheral = nil
-//        connectedCharacteristic = nil
+
         setupStreamHandler.send(data: "deviceDisconnected")
     }    
 }
@@ -630,7 +622,7 @@ class Port {
     }
 }
 
-class ConnectedDevice : NSObject {
+ class ConnectedDevice : NSObject {
     var id:String
     var deviceType:String
     var streamHandler : StreamHandler
@@ -805,13 +797,16 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var bleMidiBuffer:[UInt8] = []
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
+
+    var setupStream : StreamHandler?;
     
     init(id:String, type:String, streamHandler:StreamHandler, peripheral:CBPeripheral, ports:[Port]?) {
         self.peripheral = peripheral
         super.init(id: id, type: type, streamHandler: streamHandler)
     }
     
-    func setupBLE() {
+    func setupBLE(stream: StreamHandler) {
+        setupStream = stream
         peripheral.delegate = self
         peripheral.discoverServices([CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")])
     }
@@ -917,6 +912,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 self.characteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
                 print("set up characteristic for device")
+                setupStream?.send(data: "deviceConnected")
             }
         }
     }
