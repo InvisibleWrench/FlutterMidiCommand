@@ -38,6 +38,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     // BLE
     var manager:CBCentralManager!
     var discoveredDevices:Set<CBPeripheral> = []
+
+
+    var ongoingConnections = Dictionary<String, FlutterResult>()
     
 
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
@@ -120,9 +123,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         if connectedDevices[deviceId] != nil {
                             result(FlutterError.init(code: "MESSAGEERROR", message: "Device already connected", details: call.arguments))
                         } else {
-                            connectToDevice(deviceId: deviceInfo["id"] as! String, type: deviceInfo["type"] as! String, ports: nil)
+                            ongoingConnections[deviceId] = result
+                            connectToDevice(deviceId: deviceId, type: deviceInfo["type"] as! String, ports: nil)
                         }
-                        result(nil)
                     } else {
                         result(FlutterError.init(code: "MESSAGEERROR", message: "No device Id", details: deviceInfo))
                     }
@@ -178,7 +181,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 
         if type == "BLE" {
             if let periph = discoveredDevices.filter({ (p) -> Bool in p.identifier.uuidString == deviceId }).first {
-                let device = ConnectedBLEDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, peripheral: periph, ports:ports)
+                let device = ConnectedBLEDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, result:ongoingConnections[deviceId], peripheral: periph, ports:ports)
                 connectedDevices[deviceId] = device
                 manager.stopScan()
                 manager.connect(periph, options: nil)
@@ -189,6 +192,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let device = ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             connectedDevices[deviceId] = device
             setupStreamHandler.send(data: "deviceConnected")
+            if let result = ongoingConnections[deviceId] {
+                result(nil)
+            }
         }
     }
 
@@ -199,7 +205,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if device.deviceType == "BLE" {
                 let p = (device as! ConnectedBLEDevice).peripheral
                 manager.cancelPeripheralConnection(p)
-                //device.close()
             } else {
                 print("disconnected MIDI")
                 device.close()
@@ -566,7 +571,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         print("central didDiscover \(peripheral)")
         if !discoveredDevices.contains(peripheral) {
             discoveredDevices.insert(peripheral)
-            setupStreamHandler.send(data: "deviceFound")
+            setupStreamHandler.send(data: "deviceAppeared")
         }
     }
 
@@ -775,6 +780,7 @@ class ConnectedNativeDevice : ConnectedDevice {
 class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var peripheral:CBPeripheral
     var characteristic:CBCharacteristic?
+
     
     // BLE MIDI parsing
     enum BLE_HANDLER_STATE
@@ -798,10 +804,12 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
 
-    var setupStream : StreamHandler?;
-    
-    init(id:String, type:String, streamHandler:StreamHandler, peripheral:CBPeripheral, ports:[Port]?) {
+    var setupStream : StreamHandler?
+    var connectResult : FlutterResult?
+
+    init(id:String, type:String, streamHandler:StreamHandler, result:FlutterResult?, peripheral:CBPeripheral, ports:[Port]?) {
         self.peripheral = peripheral
+        self.connectResult = result
         super.init(id: id, type: type, streamHandler: streamHandler)
     }
     
@@ -913,7 +921,15 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 peripheral.setNotifyValue(true, for: characteristic)
                 print("set up characteristic for device")
                 setupStream?.send(data: "deviceConnected")
+                if let res = connectResult {
+                    res(nil)
+                }
+                return;
             }
+        }
+
+        if let res = connectResult {
+            res(FlutterError.init(code: "BLEERROR", message: "Did not discover MIDI characteristics", details: id))
         }
     }
     

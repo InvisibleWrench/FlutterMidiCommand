@@ -52,8 +52,8 @@ class MidiCommand {
   }
 
   /// Connects to the device
-  void connectToDevice(MidiDevice device) {
-    _platform.connectToDevice(device);
+  Future<void> connectToDevice(MidiDevice device) {
+    return _platform.connectToDevice(device);
   }
 
   /// Disconnects from the device

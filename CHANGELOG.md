@@ -1,3 +1,7 @@
+## 0.4.0-dev.1
+Updated to new connectDevice function which return a future
+Aligned status updates from native across platforms
+
 ## 0.3.8
 Updated example app
 Fixed device state handling on Android

@@ -24,22 +24,7 @@ class _MyAppState extends State<MyApp> {
     });
     _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((data) {
       print("setup changed $data");
-
       setState(() {});
-      switch (data) {
-        case "deviceFound":
-          print("device found");
-          break;
-        case "deviceOpened":
-          print("device found");
-          break;
-        case "deviceLost":
-          print("device lost");
-          break;
-        default:
-          // print("Unhandled setup change: $data");
-          break;
-      }
     });
   }
 
@@ -103,7 +88,7 @@ class _MyAppState extends State<MyApp> {
                           _midiCommand.disconnectDevice(device);
                         } else {
                           print("connect");
-                          _midiCommand.connectToDevice(device);
+                          _midiCommand.connectToDevice(device).then((_) => print("device connected async"));
                         }
                       },
                     );

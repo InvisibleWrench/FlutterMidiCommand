@@ -53,6 +53,8 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
   var discoveredDevices = mutableSetOf<BluetoothDevice>()
 
+  var ongoingConnections = mutableMapOf<String, Result>()
+
   lateinit var blManager:BluetoothManager
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -169,8 +171,9 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 //        var portList = (args["ports"] as List<Map<String, Any>>).map{
 //          Port(if (it["id"].toString() is String) it["id"].toString().toInt() else 0 , it["type"].toString())
 //        }
-        connectToDevice(device["id"].toString(), device["type"].toString())
-        result.success(null)
+        var deviceId = device["id"].toString()
+        ongoingConnections[deviceId] = result
+        connectToDevice(deviceId, device["type"].toString())
       }
       "disconnectDevice" -> {
         var args = call.arguments<Map<String, Any>>()
@@ -313,7 +316,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       result?.also {
         if (!discoveredDevices.contains(it.device)) {
           discoveredDevices.add(it.device)
-          setupStreamHandler.send("deviceFound")
+          setupStreamHandler.send("deviceAppeared")
         }
       }
     }
@@ -321,7 +324,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     override fun onScanFailed(errorCode: Int) {
       super.onScanFailed(errorCode)
       Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
-      setupStreamHandler.send("BLE Scan failed $errorCode")
+      setupStreamHandler.send("BLE scan failed $errorCode")
     }
   }
 
@@ -349,18 +352,13 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     override fun onDeviceOpened(it: MidiDevice?) {
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
-        Log.d("FlutterMIDICommand", "Opened\n${it.info}")
-        Log.d("FlutterMIDICommand", "Opened ${it.info.id}")
-
-        val device = ConnectedDevice(it)
-        device.connectWithReceiver(RXReceiver(rxStreamHandler, it))
+        val device = ConnectedDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
+        var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
+        device.connectWithReceiver(RXReceiver(rxStreamHandler, it), result)
         Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
         connectedDevices[device.id] = device
-
-        this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceOpened")
       }
     }
-
   }
 
   fun disconnectDevice(deviceId: String) {
@@ -438,15 +436,13 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
   }
 
 
-
-
   private val deviceConnectionCallback = object : MidiManager.DeviceCallback() {
 
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       device?.also {
         Log.d("FlutterMIDICommand", "device added $it")
-        this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
+        //this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
       }
     }
 
@@ -595,9 +591,11 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     var outputPort:MidiOutputPort? = null
     var status:MidiDeviceStatus? = null
     private var receiver:MidiReceiver? = null
+    private var streamHandler:FlutterStreamHandler? = null
 
-    constructor(device:MidiDevice) {
+    constructor(device:MidiDevice, streamHandler:FlutterStreamHandler) {
       this.midiDevice = device
+      this.streamHandler = streamHandler
       this.id = deviceIdForInfo(device.info)
       this.type = device.info.type.toString()
       device.info.ports.forEach {
@@ -605,7 +603,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       }
     }
 
-    fun connectWithReceiver(receiver: MidiReceiver) {
+    fun connectWithReceiver(receiver: MidiReceiver, connectResult:Result?) {
       Log.d("FlutterMIDICommand","connectWithHandler")
 
       this.midiDevice?.info?.let {
@@ -630,6 +628,10 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       }
 
       this.receiver = receiver
+
+      connectResult?.success(null)
+
+      streamHandler?.send("deviceConnected")
     }
 
 //    fun openPorts(ports: List<Port>) {
@@ -676,6 +678,8 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       this.receiver = null
       Log.d("FlutterMIDICommand", "Close device ${this.midiDevice}")
       this.midiDevice?.close()
+
+      streamHandler?.send("deviceDisconnected")
     }
 
   }

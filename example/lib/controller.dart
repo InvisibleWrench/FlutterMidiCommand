@@ -9,25 +9,13 @@ class ControllerPage extends StatelessWidget {
 
   ControllerPage(this.device);
 
-  // Future<bool> _save() {
-  //   print('close and disconnect');
-  //   // MidiCommand().teardown();
-  //   MidiCommand().disconnectDevice(device);
-  //   return Future.value(true);
-  // }
-
   @override
   Widget build(BuildContext context) {
-    return
-        // WillPopScope(
-        //   onWillPop: _save,
-        //   child:
-        Scaffold(
+    return Scaffold(
       appBar: AppBar(
         title: Text('Controls'),
       ),
       body: MidiControls(device),
-      // )
     );
   }
 }
