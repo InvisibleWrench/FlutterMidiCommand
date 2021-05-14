@@ -34,6 +34,19 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
+  IconData _deviceIconForType(String type) {
+    switch (type) {
+      case "native":
+        return Icons.devices;
+      case "network":
+        return Icons.language;
+      case "BLE":
+        return Icons.bluetooth;
+      default:
+        return Icons.device_unknown;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return new MaterialApp(
@@ -76,7 +89,7 @@ class _MyAppState extends State<MyApp> {
                       ),
                       subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
                       leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),
-                      trailing: device.type == "BLE" ? Icon(Icons.bluetooth) : null,
+                      trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {
                         Navigator.of(context).push(MaterialPageRoute<Null>(
                           builder: (_) => ControllerPage(device),

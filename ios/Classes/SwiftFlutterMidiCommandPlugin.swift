@@ -188,8 +188,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             } else {
                 print("error connecting to device \(deviceId) [\(type)]")
             }
-        } else if type == "native" {
+        } else {//if type == "native" {
             let device = ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
+            print("connected to \(device) \(deviceId)")
             connectedDevices[deviceId] = device
             setupStreamHandler.send(data: "deviceConnected")
             if let result = ongoingConnections[deviceId] {
@@ -221,12 +222,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         if let deviceId = deviceId {
             if let device = connectedDevices[deviceId] {
                 device.send(bytes: bytes, timestamp: timestamp)
-//                _sendDataToDevice(device: device, data: data, timestamp: timestamp)
             }
         } else {
             connectedDevices.values.forEach({ (device) in
                 device.send(bytes: bytes, timestamp: timestamp)
-//                _sendDataToDevice(device: device, data: data, timestamp: timestamp)
             })
         }
     }
@@ -239,6 +238,20 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         if err == OSStatus(noErr) { result = param!.takeRetainedValue() as String }
         return result
     }
+
+    static func isNetwork(device:MIDIObjectRef) -> Bool {
+            var isNetwork:Bool = false
+
+            var list: Unmanaged<CFPropertyList>?
+            MIDIObjectGetProperties(device, &list, true)
+            if let list = list {
+                let dict = list.takeRetainedValue() as! NSDictionary
+                if dict["apple.midirtp.session"] != nil {
+                    isNetwork = true
+                }
+            }
+            return isNetwork
+        }
     
 
     func createPortDict(count:Int) -> Array<Dictionary<String, Any>> {
@@ -262,7 +275,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             var entity : MIDIEntityRef = 0
             var status = MIDIEndpointGetEntity(destination, &entity)
             let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
-//            print("entity \(entity) status \(status) \(entityName)")
+            //print("entity \(entity) status \(status) \(entityName) \(String(entity))")
+
+            let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
             
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
@@ -281,15 +296,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 }
             }
 //            print("entityIndex \(entityIndex)")
+             let deviceId = "\(device):\(entityIndex)"
             
             let entityDestinationCount = MIDIEntityGetNumberOfDestinations(entity)
 //            print("entiry dest count \(entityDestinationCount)")
             
             nativeDevices[entity] = [
                 "name" : "\(deviceName) \(entityName)",
-                "id" : "\(device):\(entityIndex)",
-                "type" : "native",
-                "connected":(connectedDevices.keys.contains(String(entity)) ? "true" : "false"),
+                "id" :  deviceId,
+                "type" : isNetwork ? "network" : "native",
+                "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
                 "outputs" : createPortDict(count: entityDestinationCount)
                 ]
         }
@@ -303,7 +319,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             var entity : MIDIEntityRef = 0
             var status = MIDIEndpointGetEntity(source, &entity)
             let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
-//            print("entity \(entity) status \(status) \(entityName)")
+            //print("entity \(entity) status \(status) \(entityName)")
+
+            let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
             
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
@@ -322,6 +340,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 }
             }
 //            print("entityIndex \(entityIndex)")
+
+            let deviceId = "\(device):\(entityIndex)"
             
             let entitySourceCount = MIDIEntityGetNumberOfSources(entity)
 //            print("entiry source count \(entitySourceCount)")
@@ -335,9 +355,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //                print("create inputs dict")
                 nativeDevices[entity] = [
                     "name" : "\(deviceName) \(entityName)",
-                    "id" : "\(device):\(entityIndex)",
-                    "type" : "native",
-                    "connected":(connectedDevices.keys.contains(String(entity)) ? "true" : "false"),
+                    "id" : deviceId,
+                    "type" : isNetwork ? "network" : "native",
+                    "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
                     "inputs" : createPortDict(count: entitySourceCount)
                     ]
             }
@@ -366,8 +386,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         print("\ngot a MIDINotification!")
 
         let notification = midiNotification.pointee
-        print("MIDI Notify, messageId= \(notification.messageID)")
-        print("MIDI Notify, messageSize= \(notification.messageSize)")
+        print("MIDI Notify, messageId= \(notification.messageID) \(notification.messageSize)")
 
         setupStreamHandler.send(data: "\(notification.messageID)")
 
@@ -741,14 +760,15 @@ class ConnectedNativeDevice : ConnectedDevice {
     }
     
     override func close() {
+        /*
         if let oEP = outEndpoint {
             MIDIEndpointDispose(oEP)
         }
-        
+        */
         if let iS = inSource {
             MIDIPortDisconnectSource(inputPort, iS)
         }
-        
+
         MIDIPortDispose(inputPort)
         MIDIPortDispose(outputPort)
     }
