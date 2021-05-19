@@ -31,7 +31,7 @@ import android.util.Log
 
 
 /** FlutterMidiCommandPlugin */
-public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
+class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
   lateinit var context: Context
   private var activity:Activity? = null
@@ -69,7 +69,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
   override fun onAttachedToActivity(p0: ActivityPluginBinding) {
     print("onAttachedToActivity")
     // TODO: your plugin is now attached to an Activity
-    activity = p0?.activity
+    activity = p0.activity
     setup()
   }
 
@@ -465,7 +465,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
       status?.also {
         connectedDevices[deviceIdForInfo(it.deviceInfo)]?.also {
-          Log.d("FlutterMIDICommand", "update device status ${status.toString()}")
+          Log.d("FlutterMIDICommand", "update device status $status")
           it.status = status
         }
       }
@@ -481,83 +481,130 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
     val deviceInfo = mapOf("id" to if(isBluetoothDevice) device.info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(isBluetoothDevice) "BLE" else "native")
 
-    var sysexPart:MutableList<Byte> = mutableListOf()
+    // MIDI parsing
+    enum class PARSER_STATE
+    {
+      HEADER,
+      //      TIMESTAMP,
+      STATUS,
+      STATUS_RUNNING,
+      PARAMS,
+      SYSTEM_RT,
+      SYSEX,
+      SYSEX_END,
+      SYSEX_INT
+    }
+
+    var parserState = PARSER_STATE.HEADER
+
+    var sysExBuffer = mutableListOf<Byte>()
+    var midiBuffer = mutableListOf<Byte>()
+    var midiPacketLength:Int = 0
+    var sysExHasFinished = true
+    var statusByte:Byte = 0
 
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
       msg?.also {
-        var data = it.slice(IntRange(offset, offset+count-1))
+        var data = it.slice(IntRange(offset, offset + count - 1))
+        Log.d(
+          "FlutterMIDICommand",
+          "data sliced $data offset $offset count $count"
+        )
 
-        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count first ${data.first()} last ${data.last()}")
+//      Log.d("FlutterMIDICommand","parse ${packet}")
 
-        if (sysexPart.isNotEmpty()) {
-          // does data contain a start byte?
-          var startIndex = data.indexOf(0xF0.toByte())
-          if (startIndex > -1) { // new sysex incoming, cap old one
-//            Log.d("FlutterMIDICommand", "new sysex message starting, ending last one from startindex $startIndex")
+        if (data.size > 0) {
+          for (i in 0 until data.size) {
+            var midiByte: Byte = data[i]
+            var midiInt = midiByte.toInt()
 
-            var tailEnd = data.subList(0, startIndex)
-            sysexPart.addAll(tailEnd)
-            if (sysexPart.indexOf(0xF7.toByte()) == -1) {
-              sysexPart.add(0xF7.toByte()) // Sometimes android drops the last byte of a BLE Midi message, so this workaround tries to save that situation
-            }
-            stream.send( mapOf("data" to sysexPart.toList(), "timestamp" to timestamp, "device" to deviceInfo))
+//          Log.d("FlutterMIDICommand", "parserState $parserState byte $midiByte")
 
-            // insert start of new message
-            sysexPart.clear()
-            sysexPart.addAll(data.subList(startIndex, data.size))
-          } else {
-            // add more data to part
-            sysexPart.addAll(data)
-          }
-
-//          Log.d("FlutterMIDICommand", "data $sysexPart")
-
-          // is the message complete
-          var endIndex = sysexPart.indexOf(0xF7.toByte())
-          if (endIndex > -1) {
-            var sysexData = sysexPart.subList(0, endIndex+1)
-//            Log.d("FlutterMIDICommand", "complete sysex message, send to app")
-            stream.send(mapOf("data" to sysexData, "timestamp" to timestamp, "device" to deviceInfo))
-            sysexPart = sysexPart.subList(endIndex+1, sysexPart.size)
-//            Log.d("FlutterMIDICommand", "remainng sysex part, $sysexPart")
-          }
-
-        } else {
-          // Start of new sysex message
-          var sysexStartIndex = data.indexOf(0xF0.toByte())
-          if (sysexStartIndex > -1) {
-
-            if (sysexStartIndex > 0) {
-              Log.d("FlutterMIDICommand", "sysex message starting in the middle $sysexStartIndex, send pre to app")
-              var msgData = data.subList(0, sysexStartIndex)
-              stream.send(mapOf("data" to msgData, "timestamp" to timestamp, "device" to deviceInfo))
-            }
-//            if (data.first() == 0xF0.toByte()) {
-            var sysexData = data.subList(sysexStartIndex, data.size)
-
-//            var endIndex = data.indexOf(0xF7.toByte())
-            var endIndex = sysexData.indexOf(0xF7.toByte())
-//            Log.d("FlutterMIDICommand", "sysex end index $endIndex")
-            if (endIndex > -1) { // Has end byte
-                var sysexData = sysexData.subList(0, endIndex+1);
-//              Log.d("FlutterMIDICommand", "complete sysex message $sysexData, send to app")
-                stream.send(mapOf("data" to sysexData, "timestamp" to timestamp, "device" to deviceInfo))
-
-                if (endIndex < sysexData.size-1) {
-//                  Log.d("FlutterMIDICommand", "start of new sysex message in tail, save...")
-                  sysexPart.clear()
-                  sysexPart.addAll(sysexData.subList(endIndex+1, sysexData.size))
+            when (parserState) {
+              PARSER_STATE.HEADER -> {
+                if (midiInt and 0xFF == 0xF0) {
+                  parserState = PARSER_STATE.SYSEX
+                  sysExBuffer.clear()
+                  sysExBuffer.add(midiByte)
+                } else if (midiInt and 0x80 == 0x80) {
+                  // some kind of midi msg
+                  statusByte = midiByte
+                  midiPacketLength = lengthOfMessageType(midiInt)
+//                Log.d("FlutterMIDICommand", "expected length $midiPacketLength")
+                  midiBuffer.clear()
+                  midiBuffer.add(midiByte)
+                  parserState = PARSER_STATE.PARAMS
+                } else {
+                  // in header state but no status byte, do running status
+                  midiBuffer.clear()
+                  midiBuffer.add(statusByte)
+                  midiBuffer.add(midiByte)
+                  parserState = PARSER_STATE.PARAMS
+                  finalizeMessageIfComplete(timestamp)
                 }
-            } else { // no end byte, save for later
-              sysexPart.clear()
-              sysexPart.addAll(sysexData)
+              }
+
+              PARSER_STATE.SYSEX -> {
+                if (midiInt and 0xFF == 0xF0) {
+                  // Android can skip SysEx end bytes, when more sysex messages are coming in succession.
+                  // in an attempt to save the situation, add an end byte to the current buffer and start a new one.
+                  sysExBuffer.add(0xF7.toByte())
+//                Log.d("FlutterMIDICommand", "sysex force finalized $sysExBuffer")
+                  stream.send(
+                    mapOf(
+                      "data" to sysExBuffer.toList(),
+                      "timestamp" to timestamp,
+                      "device" to deviceInfo
+                    )
+                  )
+                  sysExBuffer.clear();
+                }
+                sysExBuffer.add(midiByte)
+                if (midiInt and 0xFF == 0xF7) {
+                  // Sysex complete
+//                Log.d("FlutterMIDICommand", "sysex complete $sysExBuffer")
+                  stream.send(
+                    mapOf(
+                      "data" to sysExBuffer.toList(),
+                      "timestamp" to timestamp,
+                      "device" to deviceInfo
+                    )
+                  )
+                  parserState = PARSER_STATE.HEADER
+                }
+              }
+
+              PARSER_STATE.PARAMS -> {
+                midiBuffer.add(midiByte)
+                finalizeMessageIfComplete(timestamp)
+              }
             }
-          } else {
-            // regular midi message
-            stream.send(mapOf("data" to data, "timestamp" to timestamp, "device" to deviceInfo))
           }
         }
       }
+    }
+
+    fun finalizeMessageIfComplete(timestamp: Long) {
+      if (midiBuffer.size == midiPacketLength) {
+        Log.d("FlutterMIDICommand", "status complete $midiBuffer")
+        stream.send( mapOf("data" to midiBuffer.toList(), "timestamp" to timestamp, "device" to deviceInfo))
+        parserState = PARSER_STATE.HEADER
+      }
+    }
+
+    fun lengthOfMessageType(type:Int): Int {
+      var midiType:Int = type and 0xF0
+
+      when (type) {
+        0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE -> return 1
+        0xF1, 0xF3 -> return 2
+      }
+
+      when (midiType) {
+        0xC0, 0xD0 -> return 2
+        0xF2, 0x80, 0x90, 0xA0, 0xB0, 0xE0 -> return 3
+      }
+      return 0
     }
   }
 
@@ -577,7 +624,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     }
 
     fun send(data: Any) {
-//      Log.d("FlutterMIDICommand","FlutterStreamHandler send ${data}")
+//      Log.d("FlutterMIDICommand","FlutterStreamHandler send $data $handler $eventSink")
       handler.post {
         eventSink?.success(data)
       }
@@ -617,7 +664,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
     fun connectWithReceiver(receiver: MidiReceiver, connectResult:Result?) {
       Log.d("FlutterMIDICommand","connectWithHandler")
 
-      this.midiDevice?.info?.let {
+      this.midiDevice.info?.let {
 
 //        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
 
@@ -629,11 +676,11 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
         if(it.inputPortCount > 0) {
           Log.d("FlutterMIDICommand", "Open input port")
-          this.inputPort = this.midiDevice?.openInputPort(0)
+          this.inputPort = this.midiDevice.openInputPort(0)
         }
         if (it.outputPortCount > 0) {
           Log.d("FlutterMIDICommand", "Open output port")
-          this.outputPort = this.midiDevice?.openOutputPort(0)
+          this.outputPort = this.midiDevice.openOutputPort(0)
           this.outputPort?.connect(receiver)
         }
       }
@@ -674,7 +721,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 //    }
 
     fun send(data: ByteArray, timestamp: Long?) {
-      this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0);
+      this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0)
     }
 
     fun close() {
@@ -688,7 +735,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       this.outputPort?.disconnect(this.receiver)
       this.receiver = null
       Log.d("FlutterMIDICommand", "Close device ${this.midiDevice}")
-      this.midiDevice?.close()
+      this.midiDevice.close()
 
       streamHandler?.send("deviceDisconnected")
     }
