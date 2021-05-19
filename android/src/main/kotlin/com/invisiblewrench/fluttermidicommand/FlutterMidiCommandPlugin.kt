@@ -487,7 +487,7 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
       msg?.also {
         var data = it.slice(IntRange(offset, offset+count-1))
 
-//        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count first ${data.first()} last ${data.last()}")
+        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count first ${data.first()} last ${data.last()}")
 
         if (sysexPart.isNotEmpty()) {
           // does data contain a start byte?
@@ -524,22 +524,33 @@ public class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCall
 
         } else {
           // Start of new sysex message
-          if (data.first() == 0xF0.toByte()) {
-            var endIndex = data.indexOf(0xF7.toByte())
+          var sysexStartIndex = data.indexOf(0xF0.toByte())
+          if (sysexStartIndex > -1) {
+
+            if (sysexStartIndex > 0) {
+              Log.d("FlutterMIDICommand", "sysex message starting in the middle $sysexStartIndex, send pre to app")
+              var msgData = data.subList(0, sysexStartIndex)
+              stream.send(mapOf("data" to msgData, "timestamp" to timestamp, "device" to deviceInfo))
+            }
+//            if (data.first() == 0xF0.toByte()) {
+            var sysexData = data.subList(sysexStartIndex, data.size)
+
+//            var endIndex = data.indexOf(0xF7.toByte())
+            var endIndex = sysexData.indexOf(0xF7.toByte())
 //            Log.d("FlutterMIDICommand", "sysex end index $endIndex")
             if (endIndex > -1) { // Has end byte
-                var sysexData = data.subList(0, endIndex+1);
+                var sysexData = sysexData.subList(0, endIndex+1);
 //              Log.d("FlutterMIDICommand", "complete sysex message $sysexData, send to app")
                 stream.send(mapOf("data" to sysexData, "timestamp" to timestamp, "device" to deviceInfo))
 
-                if (endIndex < data.size-1) {
+                if (endIndex < sysexData.size-1) {
 //                  Log.d("FlutterMIDICommand", "start of new sysex message in tail, save...")
                   sysexPart.clear()
-                  sysexPart.addAll(data.subList(endIndex+1, data.size))
+                  sysexPart.addAll(sysexData.subList(endIndex+1, sysexData.size))
                 }
             } else { // no end byte, save for later
               sysexPart.clear()
-              sysexPart.addAll(data)
+              sysexPart.addAll(sysexData)
             }
           } else {
             // regular midi message

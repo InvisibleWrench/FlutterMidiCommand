@@ -970,7 +970,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     }
     
     func parseBLEPacket(_ packet:Data, peripheral:CBPeripheral) -> Void {
-//        print("parse \(packet)")
+        print("parse \(packet.map { String(format: "%02hhx ", $0) }.joined())")
         
         if (packet.count > 1)
           {
