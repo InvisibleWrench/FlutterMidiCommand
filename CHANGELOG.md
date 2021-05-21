@@ -1,3 +1,6 @@
+## 0.4.0-dev.2
+Aligned behavior of running messages across iOS and Android. Running messages are sent to the app layer as individual messages.
+
 ## 0.4.0-dev.1
 Updated to new connectDevice function which return a future
 Aligned status updates from native across platforms
