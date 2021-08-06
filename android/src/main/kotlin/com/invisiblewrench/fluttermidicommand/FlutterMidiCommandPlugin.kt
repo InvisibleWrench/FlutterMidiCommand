@@ -485,14 +485,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     enum class PARSER_STATE
     {
       HEADER,
-      //      TIMESTAMP,
-      STATUS,
-      STATUS_RUNNING,
       PARAMS,
-      SYSTEM_RT,
       SYSEX,
-      SYSEX_END,
-      SYSEX_INT
     }
 
     var parserState = PARSER_STATE.HEADER
@@ -500,7 +494,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     var sysExBuffer = mutableListOf<Byte>()
     var midiBuffer = mutableListOf<Byte>()
     var midiPacketLength:Int = 0
-    var sysExHasFinished = true
     var statusByte:Byte = 0
 
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
