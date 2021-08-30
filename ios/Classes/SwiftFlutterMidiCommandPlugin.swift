@@ -797,7 +797,7 @@ class ConnectedNativeDevice : ConnectedDevice {
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
             let timestamp = Int(round(Double(p.timeStamp) * timestampFactor))
-            print("data \(data) timestamp \(timestamp)")
+//            print("data \(data) timestamp \(timestamp)")
             streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":deviceInfo])
             ap = MIDIPacketNext(ap)
         }
