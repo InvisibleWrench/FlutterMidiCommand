@@ -1,3 +1,6 @@
+## 0.4.0-dev.3
+Fixes in iOS timestamp values
+
 ## 0.4.0-dev.2
 Aligned behavior of running messages across iOS and Android. Running messages are sent to the app layer as individual messages.
 

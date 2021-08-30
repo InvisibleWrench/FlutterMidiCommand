@@ -783,12 +783,21 @@ class ConnectedNativeDevice : ConnectedDevice {
                           "id": String(id),
                           "type":"native"]
         
+        var timestampFactor : Double = 1.0
+        var tb = mach_timebase_info_data_t()
+        let kError = mach_timebase_info(&tb)
+        if (kError == 0) {
+            timestampFactor = Double(tb.numer) / Double(tb.denom)
+        }
+        
+//        print("tb \(tb) timestamp \(timestampFactor)")
+        
         for _ in 0 ..< packets.numPackets {
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-            let timestamp = p.timeStamp
-//            print("data \(data) timestamp \(timestamp)")
+            let timestamp = Int(round(Double(p.timeStamp) * timestampFactor))
+            print("data \(data) timestamp \(timestamp)")
             streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":deviceInfo])
             ap = MIDIPacketNext(ap)
         }
