@@ -273,17 +273,15 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //            print("dest \(destination) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: destination))")
             
             var entity : MIDIEntityRef = 0
-            var status = MIDIEndpointGetEntity(destination, &entity)
-            let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
-            //print("entity \(entity) status \(status) \(entityName) \(String(entity))")
+            var status = MIDIEndpointGetEntity(destination, &entity)                    
 
             let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
             
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
-            let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-            //print("device \(device) status \(status) \(deviceName)")
-            
+
+            let name = displayName(endpoint: destination);
+
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 //            print("entityCount \(entityCount)")
             
@@ -302,7 +300,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 //            print("entiry dest count \(entityDestinationCount)")
             
             nativeDevices[entity] = [
-                "name" : "\(deviceName) \(entityName)",
+                "name" : name,
                 "id" :  deviceId,
                 "type" : isNetwork ? "network" : "native",
                 "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
@@ -318,16 +316,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             
             var entity : MIDIEntityRef = 0
             var status = MIDIEndpointGetEntity(source, &entity)
-            let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
-            //print("entity \(entity) status \(status) \(entityName)")
-
             let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
+            let name = displayName(endpoint: source);
             
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
-            let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-//            print("device \(device) status \(status) \(deviceName)")
-            
+
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 //            print("entityCount \(entityCount)")
             
@@ -354,7 +348,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             } else {
 //                print("create inputs dict")
                 nativeDevices[entity] = [
-                    "name" : "\(deviceName) \(entityName)",
+                    "name" : name,
                     "id" : deviceId,
                     "type" : isNetwork ? "network" : "native",
                     "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
