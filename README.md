@@ -5,7 +5,7 @@ A Flutter plugin for sending and receiving MIDI messages between Flutter and phy
 Wraps CoreMIDI/android.media.midi/ALSA in a thin dart/flutter layer.
 Supports
 - USB and BLE MIDI connections on Android
-- USB, network(session) and BLE MIDI connections on iOS and macOS.
+- USB, network(session), virtual MIDI devices and BLE MIDI connections on iOS and macOS.
 - ALSA Midi on Linux
 
 ## To install

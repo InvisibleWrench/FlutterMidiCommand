@@ -1,3 +1,6 @@
+## 0.4.0-dev.4
+Added support for virtual MIDI devices on iOS
+
 ## 0.4.0-dev.3
 Fixes in iOS timestamp values
 
