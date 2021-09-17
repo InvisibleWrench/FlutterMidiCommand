@@ -372,7 +372,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     if (deviceId != null) {
       if (connectedDevices.containsKey(deviceId)) {
         connectedDevices[deviceId]?.let {
-          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
+//          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
           it.send(data, timestamp)
         }
       } else {

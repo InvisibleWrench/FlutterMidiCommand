@@ -28,6 +28,18 @@
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_macos/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_linux/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_linux/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_linux/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/example/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/example/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_linux/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_linux/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_linux/linux/flutter/ephemeral/.plugin_symlinks/flutter_midi_command_linux/.pub" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Flutter Plugins" level="project" />
