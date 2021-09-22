@@ -1146,7 +1146,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     }
     
     func parseBLEPacket(_ packet:Data, peripheral:CBPeripheral) -> Void {
-        print("parse \(packet.map { String(format: "%02hhx ", $0) }.joined())")
+//        print("parse \(packet.map { String(format: "%02hhx ", $0) }.joined())")
         
         if (packet.count > 1)
           {
@@ -1158,11 +1158,19 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
 
             for i in 1...packet.count-1 {
                 let midiByte:UInt8 = packet[i]
-//              print ("bleHandlerState \(bleHandlerState) byte \(midiByte)")
+//              print ("from bleHandlerState \(bleHandlerState) byte \(midiByte)")
                 
-                if ((midiByte & 0x80) == 0x80 && bleHandlerState != BLE_HANDLER_STATE.TIMESTAMP && bleHandlerState != BLE_HANDLER_STATE.SYSEX_INT) {
+                if ((((midiByte & 0x80) == 0x80) && (bleHandlerState != BLE_HANDLER_STATE.TIMESTAMP)) && (bleHandlerState != BLE_HANDLER_STATE.SYSEX_INT)) {
                     if (!bleSysExHasFinished) {
-                        bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                        if ((midiByte & 0xF7) == 0xF7)
+                        { // Sysex end
+//                            print("sysex end on byte \(midiByte)")
+                          bleSysExHasFinished = true
+                          bleHandlerState = BLE_HANDLER_STATE.SYSEX_END
+                        } else {
+//                            print("Set to SYSEX_INT")
+                            bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                        }
                     } else {
                         bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
                     }
@@ -1244,7 +1252,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                   }
                 }
 
-//                print ("\(bleHandlerState) - \(midiByte) [\(String(format:"%02X", midiByte))]")
+//                print ("handle \(bleHandlerState) - \(midiByte) [\(String(format:"%02X", midiByte))]")
 
               // Data handling
               switch (bleHandlerState)
