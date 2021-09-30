@@ -1,3 +1,7 @@
+## 0.4.0-dev.5
+Fixed an issue with receiving consecutive SysEx messages on iOS
+Split packet into the (max) size reported by the connected device instead of fixed to 20 bytes, on iOS
+
 ## 0.4.0-dev.4
 Added support for virtual MIDI devices on iOS
 

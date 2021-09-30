@@ -1024,53 +1024,54 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     override func send(bytes:[UInt8], timestamp: UInt64?) {
 //        print("ble send \(id) \(bytes)")
         if (characteristic != nil) {
-            let packetSize = 20
-            
+
+            let writeType = CBCharacteristicWriteType.withoutResponse
+            let packetSize = peripheral.maximumWriteValueLength(for:writeType)
+            print("packetSize = \(packetSize)")
+
             var dataBytes = Data(bytes)
-            
+
             if bytes.first == 0xF0 && bytes.last == 0xF7 { //  this is a sysex message, handle carefully
-                if bytes.count > 17 { // Split into multiple messages of 20 bytes total
-                    
-                    
+                if bytes.count > packetSize-3 { // Split into multiple messages of 20 bytes total
+
                     // First packet
                     var packet = dataBytes.subdata(in: 0..<packetSize-2)
-                    
+
                     print("count \(dataBytes.count)")
-                    
+
                     // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
                     packet.insert(0x80, at: 0)
                     packet.insert(0x80, at: 0)
-                    
+
 //                        print("packet \(packet)")
 //                        print("packet \(hexEncodedString(packet))")
-                    
-                    peripheral.writeValue(packet, for: characteristic!, type: CBCharacteristicWriteType.withoutResponse)
-                    
+
+                    peripheral.writeValue(packet, for: characteristic!, type: writeType)
+
                     dataBytes = dataBytes.advanced(by: packetSize-2)
-                    
+
                     // More packets
                     while dataBytes.count > 0 {
-                        
+
                         print("count \(dataBytes.count)")
-                        
+
                         let pickCount = min(dataBytes.count, packetSize-1)
 //                            print("pickCount \(pickCount)")
                         packet = dataBytes.subdata(in: 0..<pickCount) // Pick bytes for packet
-                        
+
                         // Insert header
                         packet.insert(0x80, at: 0)
-                        
+
                         if (packet.count < packetSize) { // Last packet
                             // Timestamp before Sysex End byte
                             print("insert end")
                             packet.insert(0x80, at: packet.count-1)
                         }
-                        
-//                            print("packet \(hexEncodedString(packet))")
-                        
 
-                        peripheral.writeValue(packet, for: characteristic!, type: CBCharacteristicWriteType.withoutResponse)
-                        
+//                            print("packet \(hexEncodedString(packet))")
+
+                        peripheral.writeValue(packet, for: characteristic!, type: writeType)
+
                         if (dataBytes.count > packetSize-2) {
                             dataBytes = dataBytes.advanced(by: pickCount) // Advance buffer
                         }
@@ -1082,23 +1083,29 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 } else {
                     // Insert timestamp low in front of Sysex End-byte
                     dataBytes.insert(0x80, at: bytes.count-1)
-                    
+
                     // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                     dataBytes.insert(0x80, at: 0)
                     dataBytes.insert(0x80, at: 0)
-                    
-                    peripheral.writeValue(dataBytes, for: characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+
+                    peripheral.writeValue(dataBytes, for: characteristic!, type: writeType)
                 }
                 return
             }
-            
+
             // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
             dataBytes.insert(0x80, at: 0)
             dataBytes.insert(0x80, at: 0)
-            
-            peripheral.writeValue(dataBytes, for: characteristic!, type: CBCharacteristicWriteType.withoutResponse)
+
+            peripheral.writeValue(dataBytes, for: characteristic!, type: writeType)
         } else {
             print("No peripheral/characteristic in device")
+        }
+    }
+
+    public func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let err = error {
+            print("error writing to characteristic \(String(describing: characteristic.properties)): \(err.localizedDescription)")
         }
     }
     
