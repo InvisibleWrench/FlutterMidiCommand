@@ -10,8 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_midi_command_platform_interface: ^0.4.0-dev.1
-  flutter_midi_command_linux: ^0.2.0-dev.1
+  # TODO: Set back, once pull requests have been merged
+  # flutter_midi_command_platform_interface: ^0.4.0-dev.1
+  flutter_midi_command_platform_interface:
+    git: git@github.com:gatzsche/flutter_midi_command_platform_interface.git
+  
+  # TODO: Set back, once pull requests have been merged
+  # flutter_midi_command_linux: ^0.2.0-dev.1
+  flutter_midi_command_linux:
+    git: git@github.com:gatzsche/flutter_midi_command_linux.git
 
 dev_dependencies:
   flutter_test:
