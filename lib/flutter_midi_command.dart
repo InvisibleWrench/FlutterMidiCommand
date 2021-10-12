@@ -94,4 +94,19 @@ class MidiCommand {
   Stream<Uint8List> get onMidiDataSent {
     return _txStreamCtrl.stream;
   }
+
+  /// Creates a virtual MIDI source
+  ///
+  /// The virtual MIDI source appears as a virtual port in other apps.
+  /// Other apps can receive MIDI from this source.
+  /// Currently only supported on iOS.
+  void addVirtualDevice({String? name}) {
+    _platform.addVirtualDevice(name: name);
+  }
+
+  /// Removes a previously created virtual MIDI source.
+  /// Currently only supported on iOS.
+  void removeVirtualDevice({String? name}) {
+    _platform.removeVirtualDevice(name: name);
+  }
 }
