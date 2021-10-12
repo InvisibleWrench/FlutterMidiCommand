@@ -225,6 +225,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         case "teardown":
             teardown()
             break
+
+        case "addVirtualDevice":
+            let name = extractName(arguments: call.arguments) ?? appName()
+            let _ = findOrCreateOwnVirtualDevice(name: name)
+            result(nil)
+            break;
+
+        case "removeVirtualDevice":
+            let name = extractName(arguments: call.arguments) ?? appName()
+            removeOwnVirtualDevice(name: name)
+            result(nil)
+            break;            
+                    
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -252,6 +265,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             } else {
                 print("error connecting to device \(deviceId) [\(type)]")
             }
+        } else if type == "own-virtual" {
+            let device = ownVirtualDevices.first { device in
+                String(device.id) == deviceId
+            }
+
+            if let device = device {
+                connectedDevices[device.id] = device
+                (device as ConnectedOwnVirtualDevice).isConnected = true
+                setupStreamHandler.send(data: "deviceConnected")
+                if let result = ongoingConnections[deviceId] {
+                    result(nil)
+                }
+            }
         } else // if type == "native" || if type == "virtual"
         {
             let device = type == "native" ? ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
@@ -272,7 +298,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if device.deviceType == "BLE" {
                 let p = (device as! ConnectedBLEDevice).peripheral
                 manager.cancelPeripheralConnection(p)
-            } else {
+            } else if device.deviceType == "own-virtual" {
+                print("disconnected MIDI")
+                (device as! ConnectedOwnVirtualDevice).isConnected = false
+                setupStreamHandler.send(data: "deviceDisconnected")
+            }
+            else {
                 print("disconnected MIDI")
                 device.close()
                 setupStreamHandler.send(data: "deviceDisconnected")
@@ -478,6 +509,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             continue;
           }
 
+          if(isOwnVirtualEndpoint(endpoint: destination)){
+            continue;
+          }
+
           let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: destination);
           let id = stringToId(str: displayName); // Will cause conflicts when multiple virtual endpoints with the same name exist
 
@@ -495,6 +530,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
           let source = MIDIGetSource(s)
 
           if(!isVirtualEndpoint(endpoint: source)){
+            continue;
+          }
+
+          if(isOwnVirtualEndpoint(endpoint: source)){
             continue;
           }
 
@@ -524,6 +563,30 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
 
         devices.append(contentsOf: virtualDevices.values)
+
+
+
+        // ###########
+        // OWN VIRTUAL
+        // ###########
+
+        var ownVirtualDevices = Dictionary<MIDIEntityRef, Dictionary<String, Any>>()
+
+        for ownVirtualDevice in self.ownVirtualDevices {
+            let displayName = ownVirtualDevice.deviceName
+            let id = stringToId(str: displayName)
+
+            ownVirtualDevices[id] = [
+                "name" : displayName,
+                "id" : "\(id)",
+                "type" : "own-virtual",
+                "connected":(connectedDevices.keys.contains(String(id)) ? "true" : "false"),
+                "outputs" : createPortDict(count: 1),
+                "inputs" : createPortDict(count: 1),
+            ]
+        }
+
+        devices.append(contentsOf: ownVirtualDevices.values)
 
 
         return devices;
