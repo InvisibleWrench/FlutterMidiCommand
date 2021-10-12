@@ -819,7 +819,8 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 
     let deviceInfo = ["name" : name,
                       "id": String(id),
-                      "type":deviceType]
+                      "type":deviceType,
+                      "connected": String(true),]
 
     for _ in 0 ..< packets.numPackets {
       let p = ap.pointee
