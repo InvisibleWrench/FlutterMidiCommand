@@ -121,6 +121,33 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
 
 
+    // Create an own virtual device appearing in other apps.
+    // Other apps can use that device to send and receive MIDI to and from this app.
+    var ownVirtualDevices = Set<ConnectedOwnVirtualDevice>()
+
+    func findOrCreateOwnVirtualDevice(name: String) -> ConnectedOwnVirtualDevice{
+        let existingDevice = ownVirtualDevices.first(where: { device in
+            device.name == name
+        })
+
+        let result = existingDevice ?? ConnectedOwnVirtualDevice(name: name, streamHandler: rxStreamHandler, client: midiClient);
+        if(existingDevice == nil){
+            ownVirtualDevices.insert(result)
+        }
+
+        return result
+    }
+
+    func removeOwnVirtualDevice(name: String){
+        let existingDevice = ownVirtualDevices.first(where: { device in
+            device.name == name
+        })
+
+        if let existingDevice = existingDevice {
+            existingDevice.close()
+            ownVirtualDevices.remove(existingDevice)
+        }
+    }
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
 //        print("call method \(call.method)")
         switch call.method {
