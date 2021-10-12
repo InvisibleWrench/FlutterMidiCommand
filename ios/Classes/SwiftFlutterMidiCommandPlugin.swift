@@ -28,6 +28,11 @@ func displayName(endpoint: MIDIEndpointRef) -> String {
   return SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint);
 }
 
+
+func stringToId(str: String) -> UInt32 {
+    return UInt32(str.hash & 0xFFFF)
+}
+
 public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, FlutterPlugin {
 
     // MIDI
@@ -70,10 +75,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     deinit {
         NotificationCenter.default.removeObserver(self)
         MIDIClientDispose(midiClient)
-    }
-
-    func stringToId(str: String) -> UInt32 {
-      return UInt32(str.hash & 0xFFFF)
     }
 
     func setup(_ registrar: FlutterPluginRegistrar) {
