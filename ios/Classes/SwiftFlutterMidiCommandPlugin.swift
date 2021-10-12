@@ -111,6 +111,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
          #endif
     }
 
+
+    func extractName(arguments: Any?) -> String?{
+        var name: String? = nil
+        if let packet = arguments as? Dictionary<String, Any> {
+            name = packet["name"] as? String
+        }
+        return name
+    }
+
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
 //        print("call method \(call.method)")
         switch call.method {
