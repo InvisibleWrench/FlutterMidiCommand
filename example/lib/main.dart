@@ -61,7 +61,9 @@ class _MyAppState extends State<MyApp> {
           actions: <Widget>[
             IconButton(
                 onPressed: () {
-                  _midiCommand.startScanningForBluetoothDevices().catchError((err) {
+                  _midiCommand
+                      .startScanningForBluetoothDevices()
+                      .catchError((err) {
                     print("Error $err");
                   });
                   setState(() {});
@@ -92,8 +94,11 @@ class _MyAppState extends State<MyApp> {
                         device.name,
                         style: Theme.of(context).textTheme.headline5,
                       ),
-                      subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
-                      leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),
+                      subtitle: Text(
+                          "ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
+                      leading: Icon(device.connected
+                          ? Icons.radio_button_on
+                          : Icons.radio_button_off),
                       trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {
                         Navigator.of(context).push(MaterialPageRoute<Null>(
@@ -106,7 +111,9 @@ class _MyAppState extends State<MyApp> {
                           _midiCommand.disconnectDevice(device);
                         } else {
                           print("connect");
-                          _midiCommand.connectToDevice(device).then((_) => print("device connected async"));
+                          _midiCommand
+                              .connectToDevice(device)
+                              .then((_) => print("device connected async"));
                         }
                       },
                     );
