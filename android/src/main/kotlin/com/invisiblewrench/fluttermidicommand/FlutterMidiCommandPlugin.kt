@@ -184,6 +184,15 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         teardown()
         result.success(null)
       }
+
+      "addVirtualDevice" -> {
+        result.success(null)
+      }
+
+      "removeVirtualDevice" -> {
+        result.success(null)
+      }
+
       else -> {
         result.notImplemented()
       }
