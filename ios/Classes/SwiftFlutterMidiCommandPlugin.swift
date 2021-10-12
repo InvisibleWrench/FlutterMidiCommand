@@ -28,6 +28,9 @@ func displayName(endpoint: MIDIEndpointRef) -> String {
   return SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint);
 }
 
+func appName() -> String {
+    return Bundle.main.infoDictionary?[kCFBundleNameKey as String] as! String;
+}
 
 func stringToId(str: String) -> UInt32 {
     return UInt32(str.hash & 0xFFFF)
