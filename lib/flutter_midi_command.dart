@@ -52,7 +52,7 @@ class MidiCommand {
   }
 
   /// Connects to the device
-  Future<void> connectToDevice(MidiDevice device) {
+  Future<void> connectToDevice(MidiDevice device) async {
     return _platform.connectToDevice(device);
   }
 
