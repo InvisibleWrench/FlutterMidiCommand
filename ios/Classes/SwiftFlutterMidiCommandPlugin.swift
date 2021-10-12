@@ -296,12 +296,18 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
             
             var entity : MIDIEntityRef = 0
-            var status = MIDIEndpointGetEntity(destination, &entity)                    
+            var status = MIDIEndpointGetEntity(destination, &entity)
+            if(status != noErr){
+                print("Error \(status) while calling MIDIEndpointGetEntity");
+            }
 
             let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
             
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
+            if(status != noErr){
+                print("Error \(status) while calling MIDIEntityGetDevice");
+            }
 
             let name = displayName(endpoint: destination);
 
@@ -343,11 +349,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             
             var entity : MIDIEntityRef = 0
             var status = MIDIEndpointGetEntity(source, &entity)
+            if(status != noErr){
+                print("Error \(status) while calling MIDIEndpointGetEntity");
+            }
             let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
             let name = displayName(endpoint: source);
             
             var device : MIDIDeviceRef = 0
             status = MIDIEntityGetDevice(entity, &device)
+            if(status != noErr){
+                print("Error \(status) while calling MIDIEntityGetDevice");
+            }
 
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 //            print("entityCount \(entityCount)")
@@ -773,6 +785,10 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
       packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
       let status = MIDISend(outputPort, ep, packetList)
+      if(status != noErr){
+          print("Error \(status) while sending MIDI to virtual or physical destination")
+      }
+
       //print("send bytes \(bytes) on port \(outputPort) \(ep) status \(status)")
       packetList.deallocate()
     } else {
@@ -889,6 +905,9 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
                 print("open default ports")
                 inSource = MIDIEntityGetSource(e, 0)
                 let status = MIDIPortConnectSource(inputPort, inSource!, &name)
+                if(status != noErr){
+                    print("Error \(status) while calling MIDIPortConnectSource");
+                }
                 outEndpoint = MIDIEntityGetDestination(e, 0)
             }
         }
