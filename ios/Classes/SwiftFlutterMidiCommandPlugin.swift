@@ -148,6 +148,15 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             ownVirtualDevices.remove(existingDevice)
         }
     }
+
+    // Check if an endpoint is an own virtual destination or source
+    func isOwnVirtualEndpoint(endpoint: MIDIEndpointRef) -> Bool{
+        return ownVirtualDevices.contains { device in
+            device.virtualSourceEndpoint == endpoint || device.virtualDestinationEndpoint == endpoint
+        }
+    }
+
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
 //        print("call method \(call.method)")
         switch call.method {
