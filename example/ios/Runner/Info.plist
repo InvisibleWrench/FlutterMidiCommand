@@ -25,7 +25,11 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Connect to Bluetooth MIDI Devices</string>
 	<key>NSLocalNetworkUsageDescription</key>
-    <string>Connect to Network MIDI Session</string>
+	<string>Connect to Network MIDI Session</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
