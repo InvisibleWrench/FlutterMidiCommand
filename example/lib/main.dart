@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'controller.dart';
+import 'dart:io' show Platform;
 
 void main() => runApp(new MyApp());
 
@@ -26,6 +27,10 @@ class _MyAppState extends State<MyApp> {
       print("setup changed $data");
       setState(() {});
     });
+
+    if (Platform.isIOS) {
+      _midiCommand.addVirtualDevice(name: "Flutter MIDI Command");
+    }
   }
 
   @override
