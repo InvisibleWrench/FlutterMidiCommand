@@ -993,6 +993,142 @@ class ConnectedVirtualDevice : ConnectedVirtualOrNativeDevice {
   }
 }
 
+class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
+    init(name: String, streamHandler:StreamHandler, client: MIDIClientRef) {
+        self.deviceName = name
+        self.midiClient = client
+        super.init(id: String(stringToId(str: name)), type: "own-virtual", streamHandler: streamHandler, client: client, ports: [])
+        initVirtualSource()
+        initVirtualDestination()
+        self.name = name
+    }
+
+    override func openPorts() {}
+
+    var virtualSourceEndpoint: MIDIClientRef = 0
+    var virtualDestinationEndpoint: MIDIClientRef = 0
+    let midiClient: MIDIClientRef
+    let deviceName: String
+    var isConnected = false
+
+
+    override func send(bytes: [UInt8], timestamp: UInt64?) {
+
+        if(!isConnected){
+            return;
+        }
+
+        let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
+        var packet = MIDIPacketListInit(packetList)
+        let time = timestamp ?? mach_absolute_time()
+        packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
+
+        let status = MIDIReceived(virtualSourceEndpoint, packetList)
+        if(status != noErr){
+            print("Error \(status) while publishing MIDI on own virtual source endpoint")
+        }
+
+        packetList.deallocate()
+    }
+
+    override func close() {
+        closeVirtualSource()
+        closeVirtualDestination()
+    }
+
+
+    func initVirtualSource(){
+        let s = MIDISourceCreate(midiClient, deviceName as CFString, &virtualSourceEndpoint);
+        if(s != noErr){
+            print("Error \(s) while create MIDI virtual source")
+            return
+        }
+
+        // Attempt to use saved unique ID
+        let defaults = UserDefaults.standard
+        var uniqueID = Int32(defaults.integer(forKey: "FlutterMIDICommand Saved Virtual Source ID \(deviceName)"))
+
+        //Set unique ID if available
+        if ( uniqueID != 0 )
+        {
+            let s = MIDIObjectSetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, uniqueID);
+
+            if ( s == kMIDIIDNotUnique )
+            {
+                uniqueID = 0;
+            }
+        }
+
+        // Create and save a new unique id
+        if ( uniqueID == 0 ) {
+            let s = MIDIObjectGetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, &uniqueID);
+            if(s != noErr){
+                print("Error \(s) while getting MIDI virtual source ID");
+            }
+
+            if ( s == noErr ) {
+                defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Source ID \(deviceName)")
+            }
+        }
+    }
+
+    func closeVirtualSource(){
+        let s = MIDIEndpointDispose(virtualSourceEndpoint);
+        if(s != noErr){
+            print("Error \(s) while disposing MIDI virtual source.")
+        }
+    }
+
+    func initVirtualDestination(){
+
+
+        let s = MIDIDestinationCreateWithBlock(midiClient, deviceName as CFString, &virtualDestinationEndpoint) { (packetList, srcConnRefCon) in
+            if(self.isConnected){
+              self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
+            }
+        }
+
+
+        if ( s != noErr ) {
+            if(s == -10844){
+                print("Error while creating virtual MIDI destination. You need to add the key 'UIBackgroundModes' with value 'audio' to your Info.plist file");
+            }
+            return;
+        }
+
+        // Attempt to use saved unique ID
+        let defaults = UserDefaults.standard
+        var uniqueID = Int32(defaults.integer(forKey: "FlutterMIDICommand Saved Virtual Destination ID  \(deviceName)"))
+
+        if ( uniqueID != 0 )
+        {
+            let s = MIDIObjectSetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, uniqueID);
+            if ( s == kMIDIIDNotUnique )
+            {
+                uniqueID = 0;
+            }
+        }
+        // Save the ID
+        if ( uniqueID == 0 ) {
+            let s = MIDIObjectGetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, &uniqueID);
+
+            if ( s == noErr ) {
+                defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Destination ID \(deviceName)");
+            }
+            else {
+                print("Error: \(s) while setting unique ID for virtuel endpoint");
+            }
+        }
+    }
+
+    func closeVirtualDestination(){
+        let s = MIDIEndpointDispose(virtualDestinationEndpoint);
+        if(s != 0){
+            print("Error: \(s) while disposing MIDI endpoint");
+        }
+    }
+}
+
 class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var peripheral:CBPeripheral
     var characteristic:CBCharacteristic?
