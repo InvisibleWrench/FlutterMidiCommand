@@ -228,8 +228,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
         case "addVirtualDevice":
             let name = extractName(arguments: call.arguments) ?? appName()
-            let _ = findOrCreateOwnVirtualDevice(name: name)
-            result(nil)
+            let ownVirtualDevice = findOrCreateOwnVirtualDevice(name: name)
+            let error = ownVirtualDevice.errors.count > 0 ? ownVirtualDevice.errors.joined(separator: "\n") : nil;
+            if(error != nil){
+                removeOwnVirtualDevice(name: name)
+            }
+
+            result(error == nil ? error : FlutterError.init(code: "AUDIOERROR", message: error, details: call.arguments))
             break;
 
         case "removeVirtualDevice":
@@ -1123,6 +1128,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
     let midiClient: MIDIClientRef
     let deviceName: String
     var isConnected = false
+    var errors: Array<String> = []
 
 
     override func send(bytes: [UInt8], timestamp: UInt64?) {
@@ -1138,7 +1144,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
 
         let status = MIDIReceived(virtualSourceEndpoint, packetList)
         if(status != noErr){
-            print("Error \(status) while publishing MIDI on own virtual source endpoint")
+            let error = "Error \(status) while publishing MIDI on own virtual source endpoint."
+            errors.append(error)
+            print(error)
         }
 
         packetList.deallocate()
@@ -1153,7 +1161,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
     func initVirtualSource(){
         let s = MIDISourceCreate(midiClient, deviceName as CFString, &virtualSourceEndpoint);
         if(s != noErr){
-            print("Error \(s) while create MIDI virtual source")
+            let error = "Error \(s) while create MIDI virtual source"
+            errors.append(error)
+            print(error)
             return
         }
 
@@ -1176,7 +1186,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         if ( uniqueID == 0 ) {
             let s = MIDIObjectGetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, &uniqueID);
             if(s != noErr){
-                print("Error \(s) while getting MIDI virtual source ID");
+                let error = "Error \(s) while getting MIDI virtual source ID"
+                errors.append(error)
+                print(error)
             }
 
             if ( s == noErr ) {
@@ -1188,7 +1200,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
     func closeVirtualSource(){
         let s = MIDIEndpointDispose(virtualSourceEndpoint);
         if(s != noErr){
-            print("Error \(s) while disposing MIDI virtual source.")
+            let error = "Error \(s) while disposing MIDI virtual source."
+            errors.append(error)
+            print(error)
         }
     }
 
@@ -1204,7 +1218,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
 
         if ( s != noErr ) {
             if(s == -10844){
-                print("Error while creating virtual MIDI destination. You need to add the key 'UIBackgroundModes' with value 'audio' to your Info.plist file");
+                let error = "Error while creating virtual MIDI destination. You need to add the key 'UIBackgroundModes' with value 'audio' to your Info.plist file"
+                errors.append(error)
+                print(error)
             }
             return;
         }
@@ -1229,7 +1245,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
                 defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Destination ID \(deviceName)")
             }
             else {
-                print("Error: \(s) while setting unique ID for virtuel endpoint");
+                let error = "Error: \(s) while setting unique ID for virtuel endpoint"
+                errors.append(error)
+                print(error)
             }
         }
     }
@@ -1237,7 +1255,9 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
     func closeVirtualDestination(){
         let s = MIDIEndpointDispose(virtualDestinationEndpoint);
         if(s != 0){
-            print("Error: \(s) while disposing MIDI endpoint");
+            let error = "Error: \(s) while disposing MIDI endpoint"
+            errors.append(error)
+            print(error)
         }
     }
 }
