@@ -186,11 +186,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
 
       "addVirtualDevice" -> {
-        result.success(null)
+        result.notImplemented()
       }
 
       "removeVirtualDevice" -> {
-        result.success(null)
+        result.notImplemented()
       }
 
       else -> {
