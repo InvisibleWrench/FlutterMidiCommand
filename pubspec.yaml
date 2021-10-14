@@ -15,17 +15,17 @@ dependencies:
   flutter_midi_command_platform_interface:
     git: 
       url: git@github.com:gatzsche/flutter_midi_command_platform_interface.git
-      ref: 69c86c8
+      ref: af2f85b
   
   # TODO: Set back, once pull requests have been merged
   # flutter_midi_command_linux: ^0.2.0-dev.1
   flutter_midi_command_linux:
     git: 
       url: git@github.com:gatzsche/flutter_midi_command_linux.git
-      ref: master
+      ref: fd414bd
 
 dev_dependencies:
-  flutter_test:
+  flutter_test: 
     sdk: flutter
 
 # For information on the generic Dart part of this file, see the
