@@ -1215,7 +1215,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
 
         if ( uniqueID != 0 )
         {
-            let s = MIDIObjectSetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, uniqueID);
+            let s = MIDIObjectSetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, uniqueID)
             if ( s == kMIDIIDNotUnique )
             {
                 uniqueID = 0;
@@ -1223,10 +1223,10 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         }
         // Save the ID
         if ( uniqueID == 0 ) {
-            let s = MIDIObjectGetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, &uniqueID);
+            let s = MIDIObjectGetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, &uniqueID)
 
             if ( s == noErr ) {
-                defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Destination ID \(deviceName)");
+                defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Destination ID \(deviceName)")
             }
             else {
                 print("Error: \(s) while setting unique ID for virtuel endpoint");
