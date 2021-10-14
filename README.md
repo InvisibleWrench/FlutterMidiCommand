@@ -1,12 +1,14 @@
 # flutter_midi_command
 
-A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices. 
+A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices.
 
 Wraps CoreMIDI/android.media.midi/ALSA in a thin dart/flutter layer.
 Supports
+
 - USB and BLE MIDI connections on Android
 - USB, network(session), virtual MIDI devices and BLE MIDI connections on iOS and macOS.
 - ALSA Midi on Linux
+- Create own virtual MIDI devices on iOS
 
 ## To install
 
@@ -15,7 +17,6 @@ Supports
 - In ios/Podfile uncomment and change the platform to 10.0 `platform :ios, '10.0'`
 - On iOS, After building, Add a NSBluetoothAlwaysUsageDescription and NSLocalNetworkUsageDescription to info.plist in the generated Xcode project.
 - On Linux, make sure ALSA is installed.
-
 
 ## Getting Started
 
@@ -34,6 +35,7 @@ Import flutter_midi_command
 - Listen for incoming MIDI messages on from the current device by subscribing to `MidiCommand().onMidiDataReceived`, after which the listener will recieve inbound MIDI messages as an UInt8List of variable length.
 - Send a MIDI message by calling `MidiCommand.sendData(data)`, where data is an UInt8List of bytes following the MIDI spec.
 - Or use the various `MidiCommand` subtypes to send PC, CC, NoteOn and NoteOff messages.
+- On iOS use `MidiCommand().addVirtualDevice(name: "Your Device Name")` to create a virtual MIDI destination and a virtual MIDI source. These virtual MIDI devices show up in other apps and can be used by other apps to send and receive MIDI to or from your app. To make this feature work, enable background audio for your app, i.e., add key `UIBackgroundModes` with value `audio` to your app's `info.plist` file.
 
 See example folder for how to use.
 
