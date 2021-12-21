@@ -928,7 +928,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     MIDIPortDispose(outputPort)
   }
 
-  var buffer = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 2) // Don't know why I need to setup two here. If I setup 1 I'm getting a crash.
+  var buffer = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 2) // Don't know why I need to a capacity of 2 here. If I setup 1 I'm getting a crash.
 
   func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
     let packets = packetList.pointee
