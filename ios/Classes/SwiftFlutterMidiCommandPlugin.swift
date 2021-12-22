@@ -1049,7 +1049,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
     override func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
         let packets = packetList.pointee
         let packet:MIDIPacket = packets.packet
-        var ap = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 1)
+        var ap = buffer
         ap.initialize(to:packet)
 
         let deviceInfo = ["name" : name,
