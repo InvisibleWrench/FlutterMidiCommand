@@ -153,6 +153,14 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       "getDevices" -> {
         result.success(listOfDevices())
       }
+      "startBluetoothCentral" -> {
+        val errorMsg = tryToInitBT()
+        if (errorMsg != null) {
+          result.error("ERROR", errorMsg, null)
+        } else {
+          result.success(null)
+        }
+      }
       "scanForDevices" -> {
         val errorMsg = startScanningLeDevices()
         if (errorMsg != null) {

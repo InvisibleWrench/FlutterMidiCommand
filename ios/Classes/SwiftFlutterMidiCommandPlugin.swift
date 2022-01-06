@@ -102,8 +102,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             self.handleMIDINotification(notification)
         }
 
-        manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
-
 #if os(iOS)
          session = MIDINetworkSession.default()
          session?.isEnabled = true
@@ -156,11 +154,20 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
 
+    public func startBluetoothCentralWhenNeeded(){
+        if(manager == nil){
+            manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
+        }
+    }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
 //        print("call method \(call.method)")
         switch call.method {
+        case "startBluetoothCentral":
+            startBluetoothCentralWhenNeeded();
+            result(nil);
         case "scanForDevices":
+            startBluetoothCentralWhenNeeded();
             print("\(manager.state.rawValue)")
             if manager.state == CBManagerState.poweredOn {
                 print("Start discovery")
@@ -173,6 +180,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
             break
         case "stopScanForDevices":
+            startBluetoothCentralWhenNeeded();
             manager.stopScan()
             break
         case "getDevices":
@@ -1316,7 +1324,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
 
             let writeType = CBCharacteristicWriteType.withoutResponse
             let packetSize = peripheral.maximumWriteValueLength(for:writeType)
-            print("packetSize = \(packetSize)")
+            // print("packetSize = \(packetSize)")
 
             var dataBytes = Data(bytes)
 

@@ -27,6 +27,7 @@ Import flutter_midi_command
 `import 'package:flutter_midi_command/flutter_midi_command.dart';`
 
 - Get a list of available MIDI devices by calling `MidiCommand().devices` which returns a list of `MidiDevice`
+- Start bluetooth subsystem by calling `MidiCommand().startBluetoothCentral()`
 - Start scanning for BLE MIDI devices by calling `MidiCommand().startScanningForBluetoothDevices()`
 - Connect to a specific `MidiDevice` by calling `MidiCommand.connectToDevice(selectedDevice)`
 - Stop scanning for BLE MIDI devices by calling `MidiCommand().stopScanningForBluetoothDevices()`
@@ -42,4 +43,5 @@ See example folder for how to use.
 For help getting started with Flutter, view our online
 [documentation](https://flutter.io/).
 
-For help on editing plugin code, view the [documentation](https://flutter.io/developing-packages/#edit-plugin-package).
+For help on editing plugin code, view the [documentation](https://flutter.io/pwd
+developing-packages/#edit-plugin-package).

@@ -1,3 +1,6 @@
+## 0.4.0-dev.6
+Added startBluetoothCentral() function
+
 ## 0.4.0-dev.5
 Fixed an issue with receiving consecutive SysEx messages on iOS
 Split packet into the (max) size reported by the connected device instead of fixed to 20 bytes, on iOS

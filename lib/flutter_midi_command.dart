@@ -39,6 +39,13 @@ class MidiCommand {
     return _platform.devices;
   }
 
+  /// Starts bluetooth subsystem.
+  ///
+  /// Shows an alert requesting access rights for bluetooth.
+  Future<void> startBluetoothCentral() async {
+    return _platform.startBluetoothCentral();
+  }
+
   /// Starts scanning for BLE MIDI devices
   ///
   /// Found devices will be included in the list returned by [devices]
