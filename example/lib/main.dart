@@ -14,6 +14,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   StreamSubscription<String>? _setupSubscription;
+  StreamSubscription<String>? _bluetoothStateSubscription;
   MidiCommand _midiCommand = MidiCommand();
 
   @override
@@ -21,11 +22,19 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     _midiCommand.startBluetoothCentral();
+
     _midiCommand.startScanningForBluetoothDevices().catchError((err) {
       print("Error $err");
     });
     _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((data) {
       print("setup changed $data");
+      setState(() {});
+    });
+
+    print(_midiCommand.bluetoothState);
+    _bluetoothStateSubscription =
+        _midiCommand.onBluetoothStateChanged?.listen((data) {
+      print("bluetooth state change $data");
       setState(() {});
     });
 
@@ -37,6 +46,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _setupSubscription?.cancel();
+    _bluetoothStateSubscription?.cancel();
     super.dispose();
   }
 

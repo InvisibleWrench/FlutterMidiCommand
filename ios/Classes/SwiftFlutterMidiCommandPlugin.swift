@@ -45,8 +45,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     // Flutter
     var midiRXChannel:FlutterEventChannel?
     var rxStreamHandler = StreamHandler()
+
     var midiSetupChannel:FlutterEventChannel?
     var setupStreamHandler = StreamHandler()
+
+    var bluetoothStateChannel: FlutterEventChannel?
+    var bluetoothStateHandler = StreamHandler()
 
     #if os(iOS)
     // Network Session
@@ -92,10 +96,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
         #if os(macOS)
             midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger)
+            bluetoothStateChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state", binaryMessenger: registrar.messenger)
         #else
             midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger())
+            bluetoothStateChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state", binaryMessenger: registrar.messenger())
         #endif
         midiSetupChannel?.setStreamHandler(setupStreamHandler)
+        bluetoothStateChannel?.setStreamHandler(bluetoothStateHandler)
+
 
         // MIDI client with notification handler
         MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &midiClient) { (notification) in
@@ -160,12 +168,33 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
 
+    public func getBluetooCentralStateAsString() -> String {
+        startBluetoothCentralWhenNeeded();
+        switch(manager.state){
+        case CBManagerState.poweredOn:
+            return "poweredOn";
+        case CBManagerState.poweredOff:
+            return "poweredOff";
+        case CBManagerState.resetting:
+            return "resetting";
+        case CBManagerState.unauthorized:
+            return "unauthorized";
+        case CBManagerState.unknown:
+            return "unknown";
+        case CBManagerState.unsupported:
+            return "unsupported";
+        @unknown default:
+            return "other";
+        }
+    }
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
 //        print("call method \(call.method)")
         switch call.method {
         case "startBluetoothCentral":
             startBluetoothCentralWhenNeeded();
             result(nil);
+            break;
         case "scanForDevices":
             startBluetoothCentralWhenNeeded();
             print("\(manager.state.rawValue)")
@@ -808,6 +837,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     // Central
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         print("central did update state \(central.state.rawValue)")
+        bluetoothStateHandler.send(data: getBluetooCentralStateAsString());
     }
 
     public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {

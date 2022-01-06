@@ -46,6 +46,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   lateinit var rxStreamHandler:FlutterStreamHandler
   lateinit var setupChannel:EventChannel
   lateinit var setupStreamHandler:FlutterStreamHandler
+  lateinit var bluetoothStateChannel:EventChannel
+  lateinit var bluetoothStateHandler:FlutterStreamHandler
 
   lateinit var bluetoothAdapter:BluetoothAdapter
   var bluetoothScanner:BluetoothLeScanner? = null
@@ -138,6 +140,10 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     setupStreamHandler = FlutterStreamHandler(handler)
     setupChannel = EventChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command/setup_channel")
     setupChannel.setStreamHandler( setupStreamHandler )
+
+    bluetoothStateHandler = FlutterStreamHandler(handler)
+    bluetoothStateChannel = EventChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state")
+    bluetoothStateChannel.setStreamHandler( bluetoothStateHandler )
   }
 
 
@@ -213,6 +219,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
+      bluetoothStateHandler.send("unknown");
+
       if (activity != null) {
         var activity = activity!!
         if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
@@ -226,8 +234,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       Log.d("FlutterMIDICommand", "Already permitted")
 
       blManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+
       bluetoothAdapter = blManager.adapter
       if (bluetoothAdapter != null) {
+        bluetoothStateHandler.send("poweredOn");
+
         bluetoothScanner = bluetoothAdapter.bluetoothLeScanner
 
         if (bluetoothScanner != null) {
@@ -240,6 +251,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           return "bluetoothNotAvailable"
         }
       } else {
+        bluetoothStateHandler.send("unsupported");
         Log.d("FlutterMIDICommand", "bluetoothAdapter is null")
       }
     }
@@ -256,6 +268,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         when (state) {
           BluetoothAdapter.STATE_OFF -> {
             Log.d("FlutterMIDICommand", "BT is now off")
+            bluetoothStateHandler.send("poweredOff");
             bluetoothScanner = null
           }
 
@@ -264,6 +277,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           }
 
           BluetoothAdapter.STATE_ON -> {
+            bluetoothStateHandler.send("poweredOn");
             Log.d("FlutterMIDICommand", "BT is now on")
           }
         }
@@ -300,6 +314,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     if (requestCode == PERMISSIONS_REQUEST_ACCESS_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
       startScanningLeDevices()
     } else {
+      bluetoothStateHandler.send("unauthorized");
       Log.d("FlutterMIDICommand", "Perms failed")
     }
   }

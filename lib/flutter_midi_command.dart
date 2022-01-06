@@ -4,7 +4,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_midi_command_linux/flutter_midi_command_linux.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
-export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice, MidiPacket, MidiPort;
+export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
+    show MidiDevice, MidiPacket, MidiPort;
 
 class MidiCommand {
   factory MidiCommand() {
@@ -14,13 +15,20 @@ class MidiCommand {
     return _instance!;
   }
 
-  MidiCommand._();
+  MidiCommand._() {
+    _listenToBluetoothState();
+  }
 
   static MidiCommand? _instance;
 
   static MidiCommandPlatform? __platform;
 
   StreamController<Uint8List> _txStreamCtrl = StreamController.broadcast();
+
+  String _bluetoothState = 'unknown';
+  _listenToBluetoothState() {
+    _platform.onBluetoothStateChanged?.listen((s) => _bluetoothState = s);
+  }
 
   /// Get the platform specific implementation
   static MidiCommandPlatform get _platform {
@@ -39,9 +47,15 @@ class MidiCommand {
     return _platform.devices;
   }
 
-  /// Starts bluetooth subsystem.
-  ///
-  /// Shows an alert requesting access rights for bluetooth.
+  /// Stream firing events whenever the bluetooth state changes
+  Stream<String>? get onBluetoothStateChanged {
+    return _platform.onBluetoothStateChanged;
+  }
+
+  /// Returns the state of the bluetooth central
+  String get bluetoothState => _bluetoothState;
+
+  /// Returns the bluetooth central state ()
   Future<void> startBluetoothCentral() async {
     return _platform.startBluetoothCentral();
   }
