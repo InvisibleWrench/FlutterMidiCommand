@@ -3,12 +3,9 @@ package com.invisiblewrench.fluttermidicommand
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.Registrar
-import io.flutter.plugin.common.EventChannel
 
 import android.app.Activity
 import android.os.Handler
@@ -25,13 +22,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import io.flutter.plugin.common.BinaryMessenger
 
 import android.util.Log
+import io.flutter.plugin.common.*
 
 
 /** FlutterMidiCommandPlugin */
-class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
+class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.RequestPermissionsResultListener {
 
   lateinit var context: Context
   private var activity:Activity? = null
@@ -48,6 +45,12 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   lateinit var setupStreamHandler:FlutterStreamHandler
   lateinit var bluetoothStateChannel:EventChannel
   lateinit var bluetoothStateHandler:FlutterStreamHandler
+  var bluetoothState: String = "unknown"
+    set(value) {
+      bluetoothStateHandler.send(value);
+      field = value
+    }
+
 
   lateinit var bluetoothAdapter:BluetoothAdapter
   var bluetoothScanner:BluetoothLeScanner? = null
@@ -72,6 +75,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     print("onAttachedToActivity")
     // TODO: your plugin is now attached to an Activity
     activity = p0.activity
+    p0.addRequestPermissionsResultListener(this)
     setup()
   }
 
@@ -84,6 +88,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
   override fun onReattachedToActivityForConfigChanges(p0: ActivityPluginBinding) {
     // TODO: your plugin is now attached to a new Activity
+    p0.addRequestPermissionsResultListener(this)
 
 // after a configuration change.
     print("onReattachedToActivityForConfigChanges")
@@ -159,6 +164,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       "getDevices" -> {
         result.success(listOfDevices())
       }
+
+      "bluetoothState" -> {
+        result.success(bluetoothState)
+      }
+
       "startBluetoothCentral" -> {
         val errorMsg = tryToInitBT()
         if (errorMsg != null) {
@@ -219,15 +229,16 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
-      bluetoothStateHandler.send("unknown");
+      bluetoothState = "unknown";
 
       if (activity != null) {
         var activity = activity!!
         if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
           Log.d("FlutterMIDICommand", "Show rationale for Location")
-          return "showRationaleForPermission"
+          bluetoothState = "unauthorized"
         } else {
           activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION), PERMISSIONS_REQUEST_ACCESS_LOCATION)
+
         }
       }
     } else {
@@ -237,7 +248,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
       bluetoothAdapter = blManager.adapter
       if (bluetoothAdapter != null) {
-        bluetoothStateHandler.send("poweredOn");
+        bluetoothState = "poweredOn";
 
         bluetoothScanner = bluetoothAdapter.bluetoothLeScanner
 
@@ -251,7 +262,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           return "bluetoothNotAvailable"
         }
       } else {
-        bluetoothStateHandler.send("unsupported");
+        bluetoothState = "unsupported";
         Log.d("FlutterMIDICommand", "bluetoothAdapter is null")
       }
     }
@@ -268,7 +279,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         when (state) {
           BluetoothAdapter.STATE_OFF -> {
             Log.d("FlutterMIDICommand", "BT is now off")
-            bluetoothStateHandler.send("poweredOff");
+            bluetoothState = "poweredOff";
             bluetoothScanner = null
           }
 
@@ -277,7 +288,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           }
 
           BluetoothAdapter.STATE_ON -> {
-            bluetoothStateHandler.send("poweredOn");
+            bluetoothState = "poweredOn";
             Log.d("FlutterMIDICommand", "BT is now on")
           }
         }
@@ -308,15 +319,24 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     discoveredDevices.clear()
   }
 
-  fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>,
-                                 grantResults: IntArray) {
+
+  override fun onRequestPermissionsResult(
+          requestCode: Int,
+          permissions: Array<out String>?,
+          grantResults: IntArray?): Boolean {
     Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
-    if (requestCode == PERMISSIONS_REQUEST_ACCESS_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+
+    if (requestCode == PERMISSIONS_REQUEST_ACCESS_LOCATION && grantResults?.get(0) == PackageManager.PERMISSION_GRANTED) {
       startScanningLeDevices()
+      return true;
     } else {
-      bluetoothStateHandler.send("unauthorized");
+      bluetoothState = "unauthorized"
       Log.d("FlutterMIDICommand", "Perms failed")
+      return true;
     }
+
+    return false;
   }
 
   private fun connectToDevice(deviceId:String, type:String) {

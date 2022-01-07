@@ -7,6 +7,16 @@ import 'package:flutter_midi_command_platform_interface/flutter_midi_command_pla
 export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
     show MidiDevice, MidiPacket, MidiPort;
 
+enum BluetoothState {
+  poweredOn,
+  poweredOff,
+  resetting,
+  unauthorized,
+  unknown,
+  unsupported,
+  other,
+}
+
 class MidiCommand {
   factory MidiCommand() {
     if (_instance == null) {
@@ -19,15 +29,35 @@ class MidiCommand {
     _listenToBluetoothState();
   }
 
+  dispose() {
+    _bluetoothStateStream.close();
+    _onBluetoothStateChangedStreamSubscription?.cancel();
+  }
+
   static MidiCommand? _instance;
 
   static MidiCommandPlatform? __platform;
 
   StreamController<Uint8List> _txStreamCtrl = StreamController.broadcast();
 
-  String _bluetoothState = 'unknown';
-  _listenToBluetoothState() {
-    _platform.onBluetoothStateChanged?.listen((s) => _bluetoothState = s);
+  final _bluetoothStateStream = StreamController<BluetoothState>();
+
+  BluetoothState _bluetoothState = BluetoothState.unknown;
+  StreamSubscription? _onBluetoothStateChangedStreamSubscription;
+  _listenToBluetoothState() async {
+    _onBluetoothStateChangedStreamSubscription =
+        _platform.onBluetoothStateChanged?.listen((s) {
+      _bluetoothState = BluetoothState.values.byName(s);
+      _bluetoothStateStream.add(_bluetoothState);
+    });
+
+    scheduleMicrotask(() async {
+      if (_bluetoothState == BluetoothState.unknown) {
+        _bluetoothState =
+            BluetoothState.values.byName(await _platform.bluetoothState());
+        _bluetoothStateStream.add(_bluetoothState);
+      }
+    });
   }
 
   /// Get the platform specific implementation
@@ -48,12 +78,11 @@ class MidiCommand {
   }
 
   /// Stream firing events whenever the bluetooth state changes
-  Stream<String>? get onBluetoothStateChanged {
-    return _platform.onBluetoothStateChanged;
-  }
+  Stream<BluetoothState> get onBluetoothStateChanged =>
+      _bluetoothStateStream.stream.distinct();
 
   /// Returns the state of the bluetooth central
-  String get bluetoothState => _bluetoothState;
+  BluetoothState get bluetoothState => _bluetoothState;
 
   /// Returns the bluetooth central state ()
   Future<void> startBluetoothCentral() async {

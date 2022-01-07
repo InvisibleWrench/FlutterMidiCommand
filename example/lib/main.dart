@@ -14,29 +14,25 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   StreamSubscription<String>? _setupSubscription;
-  StreamSubscription<String>? _bluetoothStateSubscription;
+  StreamSubscription<BluetoothState>? _bluetoothStateSubscription;
   MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
     super.initState();
 
-    _midiCommand.startBluetoothCentral();
-
-    _midiCommand.startScanningForBluetoothDevices().catchError((err) {
-      print("Error $err");
-    });
-    _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((data) {
+    _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((data) async {
       print("setup changed $data");
       setState(() {});
     });
 
-    print(_midiCommand.bluetoothState);
-    _bluetoothStateSubscription =
-        _midiCommand.onBluetoothStateChanged?.listen((data) {
+    _midiCommand.startBluetoothCentral();
+
+    /* _bluetoothStateSubscription =
+        _midiCommand.onBluetoothStateChanged.listen((data) {
       print("bluetooth state change $data");
       setState(() {});
-    });
+    });*/
 
     if (Platform.isIOS) {
       _midiCommand.addVirtualDevice(name: "Flutter MIDI Command");
@@ -70,16 +66,50 @@ class _MyAppState extends State<MyApp> {
         appBar: new AppBar(
           title: const Text('FlutterMidiCommand Example'),
           actions: <Widget>[
-            IconButton(
-                onPressed: () {
-                  _midiCommand
-                      .startScanningForBluetoothDevices()
-                      .catchError((err) {
-                    print("Error $err");
-                  });
-                  setState(() {});
-                },
-                icon: Icon(Icons.refresh))
+            Builder(builder: (context) {
+              return IconButton(
+                  onPressed: () {
+                    // If bluetooth is powered on, start scanning
+                    if (_midiCommand.bluetoothState ==
+                        BluetoothState.poweredOn) {
+                      _midiCommand
+                          .startScanningForBluetoothDevices()
+                          .catchError((err) {
+                        print("Error $err");
+                      });
+
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Scanning for bluetooth devices ...'),
+                      ));
+                    } else {
+                      final messages = {
+                        BluetoothState.unsupported:
+                            'Bluetooth is not supported on this device.',
+                        BluetoothState.poweredOff:
+                            'Please switch on bluetooth and try again.',
+                        BluetoothState.poweredOn: 'Everything is fine.',
+                        BluetoothState.resetting:
+                            'Currently resetting. Try again later.',
+                        BluetoothState.unauthorized:
+                            'This app has needs bluetooth permissions. Please open settings, find your app and assign bluetooth access rights and start your app again.',
+                        BluetoothState.unknown:
+                            'Bluetooth is not ready yet. Try again later.',
+                        BluetoothState.other:
+                            'This should never happen. Please inform the developer of your app.',
+                      };
+
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        backgroundColor: Colors.red,
+                        content: Text(messages[_midiCommand.bluetoothState] ??
+                            'Unknown bluetooth state: ${_midiCommand.bluetoothState}'),
+                      ));
+                    }
+
+                    // If not show a message telling users what to do
+                    setState(() {});
+                  },
+                  icon: Icon(Icons.refresh));
+            }),
           ],
         ),
         bottomNavigationBar: Container(

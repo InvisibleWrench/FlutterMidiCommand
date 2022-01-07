@@ -165,6 +165,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     public func startBluetoothCentralWhenNeeded(){
         if(manager == nil){
             manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
+
+          bluetoothStateHandler.send(data: getBluetooCentralStateAsString())
         }
     }
 
@@ -172,19 +174,19 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         startBluetoothCentralWhenNeeded();
         switch(manager.state){
         case CBManagerState.poweredOn:
-            return "poweredOn";
+            return "poweredOn"
         case CBManagerState.poweredOff:
-            return "poweredOff";
+            return "poweredOff"
         case CBManagerState.resetting:
-            return "resetting";
+            return "resetting"
         case CBManagerState.unauthorized:
-            return "unauthorized";
+            return "unauthorized"
         case CBManagerState.unknown:
-            return "unknown";
+            return "unknown"
         case CBManagerState.unsupported:
-            return "unsupported";
+            return "unsupported"
         @unknown default:
-            return "other";
+            return "other"
         }
     }
 
@@ -195,6 +197,9 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             startBluetoothCentralWhenNeeded();
             result(nil);
             break;
+        case "bluetoothState":
+          result(getBluetooCentralStateAsString());
+          break;
         case "scanForDevices":
             startBluetoothCentralWhenNeeded();
             print("\(manager.state.rawValue)")
@@ -836,7 +841,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     // Central
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        print("central did update state \(central.state.rawValue)")
+        print("central did update state \(getBluetooCentralStateAsString())")
         bluetoothStateHandler.send(data: getBluetooCentralStateAsString());
     }
 
