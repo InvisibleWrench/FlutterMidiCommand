@@ -40,7 +40,9 @@ class MidiCommand {
 
   StreamController<Uint8List> _txStreamCtrl = StreamController.broadcast();
 
-  final _bluetoothStateStream = StreamController<BluetoothState>();
+  final _bluetoothStateStream = StreamController<BluetoothState>.broadcast();
+
+  var _bluetoothCentralIsStarted = false;
 
   BluetoothState _bluetoothState = BluetoothState.unknown;
   StreamSubscription? _onBluetoothStateChangedStreamSubscription;
@@ -84,8 +86,12 @@ class MidiCommand {
   /// Returns the state of the bluetooth central
   BluetoothState get bluetoothState => _bluetoothState;
 
-  /// Returns the bluetooth central state ()
+  /// Starts the bluetooth central
   Future<void> startBluetoothCentral() async {
+    if (_bluetoothCentralIsStarted) {
+      return;
+    }
+    _bluetoothCentralIsStarted = true;
     return _platform.startBluetoothCentral();
   }
 

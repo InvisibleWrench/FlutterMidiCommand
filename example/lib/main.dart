@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'controller.dart';
 import 'dart:io' show Platform;
 
@@ -26,13 +27,11 @@ class _MyAppState extends State<MyApp> {
       setState(() {});
     });
 
-    _midiCommand.startBluetoothCentral();
-
-    /* _bluetoothStateSubscription =
+    _bluetoothStateSubscription =
         _midiCommand.onBluetoothStateChanged.listen((data) {
       print("bluetooth state change $data");
       setState(() {});
-    });*/
+    });
 
     if (Platform.isIOS) {
       _midiCommand.addVirtualDevice(name: "Flutter MIDI Command");
@@ -59,6 +58,55 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _informUserAboutBluetoothPermissions(
+      BuildContext context) async {
+    // Check if user already provided bluetooth permissions
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('didAskUserForBluetoothPreferences') == true) {
+      return;
+    }
+    prefs.setBool('didAskUserForBluetoothPreferences', true);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Please Grant Bluetooth Permissions.'),
+          content: const Text(
+              'In the next dialog we will ask you for bluetooth permissions.\n'
+              'Please grant permissions to make bluetooth MIDI possible.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Ok. I got it!'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    return;
+  }
+
+  Future<void> _waitUntilBluetoothIsInitialized() async {
+    bool isInitialized() =>
+        _midiCommand.bluetoothState != BluetoothState.unknown;
+
+    if (isInitialized()) {
+      return;
+    }
+
+    await for (final _ in _midiCommand.onBluetoothStateChanged) {
+      if (isInitialized()) {
+        break;
+      }
+    }
+    return;
+  }
+
   @override
   Widget build(BuildContext context) {
     return new MaterialApp(
@@ -68,7 +116,15 @@ class _MyAppState extends State<MyApp> {
           actions: <Widget>[
             Builder(builder: (context) {
               return IconButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    // Ask for bluetooth permissions
+                    await _informUserAboutBluetoothPermissions(context);
+
+                    // Start bluetooth
+                    await _midiCommand.startBluetoothCentral();
+
+                    await _waitUntilBluetoothIsInitialized();
+
                     // If bluetooth is powered on, start scanning
                     if (_midiCommand.bluetoothState ==
                         BluetoothState.poweredOn) {
