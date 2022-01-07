@@ -1,5 +1,10 @@
 ## 0.4.0-dev.6
-Added startBluetoothCentral() function
+- Improved bluetooth state handling:
+  - Start bluetooth subsystem only when you want, not automatically
+  - Allow to retrieve bluetooth state before starting scanning
+  - Allow to observe bluetooth state (poweredOn, poweredOff, ...)
+  - Prepare user to grant bluetooth permissions
+  - Show feedback about the bluetooth state when scanning
 
 ## 0.4.0-dev.5
 Fixed an issue with receiving consecutive SysEx messages on iOS
