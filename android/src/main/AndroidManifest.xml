@@ -6,5 +6,19 @@
 
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+
+    <application>
+                <service android:name=".VirtualDeviceService"
+                    android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE"
+                    android:enabled="false">
+                    <intent-filter>
+                        <action android:name="android.media.midi.MidiDeviceService" />
+                    </intent-filter>
+                    <meta-data android:name="android.media.midi.MidiDeviceService"
+                        android:resource="@xml/virtual_device_info" />
+                </service>
+    </application>
 </manifest>

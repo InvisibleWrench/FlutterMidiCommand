@@ -1,0 +1,7 @@
+
+<devices>
+    <device name="FlutterMidiCommand" manufacturer="InvisibleWrench" product="FlutterMidiCommand">
+        <input-port name="input" />
+        <output-port name="output" />
+    </device>
+</devices>

@@ -18,13 +18,18 @@ import android.bluetooth.le.*
 import android.content.pm.PackageManager
 import android.os.ParcelUuid
 import android.Manifest
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 
 import android.util.Log
 import io.flutter.plugin.common.*
+import android.content.pm.PackageInfo
+import android.content.pm.ServiceInfo
+import android.os.Binder
+import android.os.IBinder
+import android.media.midi.MidiDeviceStatus
+
+
+
 
 
 /** FlutterMidiCommandPlugin */
@@ -40,7 +45,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   private var connectedDevices = mutableMapOf<String, ConnectedDevice>()
 
   lateinit var rxChannel:EventChannel
-  lateinit var rxStreamHandler:FlutterStreamHandler
+//  static var rxStreamHandler:FlutterStreamHandler?
   lateinit var setupChannel:EventChannel
   lateinit var setupStreamHandler:FlutterStreamHandler
   lateinit var bluetoothStateChannel:EventChannel
@@ -113,7 +118,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   companion object {
     @JvmStatic
     fun registerWith(registrar: Registrar) {
-//      val channel = MethodChannel(registrar.messenger(), "fluttermidicommand")
       var instance = FlutterMidiCommandPlugin()
       instance.messenger = registrar.messenger()
       instance.context = registrar.activeContext()
@@ -121,12 +125,15 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       instance.setup()
     }
 
+    lateinit var rxStreamHandler:FlutterStreamHandler
+
     fun deviceIdForInfo(info: MidiDeviceInfo): String {
       var isBluetoothDevice = info.type == MidiDeviceInfo.TYPE_BLUETOOTH
       var deviceId: String = if (isBluetoothDevice) info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else info.id.toString()
       return deviceId
     }
   }
+
 
 
   fun setup() {
@@ -210,17 +217,37 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
 
       "addVirtualDevice" -> {
-        result.notImplemented()
+        startVirtualService()
       }
 
       "removeVirtualDevice" -> {
-        result.notImplemented()
+        stopVirtualService()
       }
 
       else -> {
         result.notImplemented()
       }
     }
+  }
+
+  fun startVirtualService() {
+    val comp = ComponentName(context, VirtualDeviceService::class.qualifiedName.toString())
+    val pm = context.packageManager
+    pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.SYNCHRONOUS or PackageManager.DONT_KILL_APP)
+
+  }
+
+  fun stopVirtualService() {
+    val comp = ComponentName(context, VirtualDeviceService::class.qualifiedName.toString())
+    val pm = context.packageManager
+    pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+
+  }
+
+  fun appName() : String {
+    val pm: PackageManager = context.getPackageManager()
+    val info: PackageInfo = pm.getPackageInfo(context.getPackageName(), 0)
+    return info.applicationInfo.loadLabel(pm).toString()
   }
 
   private fun tryToInitBT() : String? {
@@ -384,6 +411,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   fun teardown() {
     Log.d("FlutterMIDICommand", "teardown")
 
+    stopVirtualService()
+
     connectedDevices.forEach { s, connectedDevice -> connectedDevice.close() }
     connectedDevices.clear()
 
@@ -398,7 +427,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       // Everything is fine.
     }
   }
-
 
   private val deviceOpenedListener = object : MidiManager.OnDeviceOpenedListener {
     override fun onDeviceOpened(it: MidiDevice?) {
@@ -439,7 +467,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   }
 
   fun listOfPorts(count: Int) :  List<Map<String, Any>> {
-    Log.d("FlutterMIDICommand", "number of ports $count")
     return (0 until count).map { mapOf("id" to it, "connected" to false) }
   }
 
@@ -452,6 +479,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     var connectedBleDeviceIds = mutableListOf<String>()
 
     devs.forEach {
+//      Log.d("FlutterMIDICommand", "dev type ${it.type}")
       var isBluetooth = it.type == MidiDeviceInfo.TYPE_BLUETOOTH
       if (isBluetooth) {
         connectedBleDeviceIds.add(it.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString())
@@ -487,14 +515,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     return list.toList()
   }
 
-
   private val deviceConnectionCallback = object : MidiManager.DeviceCallback() {
 
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       device?.also {
         Log.d("FlutterMIDICommand", "device added $it")
-        //this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
+        this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
       }
     }
 
@@ -530,7 +557,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   class RXReceiver(stream: FlutterStreamHandler, device: MidiDevice) : MidiReceiver() {
     val stream = stream
     var isBluetoothDevice = device.info.type == MidiDeviceInfo.TYPE_BLUETOOTH
-
     val deviceInfo = mapOf("id" to if(isBluetoothDevice) device.info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(isBluetoothDevice) "BLE" else "native")
 
     // MIDI parsing
@@ -664,7 +690,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     }
 
     fun send(data: Any) {
-//      Log.d("FlutterMIDICommand","FlutterStreamHandler send $data $handler $eventSink")
       handler.post {
         eventSink?.success(data)
       }
@@ -690,15 +715,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     var status:MidiDeviceStatus? = null
     private var receiver:MidiReceiver? = null
     private var streamHandler:FlutterStreamHandler? = null
+    private var isOwnVirtualDevice = false;
 
     constructor(device:MidiDevice, streamHandler:FlutterStreamHandler) {
       this.midiDevice = device
       this.streamHandler = streamHandler
       this.id = deviceIdForInfo(device.info)
       this.type = device.info.type.toString()
-      device.info.ports.forEach {
-        Log.d("FlutterMIDICommand", "port on device: ${it.name} ${it.type} ${it.portNumber}")
-      }
     }
 
     fun connectWithReceiver(receiver: MidiReceiver, connectResult:Result?) {
@@ -706,24 +729,30 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
       this.midiDevice.info?.let {
 
-//        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
-
+        Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
+//
 //        it.ports.forEach {
 //          Log.d("FlutterMIDICommand", "${it.name} ${it.type} ${it.portNumber}")
 //        }
 
 //        Log.d("FlutterMIDICommand", "is binder alive? ${this.midiDevice?.info?.properties?.getBinder(null)?.isBinderAlive}")
 
-        if(it.inputPortCount > 0) {
-          Log.d("FlutterMIDICommand", "Open input port")
-          this.inputPort = this.midiDevice.openInputPort(0)
+        var serviceInfo = it.properties.getParcelable<ServiceInfo>("service_info")
+        if (serviceInfo?.name == VirtualDeviceService::class.qualifiedName) {
+          Log.d("FlutterMIDICommand", "Own virtual")
+          isOwnVirtualDevice = true
+        } else {
+          if (it.inputPortCount > 0) {
+            Log.d("FlutterMIDICommand", "Open input port")
+            this.inputPort = this.midiDevice.openInputPort(0)
+          }
         }
         if (it.outputPortCount > 0) {
           Log.d("FlutterMIDICommand", "Open output port")
           this.outputPort = this.midiDevice.openOutputPort(0)
           this.outputPort?.connect(receiver)
         }
-      }
+          }
 
       this.receiver = receiver
 
@@ -761,7 +790,18 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 //    }
 
     fun send(data: ByteArray, timestamp: Long?) {
-      this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0)
+
+      if(isOwnVirtualDevice) {
+        Log.d("FlutterMIDICommand", "Send to recevier")
+        if (timestamp == null)
+          this.receiver?.send(data, 0, data.size)
+        else
+          this.receiver?.send(data, 0, data.size, timestamp)
+
+      } else {
+        Log.d("FlutterMIDICommand", "Send to input port ${this.inputPort}")
+        this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0)
+      }
     }
 
     fun close() {
@@ -781,4 +821,44 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     }
 
   }
+
 }
+  class VirtualRXReceiver(stream:FlutterMidiCommandPlugin.FlutterStreamHandler) : MidiReceiver() {
+    val streamHandler = stream
+    val _deviceInfo = mutableMapOf("id" to "FlutterMidiCommand_Virtual", "name" to "FlutterMidiCommand_Virtual", "type" to "native")
+
+    override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
+      msg?.also {
+        var data = it.slice(IntRange(offset, offset + count - 1))
+        streamHandler.send(mapOf("data" to data.toList(), "timestamp" to timestamp, "device" to _deviceInfo))
+        }
+    }
+
+    override fun send(msg: ByteArray?, offset: Int, count: Int) {
+      Log.d("FlutterMIDICommand", "Send override")
+      super.send(msg, offset, count)
+    }
+  }
+
+  class VirtualDeviceService() : MidiDeviceService() {
+    var receiver:VirtualRXReceiver? = null
+
+    override fun onGetInputPortReceivers(): Array<MidiReceiver> {
+        Log.d("FlutterMIDICommand", "Create recevier $this")
+      if (receiver == null) {
+        receiver = VirtualRXReceiver(FlutterMidiCommandPlugin.rxStreamHandler)
+      }
+      return  arrayOf(receiver!!)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+      Log.d("FlutterMIDICommand_vSer", "onStartCommand")
+
+      return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+      receiver = null;
+      super.onDestroy()
+    }
+  }
