@@ -1,3 +1,6 @@
+## 0.4.0-dev.7
+Added virtual midi device support on Android
+
 ## 0.4.0-dev.6
 - Improved bluetooth state handling:
   - Start bluetooth subsystem only when you want, not automatically
