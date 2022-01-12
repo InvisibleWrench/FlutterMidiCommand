@@ -1,3 +1,6 @@
+## 0.4.0-dev.8
+Fixed reflection bug on Android
+
 ## 0.4.0-dev.7
 Added virtual midi device support on Android
 
