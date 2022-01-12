@@ -231,14 +231,14 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   }
 
   fun startVirtualService() {
-    val comp = ComponentName(context, VirtualDeviceService::class.qualifiedName.toString())
+    val comp = ComponentName(context, "com.invisiblewrench.fluttermidicommand.VirtualDeviceService")
     val pm = context.packageManager
     pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.SYNCHRONOUS or PackageManager.DONT_KILL_APP)
 
   }
 
   fun stopVirtualService() {
-    val comp = ComponentName(context, VirtualDeviceService::class.qualifiedName.toString())
+    val comp = ComponentName(context, "com.invisiblewrench.fluttermidicommand.VirtualDeviceService")
     val pm = context.packageManager
     pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
 
@@ -738,7 +738,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 //        Log.d("FlutterMIDICommand", "is binder alive? ${this.midiDevice?.info?.properties?.getBinder(null)?.isBinderAlive}")
 
         var serviceInfo = it.properties.getParcelable<ServiceInfo>("service_info")
-        if (serviceInfo?.name == VirtualDeviceService::class.qualifiedName) {
+        if (serviceInfo?.name == "com.invisiblewrench.fluttermidicommand.VirtualDeviceService") {
           Log.d("FlutterMIDICommand", "Own virtual")
           isOwnVirtualDevice = true
         } else {
