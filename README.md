@@ -28,6 +28,8 @@ Import flutter_midi_command
 
 - Get a list of available MIDI devices by calling `MidiCommand().devices` which returns a list of `MidiDevice`
 - Start bluetooth subsystem by calling `MidiCommand().startBluetoothCentral()`
+- Observe the bluetooth system state by calling `MidiCommand().onBluetoothStateChanged()`
+- Get the current bluetooth system state by calling `MidiCommand().bluetoothState()`
 - Start scanning for BLE MIDI devices by calling `MidiCommand().startScanningForBluetoothDevices()`
 - Connect to a specific `MidiDevice` by calling `MidiCommand.connectToDevice(selectedDevice)`
 - Stop scanning for BLE MIDI devices by calling `MidiCommand().stopScanningForBluetoothDevices()`

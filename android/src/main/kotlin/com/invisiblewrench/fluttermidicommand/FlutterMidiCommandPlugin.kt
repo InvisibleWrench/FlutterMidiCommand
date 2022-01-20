@@ -756,9 +756,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
       this.receiver = receiver
 
-      connectResult?.success(null)
 
-      streamHandler?.send("deviceConnected")
+      Handler().postDelayed({
+        connectResult?.success(null)
+        streamHandler?.send("deviceConnected")
+      }, 2500)
     }
 
 //    fun openPorts(ports: List<Port>) {

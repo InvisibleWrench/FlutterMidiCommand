@@ -1,3 +1,6 @@
+## 0.4.0
+Fixed missing future from native
+
 ## 0.4.0-dev.8
 Fixed reflection bug on Android
 

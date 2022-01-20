@@ -78,21 +78,6 @@ class _MyAppState extends State<MyApp> {
     return;
   }
 
-  Future<void> _waitUntilBluetoothIsInitialized() async {
-    bool isInitialized() => _midiCommand.bluetoothState != BluetoothState.unknown;
-
-    if (isInitialized()) {
-      return;
-    }
-
-    await for (final _ in _midiCommand.onBluetoothStateChanged) {
-      if (isInitialized()) {
-        break;
-      }
-    }
-    return;
-  }
-
   @override
   Widget build(BuildContext context) {
     return new MaterialApp(
@@ -121,7 +106,7 @@ class _MyAppState extends State<MyApp> {
                     // Start bluetooth
                     await _midiCommand.startBluetoothCentral();
 
-                    await _waitUntilBluetoothIsInitialized();
+                    await _midiCommand.waitUntilBluetoothIsInitialized();
 
                     // If bluetooth is powered on, start scanning
                     if (_midiCommand.bluetoothState == BluetoothState.poweredOn) {

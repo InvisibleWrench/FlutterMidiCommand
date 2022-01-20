@@ -166,11 +166,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         if(manager == nil){
             manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
 
-          bluetoothStateHandler.send(data: getBluetooCentralStateAsString())
+          bluetoothStateHandler.send(data: getBluetoothCentralStateAsString())
         }
     }
 
-    public func getBluetooCentralStateAsString() -> String {
+    public func getBluetoothCentralStateAsString() -> String {
         startBluetoothCentralWhenNeeded();
         switch(manager.state){
         case CBManagerState.poweredOn:
@@ -198,7 +198,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             result(nil);
             break;
         case "bluetoothState":
-          result(getBluetooCentralStateAsString());
+          result(getBluetoothCentralStateAsString());
           break;
         case "scanForDevices":
             startBluetoothCentralWhenNeeded();
@@ -841,8 +841,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     // Central
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        print("central did update state \(getBluetooCentralStateAsString())")
-        bluetoothStateHandler.send(data: getBluetooCentralStateAsString());
+        print("central did update state \(getBluetoothCentralStateAsString())")
+        bluetoothStateHandler.send(data: getBluetoothCentralStateAsString());
     }
 
     public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
@@ -859,7 +859,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     }
 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        print("central did fail to connect state \(peripheral)")
+        print("central did fail to connect state \(peripheral) \(error?.localizedDescription)")
         
         setupStreamHandler.send(data: "connectionFailed")
         connectedDevices.removeValue(forKey: peripheral.identifier.uuidString)
@@ -1457,7 +1457,10 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 print("set up characteristic for device")
                 setupStream?.send(data: "deviceConnected")
                 if let res = connectResult {
+                print("callback result")
                     res(nil)
+                } else {
+                print("NO callback result")
                 }
                 return;
             }
