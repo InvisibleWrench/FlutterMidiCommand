@@ -327,7 +327,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         } else // if type == "native" || if type == "virtual"
         {
-            let device = type == "native" ? ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
+            let device = (type == "native" || type == "network") ? ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
                 : ConnectedVirtualDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             print("connected to \(device) \(deviceId)")
             connectedDevices[deviceId] = device
