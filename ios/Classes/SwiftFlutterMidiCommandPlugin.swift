@@ -1112,7 +1112,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-            let timestamp = Int(round(Double(p.timeStamp) * timestampFactor))
+            let timestamp = UInt64(round(Double(p.timeStamp) * timestampFactor))
 //            print("data \(data) timestamp \(timestamp)")
             streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":deviceInfo])
             ap = MIDIPacketNext(ap)
