@@ -1,3 +1,6 @@
+## 0.4.1
+Fixed issues with timestamp and network sessions in Swift
+
 ## 0.4.0
 Fixed missing future from native
 
