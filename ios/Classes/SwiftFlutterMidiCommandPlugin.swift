@@ -9,6 +9,7 @@ import CoreMIDI
 import os.log
 import CoreBluetooth
 import Foundation
+import CoreVideo
 
 ///
 /// Credit to
@@ -327,7 +328,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         } else // if type == "native" || if type == "virtual"
         {
-            let device = type == "native" ? ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
+            let device = (type == "native" || type == "network") ? ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
                 : ConnectedVirtualDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             print("connected to \(device) \(deviceId)")
             connectedDevices[deviceId] = device
@@ -1112,7 +1113,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             let p = ap.pointee
             var tmp = p.data
             let data = Data(bytes: &tmp, count: Int(p.length))
-            let timestamp = Int(round(Double(p.timeStamp) * timestampFactor))
+            let timestamp = UInt64(round(Double(p.timeStamp) * timestampFactor))
 //            print("data \(data) timestamp \(timestamp)")
             streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":deviceInfo])
             ap = MIDIPacketNext(ap)
@@ -1354,13 +1355,13 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     }
     
     override func send(bytes:[UInt8], timestamp: UInt64?) {
-//        print("ble send \(id) \(bytes)")
+        print("ble send \(id) \(bytes)")
         if (characteristic != nil) {
 
-            let writeType = CBCharacteristicWriteType.withoutResponse
+
             let packetSize = peripheral.maximumWriteValueLength(for:writeType)
             // print("packetSize = \(packetSize)")
-
+            
             var dataBytes = Data(bytes)
 
             if bytes.first == 0xF0 && bytes.last == 0xF7 { //  this is a sysex message, handle carefully
@@ -1378,7 +1379,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
 //                        print("packet \(packet)")
 //                        print("packet \(hexEncodedString(packet))")
 
-                    peripheral.writeValue(packet, for: characteristic!, type: writeType)
+                    enqueueMidiData(bytes: packet)
 
                     dataBytes = dataBytes.advanced(by: packetSize-2)
 
@@ -1402,7 +1403,8 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
 
 //                            print("packet \(hexEncodedString(packet))")
 
-                        peripheral.writeValue(packet, for: characteristic!, type: writeType)
+                        // Wait for buffer to clear
+                        enqueueMidiData(bytes: packet)
 
                         if (dataBytes.count > packetSize-2) {
                             dataBytes = dataBytes.advanced(by: pickCount) // Advance buffer
@@ -1420,7 +1422,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                     dataBytes.insert(0x80, at: 0)
                     dataBytes.insert(0x80, at: 0)
 
-                    peripheral.writeValue(dataBytes, for: characteristic!, type: writeType)
+                    enqueueMidiData(bytes: dataBytes)
                 }
                 return
             }
@@ -1428,12 +1430,41 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
             // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
             dataBytes.insert(0x80, at: 0)
             dataBytes.insert(0x80, at: 0)
-
-            peripheral.writeValue(dataBytes, for: characteristic!, type: writeType)
+            
+            enqueueMidiData(bytes: dataBytes)
         } else {
             print("No peripheral/characteristic in device")
         }
     }
+    
+    let writeType = CBCharacteristicWriteType.withoutResponse
+    var outboundMessageQueue = [Data]()
+    
+    func enqueueMidiData(bytes:Data) {
+        outboundMessageQueue.append(bytes)
+        
+        if (peripheral.canSendWriteWithoutResponse) {
+            dequeueMidiBytes()
+        }
+    }
+    
+    func dequeueMidiBytes() {
+        if (outboundMessageQueue.isEmpty) {
+            print("Can't dequeue empty queue - return")
+            return
+        }
+        let messageBytes = outboundMessageQueue.removeFirst()
+        peripheral.writeValue(messageBytes, for: characteristic!, type: writeType)
+    }
+    
+    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        if (outboundMessageQueue.isEmpty) {
+            print("Queue empty - return")
+            return
+        }
+       dequeueMidiBytes()
+    }
+    
 
     public func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         if let err = error {
@@ -1694,4 +1725,5 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         }
         return 0
     }
+
 }
