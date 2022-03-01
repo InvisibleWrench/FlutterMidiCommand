@@ -600,6 +600,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
                   midiBuffer.clear()
                   midiBuffer.add(midiByte)
                   parserState = PARSER_STATE.PARAMS
+                  finalizeMessageIfComplete(timestamp)
                 } else {
                   // in header state but no status byte, do running status
                   midiBuffer.clear()
