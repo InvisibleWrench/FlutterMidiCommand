@@ -582,13 +582,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         if (data.size > 0) {
           for (i in 0 until data.size) {
             var midiByte: Byte = data[i]
-            var midiInt = midiByte.toInt()
+            var midiInt = midiByte.toInt() and 0xFF
 
 //          Log.d("FlutterMIDICommand", "parserState $parserState byte $midiByte")
 
             when (parserState) {
               PARSER_STATE.HEADER -> {
-                if (midiInt and 0xFF == 0xF0) {
+                if (midiInt == 0xF0) {
                   parserState = PARSER_STATE.SYSEX
                   sysExBuffer.clear()
                   sysExBuffer.add(midiByte)
@@ -611,7 +611,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
               }
 
               PARSER_STATE.SYSEX -> {
-                if (midiInt and 0xFF == 0xF0) {
+                if (midiInt == 0xF0) {
                   // Android can skip SysEx end bytes, when more sysex messages are coming in succession.
                   // in an attempt to save the situation, add an end byte to the current buffer and start a new one.
                   sysExBuffer.add(0xF7.toByte())
@@ -626,7 +626,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
                   sysExBuffer.clear();
                 }
                 sysExBuffer.add(midiByte)
-                if (midiInt and 0xFF == 0xF7) {
+                if (midiInt == 0xF7) {
                   // Sysex complete
 //                Log.d("FlutterMIDICommand", "sysex complete $sysExBuffer")
                   stream.send(
