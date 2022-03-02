@@ -1711,6 +1711,8 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 return 1
             case 0xF1, 0xF3:
                     return 2
+            case 0xF2:
+                    return 3
             default:
                 break
         }
@@ -1718,7 +1720,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         switch (midiType) {
             case 0xC0, 0xD0:
                 return 2
-            case 0xF2, 0x80, 0x90, 0xA0, 0xB0, 0xE0:
+            case 0x80, 0x90, 0xA0, 0xB0, 0xE0:
                 return 3
             default:
                 break
