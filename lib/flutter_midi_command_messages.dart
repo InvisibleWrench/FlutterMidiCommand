@@ -230,7 +230,7 @@ class PitchBendMessage extends MidiMessage {
 
   @override
   void send() {
-    double mappedToRange = bend.clamp(0, 1) * 0x4000;
+    double mappedToRange = bend.clamp(0, 1) * 0x3FFF;
     int targetValue = mappedToRange.toInt();
 
     int bendMSB = targetValue >> 7;
