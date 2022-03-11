@@ -1,18 +1,7 @@
 import 'dart:typed_data';
 import 'flutter_midi_command.dart';
 
-enum MessageType {
-  CC,
-  PC,
-  NoteOn,
-  NoteOff,
-  NRPN,
-  SYSEX,
-  Beat,
-  PolyAT,
-  AT,
-  PitchBend
-}
+enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, SYSEX, Beat, PolyAT, AT, PitchBend }
 
 /// Base class for MIDI message types
 class MidiMessage {
@@ -225,13 +214,13 @@ class PitchBendMessage extends MidiMessage {
   final int channel;
   final double bend;
 
-  /// Create Pitch Bend Message with a bend value range of 0.0 to 1.0 (default: 0.5).
-  PitchBendMessage({this.channel = 0, this.bend = 0.5});
+  /// Create Pitch Bend Message with a bend value range of -1.0 to 1.0 (default: 0.0).
+  PitchBendMessage({this.channel = 0, this.bend = 0});
 
   @override
   void send() {
-    double mappedToRange = bend.clamp(0, 1) * 0x3FFF;
-    int targetValue = mappedToRange.toInt();
+    double clampedBend = (bend.clamp(-1, 1) + 1) / 2.0;
+    int targetValue = (clampedBend * 0x3FFF).round();
 
     int bendMSB = targetValue >> 7;
     int bendLSB = targetValue & 0x7F;

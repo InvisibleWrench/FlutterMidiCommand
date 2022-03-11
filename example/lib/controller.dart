@@ -35,7 +35,9 @@ class MidiControls extends StatefulWidget {
 class MidiControlsState extends State<MidiControls> {
   var _channel = 0;
   var _controller = 0;
-  var _value = 0;
+  var _ccValue = 0;
+  var _pcValue = 0;
+  var _pitchValue = 0.0;
 
   // StreamSubscription<String> _setupSubscription;
   StreamSubscription<MidiPacket>? _rxSubscription;
@@ -64,14 +66,32 @@ class MidiControlsState extends State<MidiControls> {
       }
 
       if (data.length >= 2) {
-        var d1 = data[1];
-        var d2 = data[2];
         var rawStatus = status & 0xF0; // without channel
         var channel = (status & 0x0F);
-        if (rawStatus == 0xB0 && channel == _channel && d1 == _controller) {
-          setState(() {
-            _value = d2;
-          });
+        if (channel == _channel) {
+          var d1 = data[1];
+          switch (rawStatus) {
+            case 0xB0: // CC
+              if (d1 == _controller) {
+                // CC
+                var d2 = data[2];
+                setState(() {
+                  _ccValue = d2;
+                });
+              }
+              break;
+            case 0xC0: // PC
+              setState(() {
+                _pcValue = d1;
+              });
+              break;
+            case 0xE0: // Pitch Bend
+              setState(() {
+                var rawPitch = d1 + (data[2] << 7);
+                _pitchValue = (((rawPitch) / 0x3FFF) * 2.0) - 1;
+              });
+              break;
+          }
         }
       }
     });
@@ -87,14 +107,30 @@ class MidiControlsState extends State<MidiControls> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Column(
-        children: <Widget>[
-          SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
-          SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
-          SlidingSelector('Value', _value, 0, 127, _onValueChanged),
-        ],
-      ),
+    return ListView(
+      padding: EdgeInsets.all(12),
+      children: <Widget>[
+        Text("Channel", style: Theme.of(context).textTheme.headline6),
+        SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
+        Divider(),
+        Text("CC", style: Theme.of(context).textTheme.headline6),
+        SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
+        SlidingSelector('Value', _ccValue, 0, 127, _onValueChanged),
+        Divider(),
+        Text("PC", style: Theme.of(context).textTheme.headline6),
+        SteppedSelector('Program', _pcValue, 0, 127, _onProgramChanged),
+        Divider(),
+        Text("Pitch Bend", style: Theme.of(context).textTheme.headline6),
+        Slider(
+            value: _pitchValue,
+            max: 1,
+            min: -1,
+            onChanged: _onPitchChanged,
+            onChangeEnd: (_) {
+              _onPitchChanged(0);
+            }),
+        Divider()
+      ],
     );
   }
 
@@ -110,11 +146,25 @@ class MidiControlsState extends State<MidiControls> {
     });
   }
 
+  _onProgramChanged(int newValue) {
+    setState(() {
+      _pcValue = newValue;
+    });
+    PCMessage(channel: _channel, program: _pcValue).send();
+  }
+
   _onValueChanged(int newValue) {
     setState(() {
-      _value = newValue;
-      CCMessage(channel: _channel, controller: _controller, value: _value).send();
+      _ccValue = newValue;
     });
+    CCMessage(channel: _channel, controller: _controller, value: _ccValue).send();
+  }
+
+  _onPitchChanged(double newValue) {
+    setState(() {
+      _pitchValue = newValue;
+    });
+    PitchBendMessage(channel: _channel, bend: newValue).send();
   }
 }
 

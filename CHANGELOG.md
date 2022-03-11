@@ -1,3 +1,7 @@
+## 0.4.5
+Added Pitch bend message type
+More controls in example app
+
 ## 0.4.4
 Fixed issue with single messages, credit to https://github.com/anzbert
 

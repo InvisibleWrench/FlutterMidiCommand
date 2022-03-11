@@ -803,7 +803,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           this.receiver?.send(data, 0, data.size, timestamp)
 
       } else {
-        Log.d("FlutterMIDICommand", "Send to input port ${this.inputPort}")
+//        Log.d("FlutterMIDICommand", "Send to input port ${this.inputPort}")
         this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0)
       }
     }
