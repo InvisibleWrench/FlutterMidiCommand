@@ -1,3 +1,7 @@
+## 0.4.6
+Fixed an issue showing the OS bluetooth permission alerat before
+refresh button was pressed.
+
 ## 0.4.5
 Added Pitch bend message type
 More controls in example app

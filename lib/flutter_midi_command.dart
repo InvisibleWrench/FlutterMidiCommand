@@ -24,9 +24,7 @@ class MidiCommand {
     return _instance!;
   }
 
-  MidiCommand._() {
-    _listenToBluetoothState();
-  }
+  MidiCommand._();
 
   dispose() {
     _bluetoothStateStream.close();
@@ -88,7 +86,8 @@ class MidiCommand {
       return;
     }
     _bluetoothCentralIsStarted = true;
-    return _platform.startBluetoothCentral();
+    await _platform.startBluetoothCentral();
+    await _listenToBluetoothState();
   }
 
   /// Wait for the blueetooth state to be initialized
