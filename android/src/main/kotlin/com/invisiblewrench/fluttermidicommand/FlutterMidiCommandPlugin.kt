@@ -164,8 +164,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
     when (call.method) {
       "sendData" -> {
-        var args = call.arguments<Map<String, Any>>()
-        sendData(args["data"] as ByteArray, args["timestamp"] as? Long, args["deviceId"]?.toString())
+        var args : Map<String,Any>? = call.arguments()
+        sendData(args?.get("data") as ByteArray, args["timestamp"] as? Long, args["deviceId"]?.toString())
         result.success(null)
       }
       "getDevices" -> {
@@ -198,7 +198,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
       "connectToDevice" -> {
         var args = call.arguments<Map<String, Any>>()
-        var device = (args["device"] as Map<String, Any>)
+        var device = (args?.get("device") as Map<String, Any>)
 //        var portList = (args["ports"] as List<Map<String, Any>>).map{
 //          Port(if (it["id"].toString() is String) it["id"].toString().toInt() else 0 , it["type"].toString())
 //        }
@@ -208,7 +208,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
       "disconnectDevice" -> {
         var args = call.arguments<Map<String, Any>>()
-        disconnectDevice(args["id"].toString())
+        args?.get("id")?.let { disconnectDevice(it.toString()) }
         result.success(null)
       }
       "teardown" -> {
@@ -346,11 +346,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     discoveredDevices.clear()
   }
 
-
+//fun onRequestPermissionsResult(p0: Int, p1: Array<(out) String!>, p2: IntArray): Boolean
   override fun onRequestPermissionsResult(
           requestCode: Int,
-          permissions: Array<out String>?,
-          grantResults: IntArray?): Boolean {
+          permissions: Array<out String>,
+          grantResults: IntArray): Boolean {
     Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
 
 
