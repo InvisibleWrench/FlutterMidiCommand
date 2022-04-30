@@ -1,7 +1,18 @@
 import 'dart:typed_data';
 import 'flutter_midi_command.dart';
 
-enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, SYSEX, Beat, PolyAT, AT, PitchBend }
+enum MessageType {
+  CC,
+  PC,
+  NoteOn,
+  NoteOff,
+  NRPN,
+  SYSEX,
+  Beat,
+  PolyAT,
+  AT,
+  PitchBend
+}
 
 /// Base class for MIDI message types
 class MidiMessage {
@@ -18,9 +29,9 @@ class MidiMessage {
 
 /// Continuous Control Message
 class CCMessage extends MidiMessage {
-  int channel = 0;
-  int controller = 0;
-  int value = 0;
+  int channel;
+  int controller;
+  int value;
 
   CCMessage({this.channel = 0, this.controller = 0, this.value = 0});
 
@@ -36,8 +47,8 @@ class CCMessage extends MidiMessage {
 
 /// Program Change Message
 class PCMessage extends MidiMessage {
-  int channel = 0;
-  int program = 0;
+  int channel;
+  int program;
 
   PCMessage({this.channel = 0, this.program = 0});
 
@@ -52,9 +63,9 @@ class PCMessage extends MidiMessage {
 
 /// Note On Message
 class NoteOnMessage extends MidiMessage {
-  int channel = 0;
-  int note = 0;
-  int velocity = 0;
+  int channel;
+  int note;
+  int velocity;
 
   NoteOnMessage({this.channel = 0, this.note = 0, this.velocity = 0});
 
@@ -70,9 +81,9 @@ class NoteOnMessage extends MidiMessage {
 
 /// Note Off Message
 class NoteOffMessage extends MidiMessage {
-  int channel = 0;
-  int note = 0;
-  int velocity = 0;
+  int channel;
+  int note;
+  int velocity;
 
   NoteOffMessage({this.channel = 0, this.note = 0, this.velocity = 0});
 
@@ -88,8 +99,8 @@ class NoteOffMessage extends MidiMessage {
 
 /// System Exclusive Message
 class SysExMessage extends MidiMessage {
-  List<int> headerData = [];
-  int value = 0;
+  List<int> headerData;
+  int value;
 
   SysExMessage({this.headerData = const [], this.value = 0});
 
@@ -131,9 +142,9 @@ class SysExMessage extends MidiMessage {
 
 /// NRPN Message
 class NRPNMessage extends MidiMessage {
-  int channel = 0;
-  int parameter = 0;
-  int value = 0;
+  int channel;
+  int parameter;
+  int value;
 
   NRPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
 
@@ -166,18 +177,18 @@ class NRPNMessage extends MidiMessage {
 
 /// NRPN Message with data separated in MSB, LSB
 class NRPNHexMessage extends MidiMessage {
-  int channel = 0;
-  int parameterMSB = 0;
-  int parameterLSB = 0;
-  int valueMSB = 0;
-  int valueLSB = -1;
+  int channel;
+  int parameterMSB;
+  int parameterLSB;
+  int valueMSB;
+  int valueLSB;
 
   NRPNHexMessage({
     this.channel = 0,
     this.parameterMSB = 0,
     this.parameterLSB = 0,
     this.valueMSB = 0,
-    this.valueLSB = 0,
+    this.valueLSB = -1,
   });
 
   @override
@@ -211,8 +222,8 @@ class NRPNHexMessage extends MidiMessage {
 }
 
 class PitchBendMessage extends MidiMessage {
-  final int channel;
-  final double bend;
+  int channel;
+  double bend;
 
   /// Create Pitch Bend Message with a bend value range of -1.0 to 1.0 (default: 0.0).
   PitchBendMessage({this.channel = 0, this.bend = 0});
@@ -234,9 +245,9 @@ class PitchBendMessage extends MidiMessage {
 }
 
 class PolyATMessage extends MidiMessage {
-  int channel = 0;
-  int note = 0;
-  int pressure = 0;
+  int channel;
+  int note;
+  int pressure;
 
   /// Create a Polyphonic Aftertouch Message for a single note
   PolyATMessage({this.channel = 0, this.note = 0, this.pressure = 0});
@@ -252,8 +263,8 @@ class PolyATMessage extends MidiMessage {
 }
 
 class ATMessage extends MidiMessage {
-  int channel = 0;
-  int pressure = 0;
+  int channel;
+  int pressure;
 
   /// Create an Aftertouch Message for a single channel
   ATMessage({this.channel = 0, this.pressure = 0});
