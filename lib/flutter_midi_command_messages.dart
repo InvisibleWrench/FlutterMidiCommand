@@ -258,6 +258,7 @@ class RPNMessage extends MidiMessage {
   /// - 0x0003 – Tuning program change
   /// - 0x0004 – Tuning bank select
   /// - 0x0005 – Modulation depth range
+  /// - 0x0006 – MPE Configuration Message (MCM)
   ///
   /// Value Range is Hex: 0x0000 - 0x3FFFF or Decimal: 0-16383
   RPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
