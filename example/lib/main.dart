@@ -177,6 +177,7 @@ class _MyAppState extends State<MyApp> {
                       leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),
                       trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {
+                        _midiCommand.stopScanningForBluetoothDevices();
                         Navigator.of(context).push(MaterialPageRoute<Null>(
                           builder: (_) => ControllerPage(device),
                         ));
