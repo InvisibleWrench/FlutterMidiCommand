@@ -43,7 +43,6 @@ Import flutter_midi_command
 See example folder for how to use.
 
 For help getting started with Flutter, view our online
-[documentation](https://flutter.io/).
+[documentation](https://flutter.dev/).
 
-For help on editing plugin code, view the [documentation](https://flutter.io/pwd
-developing-packages/#edit-plugin-package).
+For help on editing plugin code, view the [documentation](https://docs.flutter.dev/development/packages-and-plugins/developing-packages#edit-plugin-package).
