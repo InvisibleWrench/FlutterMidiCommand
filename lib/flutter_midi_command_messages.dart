@@ -1,13 +1,25 @@
 import 'dart:typed_data';
 import 'flutter_midi_command.dart';
 
-enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, SYSEX, Beat, PolyAT, AT, PitchBend }
+enum MessageType {
+  CC,
+  PC,
+  NoteOn,
+  NoteOff,
+  NRPN,
+  RPN,
+  SYSEX,
+  Beat,
+  PolyAT,
+  AT,
+  PitchBend
+}
 
-/// Base class for MIDI message types
 class MidiMessage {
   /// Byte data of the message
   Uint8List data = Uint8List(0);
 
+  /// Base class for MIDI message types
   MidiMessage();
 
   /// Send the message bytes to all connected devices
@@ -16,12 +28,12 @@ class MidiMessage {
   }
 }
 
-/// Continuous Control Message
 class CCMessage extends MidiMessage {
-  int channel = 0;
-  int controller = 0;
-  int value = 0;
+  int channel;
+  int controller;
+  int value;
 
+  /// Continuous Control Message
   CCMessage({this.channel = 0, this.controller = 0, this.value = 0});
 
   @override
@@ -34,11 +46,11 @@ class CCMessage extends MidiMessage {
   }
 }
 
-/// Program Change Message
 class PCMessage extends MidiMessage {
-  int channel = 0;
-  int program = 0;
+  int channel;
+  int program;
 
+  /// Program Change Message
   PCMessage({this.channel = 0, this.program = 0});
 
   @override
@@ -50,12 +62,12 @@ class PCMessage extends MidiMessage {
   }
 }
 
-/// Note On Message
 class NoteOnMessage extends MidiMessage {
-  int channel = 0;
-  int note = 0;
-  int velocity = 0;
+  int channel;
+  int note;
+  int velocity;
 
+  /// Note On Message
   NoteOnMessage({this.channel = 0, this.note = 0, this.velocity = 0});
 
   @override
@@ -68,12 +80,12 @@ class NoteOnMessage extends MidiMessage {
   }
 }
 
-/// Note Off Message
 class NoteOffMessage extends MidiMessage {
-  int channel = 0;
-  int note = 0;
-  int velocity = 0;
+  int channel;
+  int note;
+  int velocity;
 
+  /// Note Off Message
   NoteOffMessage({this.channel = 0, this.note = 0, this.velocity = 0});
 
   @override
@@ -86,11 +98,11 @@ class NoteOffMessage extends MidiMessage {
   }
 }
 
-/// System Exclusive Message
 class SysExMessage extends MidiMessage {
-  List<int> headerData = [];
-  int value = 0;
+  List<int> headerData;
+  int value;
 
+  /// System Exclusive Message
   SysExMessage({this.headerData = const [], this.value = 0});
 
   @override
@@ -129,12 +141,12 @@ class SysExMessage extends MidiMessage {
   }
 }
 
-/// NRPN Message
 class NRPNMessage extends MidiMessage {
-  int channel = 0;
-  int parameter = 0;
-  int value = 0;
+  int channel;
+  int parameter;
+  int value;
 
+  /// NRPN Message
   NRPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
 
   @override
@@ -143,41 +155,41 @@ class NRPNMessage extends MidiMessage {
     // Data Entry MSB
     data[0] = 0xB0 + channel;
     data[1] = 0x63;
-    data[2] = parameter ~/ 128;
+    data[2] = parameter >> 7;
 
     // Data Entry LSB
     data[3] = 0xB0 + channel;
     data[4] = 0x62;
-    data[5] = parameter - (data[2] * 128);
+    data[5] = parameter & 0x7F;
 
     // Data Value MSB
     data[6] = 0xB0 + channel;
     data[7] = 0x06;
-    data[8] = value & 0x7F;
+    data[8] = value >> 7;
 
     // Data Value LSB
     data[9] = 0xB0 + channel;
     data[10] = 0x38;
-    data[11] = value & 0x3F80;
+    data[11] = value & 0x7F;
 
     super.send();
   }
 }
 
-/// NRPN Message with data separated in MSB, LSB
 class NRPNHexMessage extends MidiMessage {
-  int channel = 0;
-  int parameterMSB = 0;
-  int parameterLSB = 0;
-  int valueMSB = 0;
-  int valueLSB = -1;
+  int channel;
+  int parameterMSB;
+  int parameterLSB;
+  int valueMSB;
+  int valueLSB;
 
+  /// NRPN Message with data separated in MSB, LSB
   NRPNHexMessage({
     this.channel = 0,
     this.parameterMSB = 0,
     this.parameterLSB = 0,
     this.valueMSB = 0,
-    this.valueLSB = 0,
+    this.valueLSB = -1,
   });
 
   @override
@@ -210,9 +222,146 @@ class NRPNHexMessage extends MidiMessage {
   }
 }
 
+class NRPNNullMessage extends MidiMessage {
+  int channel;
+
+  /// It is best practice, but not mandatory, to send a Null Message at the end of a NRPN
+  /// Stream to prevent accidental value changes on CC6 after a message has concluded.
+  NRPNNullMessage({this.channel = 0});
+
+  void send() {
+    data = Uint8List(6);
+    // Data Entry MSB
+    data[0] = 0xB0 + channel;
+    data[1] = 0x63;
+    data[2] = 0x7F;
+
+    // Data Entry LSB
+    data[3] = 0xB0 + channel;
+    data[4] = 0x62;
+    data[5] = 0x7F;
+
+    super.send();
+  }
+}
+
+class RPNMessage extends MidiMessage {
+  int channel;
+  int parameter;
+  int value;
+
+  /// ## RPN Message
+  /// All defined RPN Parameters as per Midi Spec:
+  /// - 0x0000 – Pitch bend range
+  /// - 0x0001 – Fine tuning
+  /// - 0x0002 – Coarse tuning
+  /// - 0x0003 – Tuning program change
+  /// - 0x0004 – Tuning bank select
+  /// - 0x0005 – Modulation depth range
+  /// - 0x0006 – MPE Configuration Message (MCM)
+  ///
+  /// Value Range is Hex: 0x0000 - 0x3FFFF or Decimal: 0-16383
+  RPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
+
+  @override
+  void send() {
+    data = Uint8List(12);
+    // Data Entry MSB
+    data[0] = 0xB0 + channel;
+    data[1] = 0x65;
+    data[2] = parameter >> 7;
+
+    // Data Entry LSB
+    data[3] = 0xB0 + channel;
+    data[4] = 0x64;
+    data[5] = parameter & 0x7F;
+
+    // Data Value MSB
+    data[6] = 0xB0 + channel;
+    data[7] = 0x06;
+    data[8] = value >> 7;
+
+    // Data Value LSB
+    data[9] = 0xB0 + channel;
+    data[10] = 0x26;
+    data[11] = value & 0x7F;
+
+    super.send();
+  }
+}
+
+class RPNHexMessage extends MidiMessage {
+  int channel;
+  int parameterMSB;
+  int parameterLSB;
+  int valueMSB;
+  int valueLSB;
+
+  /// RPN Message with data separated in MSB, LSB
+  RPNHexMessage({
+    this.channel = 0,
+    this.parameterMSB = 0,
+    this.parameterLSB = 0,
+    this.valueMSB = 0,
+    this.valueLSB = -1,
+  });
+
+  @override
+  void send() {
+    var length = valueLSB > -1 ? 12 : 9;
+    data = Uint8List(length);
+    // Data Entry MSB
+    data[0] = 0xB0 + channel;
+    data[1] = 0x65;
+    data[2] = parameterMSB;
+
+    // Data Entry LSB
+    data[3] = 0xB0 + channel;
+    data[4] = 0x64;
+    data[5] = parameterLSB;
+
+    // Data Value MSB
+    data[6] = 0xB0 + channel;
+    data[7] = 0x06;
+    data[8] = valueMSB;
+
+    // Data Value LSB
+    if (valueLSB > -1) {
+      data[9] = 0xB0 + channel;
+      data[10] = 0x26;
+      data[11] = valueLSB;
+    }
+
+    super.send();
+  }
+}
+
+class RPNNullMessage extends MidiMessage {
+  int channel;
+
+  /// It is best practice, but not mandatory, to send a Null Message at the end of a RPN
+  /// Stream to prevent accidental value changes on CC6 after a message has concluded.
+  RPNNullMessage({this.channel = 0});
+
+  void send() {
+    data = Uint8List(6);
+    // Data Entry MSB
+    data[0] = 0xB0 + channel;
+    data[1] = 0x65;
+    data[2] = 0x7F;
+
+    // Data Entry LSB
+    data[3] = 0xB0 + channel;
+    data[4] = 0x64;
+    data[5] = 0x7F;
+
+    super.send();
+  }
+}
+
 class PitchBendMessage extends MidiMessage {
-  final int channel;
-  final double bend;
+  int channel;
+  double bend;
 
   /// Create Pitch Bend Message with a bend value range of -1.0 to 1.0 (default: 0.0).
   PitchBendMessage({this.channel = 0, this.bend = 0});
@@ -234,9 +383,9 @@ class PitchBendMessage extends MidiMessage {
 }
 
 class PolyATMessage extends MidiMessage {
-  int channel = 0;
-  int note = 0;
-  int pressure = 0;
+  int channel;
+  int note;
+  int pressure;
 
   /// Create a Polyphonic Aftertouch Message for a single note
   PolyATMessage({this.channel = 0, this.note = 0, this.pressure = 0});
@@ -252,8 +401,8 @@ class PolyATMessage extends MidiMessage {
 }
 
 class ATMessage extends MidiMessage {
-  int channel = 0;
-  int pressure = 0;
+  int channel;
+  int pressure;
 
   /// Create an Aftertouch Message for a single channel
   ATMessage({this.channel = 0, this.pressure = 0});
