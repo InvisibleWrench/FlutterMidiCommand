@@ -544,6 +544,27 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
 
 
+        // ###########
+        // CONNECTED BLE DEVICES (which are no longer discoverable)
+        // ###########
+
+        connectedDevices.forEach({ (key: String, value: ConnectedDevice) in
+            if (value.deviceType == "BLE" && !discoveredDevices.contains(where: { periph in
+                periph.identifier.uuidString == key
+            })) {
+                if let bleDev = value as? ConnectedBLEDevice {
+                    devices.append([
+                        "name" : bleDev.peripheral.name ?? "Unknown",
+                        "id" : key,
+                        "type" : "BLE",
+                        "connected":"true",
+                        "inputs" : [["id":0, "connected":true]],
+                        "outputs" : [["id":0, "connected":true]]
+                        ])
+                }
+            }
+        })
+
         // #######
         // VIRTUAL
         // #######

@@ -1,3 +1,7 @@
+
+## 0.4.8
+Fixed an issue where BLE devices would disappear from the device list on iOS, once connected.
+
 ## 0.4.7
 Added null_checks for latest flutter sdk (kotlin)
 fixed NRPN / added RPN
