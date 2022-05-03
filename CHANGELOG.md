@@ -1,3 +1,7 @@
+## 0.4.7
+Added null_checks for latest flutter sdk (kotlin)
+fixed NRPN / added RPN
+
 ## 0.4.6
 Fixed an issue showing the OS bluetooth permission alerat before
 refresh button was pressed.
