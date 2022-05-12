@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'dart:typed_data';
-import 'package:flutter_midi_command_linux/flutter_midi_command_linux.dart';
+// import 'package:flutter_midi_command_linux/flutter_midi_command_linux.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice, MidiPacket, MidiPort;
 
@@ -61,11 +61,11 @@ class MidiCommand {
   static MidiCommandPlatform get _platform {
     if (__platform != null) return __platform!;
 
-    if (Platform.isLinux) {
-      __platform = FlutterMidiCommandLinux();
-    } else {
-      __platform = MidiCommandPlatform.instance;
-    }
+    // if (Platform.isLinux) {
+    //   __platform = FlutterMidiCommandLinux();
+    // } else {
+    __platform = MidiCommandPlatform.instance;
+    // }
     return __platform!;
   }
 
