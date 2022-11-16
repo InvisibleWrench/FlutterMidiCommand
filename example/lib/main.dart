@@ -34,6 +34,8 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  bool _didAskForBluetoothPermissions = false;
+
   @override
   void dispose() {
     _setupSubscription?.cancel();
@@ -55,6 +57,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _informUserAboutBluetoothPermissions(BuildContext context) async {
+    if (_didAskForBluetoothPermissions) {
+      return;
+    }
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -74,6 +80,8 @@ class _MyAppState extends State<MyApp> {
         );
       },
     );
+
+    _didAskForBluetoothPermissions = true;
 
     return;
   }
@@ -169,6 +177,7 @@ class _MyAppState extends State<MyApp> {
                       leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),
                       trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {
+                        _midiCommand.stopScanningForBluetoothDevices();
                         Navigator.of(context).push(MaterialPageRoute<Null>(
                           builder: (_) => ControllerPage(device),
                         ));

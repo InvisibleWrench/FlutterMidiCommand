@@ -1,6 +1,6 @@
 PODS:
   - Flutter (1.0.0)
-  - flutter_midi_command (0.3.6):
+  - flutter_midi_command (0.4.2):
     - Flutter
 
 DEPENDENCIES:
@@ -15,7 +15,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: 50d75fe2f02b26cc09d224853bb45737f8b3214a
-  flutter_midi_command: 4acc18c6391c574d21f1d3a1cc40c7fe06ff461f
+  flutter_midi_command: 760f0ec4b7c6d3034982f6045e878d9b7d01674e
 
 PODFILE CHECKSUM: 7368163408c647b7eb699d0d788ba6718e18fb8d
 

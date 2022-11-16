@@ -544,6 +544,27 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
 
 
+        // ###########
+        // CONNECTED BLE DEVICES (which are no longer discoverable)
+        // ###########
+
+        connectedDevices.forEach({ (key: String, value: ConnectedDevice) in
+            if (value.deviceType == "BLE" && !discoveredDevices.contains(where: { periph in
+                periph.identifier.uuidString == key
+            })) {
+                if let bleDev = value as? ConnectedBLEDevice {
+                    devices.append([
+                        "name" : bleDev.peripheral.name ?? "Unknown",
+                        "id" : key,
+                        "type" : "BLE",
+                        "connected":"true",
+                        "inputs" : [["id":0, "connected":true]],
+                        "outputs" : [["id":0, "connected":true]]
+                        ])
+                }
+            }
+        })
+
         // #######
         // VIRTUAL
         // #######
@@ -1427,11 +1448,28 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 return
             }
 
-            // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
-            dataBytes.insert(0x80, at: 0)
-            dataBytes.insert(0x80, at: 0)
-            
-            enqueueMidiData(bytes: dataBytes)
+            // In bluetooth MIDI we need to send each midi command separately
+            var currentBuffer = Data();
+            for i in 0..<dataBytes.count {
+                let byte = dataBytes[i]
+                
+                // Insert header(and empty timstamp high) and timestamp
+                // low in front of BLE Midi message
+                if((byte & 0x80) != 0){
+                    currentBuffer.insert(0x80, at: 0)
+                    currentBuffer.insert(0x80, at: 0)
+                }
+                currentBuffer.append(byte);
+                
+                // Send each MIDI command separately
+                let endReached = i == (dataBytes.count - 1);
+                let isCompleteCommand = endReached || (dataBytes[i+1] & 0x80) != 0;
+                
+                if(isCompleteCommand){
+                    enqueueMidiData(bytes: currentBuffer)
+                    currentBuffer = Data()
+                }
+            }
         } else {
             print("No peripheral/characteristic in device")
         }
@@ -1711,6 +1749,8 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 return 1
             case 0xF1, 0xF3:
                     return 2
+            case 0xF2:
+                    return 3
             default:
                 break
         }
@@ -1718,7 +1758,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         switch (midiType) {
             case 0xC0, 0xD0:
                 return 2
-            case 0xF2, 0x80, 0x90, 0xA0, 0xB0, 0xE0:
+            case 0x80, 0x90, 0xA0, 0xB0, 0xE0:
                 return 3
             default:
                 break

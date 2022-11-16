@@ -27,9 +27,7 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
 import android.media.midi.MidiDeviceStatus
-
-
-
+import android.os.*
 
 
 /** FlutterMidiCommandPlugin */
@@ -164,8 +162,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
     when (call.method) {
       "sendData" -> {
-        var args = call.arguments<Map<String, Any>>()
-        sendData(args["data"] as ByteArray, args["timestamp"] as? Long, args["deviceId"]?.toString())
+        var args : Map<String,Any>? = call.arguments()
+        sendData(args?.get("data") as ByteArray, args["timestamp"] as? Long, args["deviceId"]?.toString())
         result.success(null)
       }
       "getDevices" -> {
@@ -198,7 +196,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
       "connectToDevice" -> {
         var args = call.arguments<Map<String, Any>>()
-        var device = (args["device"] as Map<String, Any>)
+        var device = (args?.get("device") as Map<String, Any>)
 //        var portList = (args["ports"] as List<Map<String, Any>>).map{
 //          Port(if (it["id"].toString() is String) it["id"].toString().toInt() else 0 , it["type"].toString())
 //        }
@@ -208,7 +206,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
       "disconnectDevice" -> {
         var args = call.arguments<Map<String, Any>>()
-        disconnectDevice(args["id"].toString())
+        args?.get("id")?.let { disconnectDevice(it.toString()) }
         result.success(null)
       }
       "teardown" -> {
@@ -253,8 +251,23 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   private fun tryToInitBT() : String? {
     Log.d("FlutterMIDICommand", "tryToInitBT")
 
-    if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+    if (Build.VERSION.SDK_INT >= 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
+              context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+
+      bluetoothState = "unknown";
+
+      if (activity != null) {
+        val activity = activity!!
+        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
+          Log.d("FlutterMIDICommand", "Show rationale for Bluetooth")
+          bluetoothState = "unauthorized"
+        } else {
+          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), PERMISSIONS_REQUEST_ACCESS_LOCATION)
+        }
+      }
+
+    } else if (Build.VERSION.SDK_INT < 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
 
       bluetoothState = "unknown";
 
@@ -346,11 +359,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     discoveredDevices.clear()
   }
 
-
+//fun onRequestPermissionsResult(p0: Int, p1: Array<(out) String!>, p2: IntArray): Boolean
   override fun onRequestPermissionsResult(
           requestCode: Int,
-          permissions: Array<out String>?,
-          grantResults: IntArray?): Boolean {
+          permissions: Array<out String>,
+          grantResults: IntArray): Boolean {
     Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
 
 
@@ -582,13 +595,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         if (data.size > 0) {
           for (i in 0 until data.size) {
             var midiByte: Byte = data[i]
-            var midiInt = midiByte.toInt()
+            var midiInt = midiByte.toInt() and 0xFF
 
 //          Log.d("FlutterMIDICommand", "parserState $parserState byte $midiByte")
 
             when (parserState) {
               PARSER_STATE.HEADER -> {
-                if (midiInt and 0xFF == 0xF0) {
+                if (midiInt == 0xF0) {
                   parserState = PARSER_STATE.SYSEX
                   sysExBuffer.clear()
                   sysExBuffer.add(midiByte)
@@ -600,6 +613,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
                   midiBuffer.clear()
                   midiBuffer.add(midiByte)
                   parserState = PARSER_STATE.PARAMS
+                  finalizeMessageIfComplete(timestamp)
                 } else {
                   // in header state but no status byte, do running status
                   midiBuffer.clear()
@@ -611,7 +625,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
               }
 
               PARSER_STATE.SYSEX -> {
-                if (midiInt and 0xFF == 0xF0) {
+                if (midiInt == 0xF0) {
                   // Android can skip SysEx end bytes, when more sysex messages are coming in succession.
                   // in an attempt to save the situation, add an end byte to the current buffer and start a new one.
                   sysExBuffer.add(0xF7.toByte())
@@ -626,7 +640,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
                   sysExBuffer.clear();
                 }
                 sysExBuffer.add(midiByte)
-                if (midiInt and 0xFF == 0xF7) {
+                if (midiInt == 0xF7) {
                   // Sysex complete
 //                Log.d("FlutterMIDICommand", "sysex complete $sysExBuffer")
                   stream.send(
@@ -664,11 +678,12 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       when (type) {
         0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE -> return 1
         0xF1, 0xF3 -> return 2
+        0xF2 -> return 3
       }
 
       when (midiType) {
         0xC0, 0xD0 -> return 2
-        0xF2, 0x80, 0x90, 0xA0, 0xB0, 0xE0 -> return 3
+        0x80, 0x90, 0xA0, 0xB0, 0xE0 -> return 3
       }
       return 0
     }
@@ -801,7 +816,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           this.receiver?.send(data, 0, data.size, timestamp)
 
       } else {
-        Log.d("FlutterMIDICommand", "Send to input port ${this.inputPort}")
+//        Log.d("FlutterMIDICommand", "Send to input port ${this.inputPort}")
         this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0)
       }
     }

@@ -13,7 +13,7 @@ Supports
 ## To install
 
 - Make sure your project is created with Kotlin and Swift support.
-- Add flutter_midi_command: ^0.4.0-dev.1 to your pubspec.yaml file.
+- Add flutter_midi_command: ^0.4.8 to your pubspec.yaml file.
 - In ios/Podfile uncomment and change the platform to 10.0 `platform :ios, '10.0'`
 - On iOS, After building, Add a NSBluetoothAlwaysUsageDescription and NSLocalNetworkUsageDescription to info.plist in the generated Xcode project.
 - On Linux, make sure ALSA is installed.
@@ -43,7 +43,6 @@ Import flutter_midi_command
 See example folder for how to use.
 
 For help getting started with Flutter, view our online
-[documentation](https://flutter.io/).
+[documentation](https://flutter.dev/).
 
-For help on editing plugin code, view the [documentation](https://flutter.io/pwd
-developing-packages/#edit-plugin-package).
+For help on editing plugin code, view the [documentation](https://docs.flutter.dev/development/packages-and-plugins/developing-packages#edit-plugin-package).
