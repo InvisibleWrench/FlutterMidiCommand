@@ -27,9 +27,7 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
 import android.media.midi.MidiDeviceStatus
-
-
-
+import android.os.*
 
 
 /** FlutterMidiCommandPlugin */
@@ -253,8 +251,23 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   private fun tryToInitBT() : String? {
     Log.d("FlutterMIDICommand", "tryToInitBT")
 
-    if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+    if (Build.VERSION.SDK_INT >= 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
+              context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+
+      bluetoothState = "unknown";
+
+      if (activity != null) {
+        val activity = activity!!
+        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
+          Log.d("FlutterMIDICommand", "Show rationale for Bluetooth")
+          bluetoothState = "unauthorized"
+        } else {
+          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), PERMISSIONS_REQUEST_ACCESS_LOCATION)
+        }
+      }
+
+    } else if (Build.VERSION.SDK_INT < 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
 
       bluetoothState = "unknown";
 
