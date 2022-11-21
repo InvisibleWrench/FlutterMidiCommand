@@ -1,3 +1,6 @@
+## 0.4.9
+Updated Android permissions.
+Example fix
 
 ## 0.4.8
 Fixed an issue where BLE devices would disappear from the device list on iOS, once connected.
