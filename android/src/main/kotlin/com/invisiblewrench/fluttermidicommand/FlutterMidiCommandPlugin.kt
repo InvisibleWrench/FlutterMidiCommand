@@ -258,12 +258,12 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
       if (activity != null) {
         val activity = activity!!
-        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
-          Log.d("FlutterMIDICommand", "Show rationale for Bluetooth")
-          bluetoothState = "unauthorized"
-        } else {
+//        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
+//          Log.d("FlutterMIDICommand", "Show rationale for Bluetooth")
+//          bluetoothState = "unauthorized"
+//        } else {
           activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), PERMISSIONS_REQUEST_ACCESS_LOCATION)
-        }
+//        }
       }
 
     } else if (Build.VERSION.SDK_INT < 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
@@ -273,13 +273,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
       if (activity != null) {
         var activity = activity!!
-        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-          Log.d("FlutterMIDICommand", "Show rationale for Location")
-          bluetoothState = "unauthorized"
-        } else {
+//        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
+//          Log.d("FlutterMIDICommand", "Show rationale for Location")
+//          bluetoothState = "unauthorized"
+//        } else {
           activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION), PERMISSIONS_REQUEST_ACCESS_LOCATION)
 
-        }
+//        }
       }
     } else {
       Log.d("FlutterMIDICommand", "Already permitted")
