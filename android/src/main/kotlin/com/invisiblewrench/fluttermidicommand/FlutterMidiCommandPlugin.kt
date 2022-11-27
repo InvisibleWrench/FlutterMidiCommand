@@ -415,8 +415,19 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
     override fun onScanFailed(errorCode: Int) {
       super.onScanFailed(errorCode)
+
+      var messages = mapOf(
+        SCAN_FAILED_ALREADY_STARTED to "Scan already started",
+              SCAN_FAILED_APPLICATION_REGISTRATION_FAILED to "Application Registration Failed",
+              SCAN_FAILED_FEATURE_UNSUPPORTED to "Future Unsupported",
+              SCAN_FAILED_INTERNAL_ERROR to "Internal Error"
+//              SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES to "Out of HW Resources",
+//              SCAN_FAILED_SCANNING_TOO_FREQUENTLY to "Scanning too frequently"
+              )
+
+
       Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
-      setupStreamHandler.send("BLE scan failed $errorCode")
+      setupStreamHandler.send("BLE scan failed $errorCode ${messages[errorCode]}")
     }
   }
 
