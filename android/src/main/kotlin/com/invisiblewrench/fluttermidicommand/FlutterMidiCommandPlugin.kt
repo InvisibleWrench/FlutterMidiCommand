@@ -611,7 +611,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
       msg?.also {
         var data = it.slice(IntRange(offset, offset + count - 1))
-        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count")
+//        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count")
 
         if (data.size > 0) {
           for (i in 0 until data.size) {
