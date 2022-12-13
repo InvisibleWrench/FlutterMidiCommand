@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
+
 import 'controller.dart';
-import 'dart:io' show Platform;
 
 void main() => runApp(new MyApp());
 
@@ -173,7 +173,7 @@ class _MyAppState extends State<MyApp> {
                         device.name,
                         style: Theme.of(context).textTheme.headline5,
                       ),
-                      subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}"),
+                      subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}, ${device.id}, ${device.type}"),
                       leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),
                       trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {

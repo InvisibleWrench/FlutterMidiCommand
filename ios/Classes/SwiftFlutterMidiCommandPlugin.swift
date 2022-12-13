@@ -1077,7 +1077,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
                 sysExBuffer.append(midiByte)
                 if (midiInt == 0xF7) {
                   // Sysex complete
-//                Log.d("FlutterMIDICommand", "sysex complete $sysExBuffer")
+//                print("rx sysex \(sysExBuffer)")
                     streamHandler.send(data: ["data": sysExBuffer, "timestamp":timestamp, "device":deviceInfo])
 
                   parserState = PARSER_STATE.HEADER
@@ -1102,7 +1102,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
       }
 
   func lengthOfMessageType(type:UInt8) -> Int {
-    var midiType:UInt8 = type & 0xF0
+    let midiType:UInt8 = type & 0xF0
 
     switch (type) {
         case 0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE: return 1
@@ -1658,7 +1658,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        print("perif didUpdateValueFor  \(String(describing: characteristic))")
+       // print("perif didUpdateValueFor  \(String(describing: characteristic))")
         if let value = characteristic.value {
             parseBLEPacket(value, peripheral:peripheral)
         }

@@ -266,7 +266,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 //        }
       }
 
-    } else if (Build.VERSION.SDK_INT < 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
+    } else
+      if (Build.VERSION.SDK_INT < 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
 
       bluetoothState = "unknown";
@@ -347,6 +348,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     } else {
       Log.d("FlutterMIDICommand", "Start BLE Scan")
       discoveredDevices.clear()
+      bluetoothScanner?.stopScan(bleScanner)
 
       var bondedDevices = bluetoothAdapter.getBondedDevices()
       bondedDevices.forEach {
@@ -404,6 +406,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         Log.d("FlutterMIDICommand", "open device ${devices[0]}")
         midiManager.openDevice(devices[0], deviceOpenedListener, handler)
       }
+    } else {
+      Log.d("FlutterMIDICommand", "Can't connect to unknown device type $type")
     }
   }
 
@@ -607,7 +611,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
       msg?.also {
         var data = it.slice(IntRange(offset, offset + count - 1))
-//        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count")
+        Log.d("FlutterMIDICommand", "data sliced $data offset $offset count $count")
 
         if (data.size > 0) {
           for (i in 0 until data.size) {
