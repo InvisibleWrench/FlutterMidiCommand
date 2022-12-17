@@ -359,11 +359,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
       bluetoothAdapter?.startDiscovery()
 
-//      var bondedDevices = bluetoothAdapter.getBondedDevices()
-//      bondedDevices.forEach {
-//         discoveredDevices.add(it)
-//      }
-
       val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")).build()
       val settings = ScanSettings.Builder().build()
       bluetoothScanner?.startScan(listOf(filter), settings, bleScanner)

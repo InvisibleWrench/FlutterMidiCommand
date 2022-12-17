@@ -206,8 +206,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             print("\(manager.state.rawValue)")
             if manager.state == CBManagerState.poweredOn {
                 print("Start discovery")
-                discoveredDevices.removeAll()
-                manager.scanForPeripherals(withServices: [CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")], options: nil)
+                manager.stopScan()
+                let serviceList = [CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")]
+                manager.retrieveConnectedPeripherals(withServices: serviceList)
+                manager.scanForPeripherals(withServices: serviceList, options: nil)
                 result(nil)
             } else {
                 print("BT not ready")

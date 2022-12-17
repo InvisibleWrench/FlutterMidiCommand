@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:io';
-
 import 'dart:typed_data';
+
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
-export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
-    show MidiDevice, MidiPacket, MidiPort;
+
+export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice, MidiPacket, MidiPort;
 
 enum BluetoothState {
   poweredOn,

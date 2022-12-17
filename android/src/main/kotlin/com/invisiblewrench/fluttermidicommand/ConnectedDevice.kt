@@ -47,10 +47,10 @@ class ConnectedDevice : Device {
             }
         }
 
-//        Handler().postDelayed({
+        Handler().postDelayed({
             connectResult?.success(null)
             streamHandler.send("deviceConnected")
-//        }, 2500)
+        }, 2500)
     }
 
 //    fun openPorts(ports: List<Port>) {
