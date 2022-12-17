@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 
 import 'controller.dart';
@@ -188,7 +189,9 @@ class _MyAppState extends State<MyApp> {
                           _midiCommand.disconnectDevice(device);
                         } else {
                           print("connect");
-                          _midiCommand.connectToDevice(device).then((_) => print("device connected async"));
+                          _midiCommand.connectToDevice(device).then((_) => print("device connected async")).catchError((err) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${(err as PlatformException?)?.message}")));
+                          });
                         }
                       },
                     );
