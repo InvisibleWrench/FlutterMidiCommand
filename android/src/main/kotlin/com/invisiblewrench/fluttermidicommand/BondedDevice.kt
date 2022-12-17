@@ -68,7 +68,7 @@ class BondedDevice  : Device {
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
-        open fun onCharacteristicChanged(
+        override open fun onCharacteristicChanged(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
@@ -76,7 +76,7 @@ class BondedDevice  : Device {
             Log.d("BluetoothGattCallback", "onCharacteristicChanged $gatt, $characteristic, $value")
         }
 
-        open fun onCharacteristicRead(
+        override open fun onCharacteristicRead(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray,
