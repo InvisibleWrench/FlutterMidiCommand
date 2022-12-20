@@ -67,51 +67,51 @@ class BondedDevice  : Device {
         setupStreamHandler?.send("deviceDisconnected")
     }
 
-    private val gattCallback = object : BluetoothGattCallback() {
-        override open fun onCharacteristicChanged(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            value: ByteArray
-        ): Unit {
-            Log.d("BluetoothGattCallback", "onCharacteristicChanged $gatt, $characteristic, $value")
-        }
-
-        override open fun onCharacteristicRead(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            value: ByteArray,
-            status: Int
-        ): Unit {
-            Log.d("BluetoothGattCallback", "onCharacteristicRead $gatt, $characteristic, $value, $status")
-        }
-
-        override fun onConnectionStateChange(
-            gatt: BluetoothGatt,
-            status: Int,
-            newState: Int
-        ): Unit {
-            super.onConnectionStateChange(gatt, status, newState)
-            Log.d("BluetoothGattCallback", "onConnectionStateChange $gatt, $status, $newState")
-
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.d("BluetoothGattCallback", "bonded device connected")
-//          var result = this@FlutterMidiCommandPlugin.ongoingConnections[gatt.device.address]
-                result?.success(null)
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.d("BluetoothGattCallback", "bonded device disconnected")
-            }
-        }
-
-        override fun onMtuChanged(
-            gatt: BluetoothGatt,
-            mtu: Int,
-            status: Int
-        ): Unit {
-            super.onMtuChanged(gatt, mtu, status)
-            Log.d("BluetoothGattCallback", "onMtuChanged $gatt, $mtu, $status")
-        }
-
-    }
+//    private val gattCallback = object : BluetoothGattCallback() {
+//        override open fun onCharacteristicChanged(
+//            gatt: BluetoothGatt,
+//            characteristic: BluetoothGattCharacteristic,
+//            value: ByteArray
+//        ): Unit {
+//            Log.d("BluetoothGattCallback", "onCharacteristicChanged $gatt, $characteristic, $value")
+//        }
+//
+//        override open fun onCharacteristicRead(
+//            gatt: BluetoothGatt,
+//            characteristic: BluetoothGattCharacteristic,
+//            value: ByteArray,
+//            status: Int
+//        ): Unit {
+//            Log.d("BluetoothGattCallback", "onCharacteristicRead $gatt, $characteristic, $value, $status")
+//        }
+//
+//        override fun onConnectionStateChange(
+//            gatt: BluetoothGatt,
+//            status: Int,
+//            newState: Int
+//        ): Unit {
+//            super.onConnectionStateChange(gatt, status, newState)
+//            Log.d("BluetoothGattCallback", "onConnectionStateChange $gatt, $status, $newState")
+//
+//            if (newState == BluetoothProfile.STATE_CONNECTED) {
+//                Log.d("BluetoothGattCallback", "bonded device connected")
+////          var result = this@FlutterMidiCommandPlugin.ongoingConnections[gatt.device.address]
+//                result?.success(null)
+//            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+//                Log.d("BluetoothGattCallback", "bonded device disconnected")
+//            }
+//        }
+//
+//        override fun onMtuChanged(
+//            gatt: BluetoothGatt,
+//            mtu: Int,
+//            status: Int
+//        ): Unit {
+//            super.onMtuChanged(gatt, mtu, status)
+//            Log.d("BluetoothGattCallback", "onMtuChanged $gatt, $mtu, $status")
+//        }
+//
+//    }
 }
 
 class BondedReceiver(stream: FMCStreamHandler, device: BluetoothDevice) : MidiReceiver() {

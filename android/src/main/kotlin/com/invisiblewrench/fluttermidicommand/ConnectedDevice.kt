@@ -49,7 +49,7 @@ class ConnectedDevice : Device {
 
         Handler().postDelayed({
             connectResult?.success(null)
-            streamHandler.send("deviceConnected")
+            setupStreamHandler?.send("deviceConnected")
         }, 2500)
     }
 

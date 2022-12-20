@@ -162,6 +162,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
 
       "startBluetoothCentral" -> {
+        if (blManager != null && bluetoothAdapter != null && bluetoothScanner != null) {
+          result.success(null)
+        }
         val errorMsg = tryToInitBT()
         if (errorMsg != null) {
           result.error("ERROR", errorMsg, null)
@@ -500,7 +503,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     if (deviceId != null) {
       if (connectedDevices.containsKey(deviceId)) {
         connectedDevices[deviceId]?.let {
-//          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
+          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
           it.send(data, timestamp)
         }
       } else {
@@ -522,6 +525,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     var list = mutableMapOf<String, Map<String, Any>>()
 
 
+    // Bonded BT devices
     var connectedGattDeviceIds = mutableListOf<String>()
     var connectedGattDevices = blManager?.getConnectedDevices(GATT_SERVER)
     connectedGattDevices?.forEach {
@@ -548,23 +552,31 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
     }
 
+    // Discovered BLE devices
     discoveredDevices.forEach {
-      Log.d("FlutterMIDICommand", "add discovered device ${it.address} type ${it.type}")
-      list[it.address] = mapOf(
-        "name" to it.name,
-        "id" to it.address,
-        "type" to "BLE",
-        "connected" to if (connectedDevices.contains(it.address)) "true" else "false",
-        "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
-        "outputs" to listOf(mapOf("id" to 0, "connected" to false))
-      )
+      var id = it.address;
+      Log.d("FlutterMIDICommand", "add discovered device $ type ${it.type}")
+
+      if (list.contains(id)) {
+        Log.d("FlutterMIDICommand", "device already in list $id")
+      } else {
+        Log.d("FlutterMIDICommand", "add native device $id type ${it.type}")
+        list[id] = mapOf(
+          "name" to it.name,
+          "id" to id,
+          "type" to "BLE",
+          "connected" to if (connectedDevices.contains(id)) "true" else "false",
+          "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
+          "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+        )
+      }
     }
 
+    // Generic MIDI devices
     val devs:Array<MidiDeviceInfo> = midiManager.devices
     devs.forEach {
       var id = Device.deviceIdForInfo(it)
       Log.d("FlutterMIDICommand", "add device from midiManager id $id")
-
 
       if (list.contains(id)) {
         Log.d("FlutterMIDICommand", "device already in list $id")
