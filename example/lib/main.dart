@@ -113,9 +113,17 @@ class _MyAppState extends State<MyApp> {
                     await _informUserAboutBluetoothPermissions(context);
 
                     // Start bluetooth
-                    await _midiCommand.startBluetoothCentral();
+                    print("start ble central");
+                    await _midiCommand.startBluetoothCentral().catchError((err) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(err),
+                      ));
+                    });
 
-                    await _midiCommand.waitUntilBluetoothIsInitialized();
+                    print("wait for init");
+                    await _midiCommand.waitUntilBluetoothIsInitialized().timeout(Duration(seconds: 5), onTimeout: () {
+                      print("Failed to initialize Bluetooth");
+                    });
 
                     // If bluetooth is powered on, start scanning
                     if (_midiCommand.bluetoothState == BluetoothState.poweredOn) {
@@ -144,6 +152,7 @@ class _MyAppState extends State<MyApp> {
                       ));
                     }
 
+                    print("done");
                     // If not show a message telling users what to do
                     setState(() {});
                   },
@@ -179,9 +188,13 @@ class _MyAppState extends State<MyApp> {
                       trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {
                         _midiCommand.stopScanningForBluetoothDevices();
-                        Navigator.of(context).push(MaterialPageRoute<Null>(
+                        Navigator.of(context)
+                            .push(MaterialPageRoute<Null>(
                           builder: (_) => ControllerPage(device),
-                        ));
+                        ))
+                            .then((value) {
+                          setState(() {});
+                        });
                       },
                       onTap: () {
                         if (device.connected) {

@@ -92,6 +92,8 @@ class MidiCommand {
   Future<void> waitUntilBluetoothIsInitialized() async {
     bool isInitialized() => _bluetoothState != BluetoothState.unknown;
 
+    print(_bluetoothState);
+
     if (isInitialized()) {
       return;
     }
