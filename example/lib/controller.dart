@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
+import 'package:flutter_virtual_piano/flutter_virtual_piano.dart';
 
 class ControllerPage extends StatelessWidget {
   final MidiDevice device;
@@ -129,7 +129,19 @@ class MidiControlsState extends State<MidiControls> {
             onChangeEnd: (_) {
               _onPitchChanged(0);
             }),
-        Divider()
+        Divider(),
+        SizedBox(
+          height: 80,
+          child: VirtualPiano(
+            noteRange: RangeValues(48, 76),
+            onNotePressed: (note, vel) {
+              NoteOnMessage(note: note, velocity: 100).send();
+            },
+            onNoteReleased: (note) {
+              NoteOffMessage(note: note).send();
+            },
+          ),
+        )
       ],
     );
   }
