@@ -12,7 +12,6 @@ import android.content.pm.PackageManager
 import android.media.midi.*
 import android.os.*
 import android.util.Log
-import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
