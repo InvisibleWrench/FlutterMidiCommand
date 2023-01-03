@@ -2,6 +2,7 @@ package com.invisiblewrench.fluttermidicommand
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.bluetooth.*
 import android.bluetooth.BluetoothGatt.*
 import android.bluetooth.BluetoothProfile.*
@@ -9,16 +10,27 @@ import android.bluetooth.le.*
 import android.content.*
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.media.midi.*
 import android.os.*
+import android.provider.Settings
 import android.util.Log
+import com.welie.blessed.BluetoothCentralManager
+import com.welie.blessed.BluetoothCentralManagerCallback
+import com.welie.blessed.BluetoothPeripheral
+import com.welie.blessed.BluetoothPeripheralCallback
+import com.welie.blessed.GattStatus
+import com.welie.blessed.HciStatus
+import com.welie.blessed.ScanFailure
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.*
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.PluginRegistry.Registrar
+import java.util.*
 
+import io.flutter.plugin.common.MethodChannel.Result
 
 /** FlutterMidiCommandPlugin */
 class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.RequestPermissionsResultListener {
@@ -45,14 +57,18 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
 
   var bluetoothAdapter:BluetoothAdapter? = null
-  var bluetoothScanner:BluetoothLeScanner? = null
+//  var bluetoothScanner:BluetoothLeScanner? = null
+  var central: BluetoothCentralManager? = null
+  private val HW_ENABLE_BLUETOOTH = 95452 // arbitrary
   private val PERMISSIONS_REQUEST_ACCESS_LOCATION = 95453 // arbitrary
-
-  var discoveredDevices = mutableSetOf<BluetoothDevice>()
-
+//  var discoveredDevices = mutableSetOf<BluetoothDevice>()
+var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   var ongoingConnections = mutableMapOf<String, Result>()
 
   var blManager:BluetoothManager? = null
+
+  var serviceUUID = UUID.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
+//  var characteristicUUID = UUID.fromString("7772E5DB-3868-4112-A1A9-F2669D106BF3")
 
   //#region Lifetime functions
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -157,13 +173,18 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
 
       "bluetoothState" -> {
-        result.success(bluetoothState)
+        if (bluetoothAdapter == null && bluetoothState != "poweredOff") {
+          result.success(bluetoothState)
+        } else {
+          if (bluetoothAdapter!!.state == BluetoothAdapter.STATE_ON) {
+            result.success("poweredOn")
+          } else {
+            result.success("poweredOff")
+          }
+        }
       }
 
       "startBluetoothCentral" -> {
-        if (blManager != null && bluetoothAdapter != null && bluetoothScanner != null) {
-          result.success(null)
-        }
         val errorMsg = tryToInitBT()
         if (errorMsg != null) {
           result.error("ERROR", errorMsg, null)
@@ -172,7 +193,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         }
       }
       "scanForDevices" -> {
-        val errorMsg = startScanningLeDevices()
+        val errorMsg = startScan()
         if (errorMsg != null) {
           result.error("ERROR", errorMsg, null)
         } else {
@@ -224,14 +245,12 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     val comp = ComponentName(context, "com.invisiblewrench.fluttermidicommand.VirtualDeviceService")
     val pm = context.packageManager
     pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.SYNCHRONOUS or PackageManager.DONT_KILL_APP)
-
   }
 
   fun stopVirtualService() {
     val comp = ComponentName(context, "com.invisiblewrench.fluttermidicommand.VirtualDeviceService")
     val pm = context.packageManager
     pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
-
   }
 
   fun appName() : String {
@@ -243,64 +262,28 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   private fun tryToInitBT() : String? {
     Log.d("FlutterMIDICommand", "tryToInitBT")
 
-    if (Build.VERSION.SDK_INT >= 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-              context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+    if (blManager != null && bluetoothAdapter != null) {
+      Log.d("FlutterMIDICommand", "Bluetooth already up")
+      return null
+    }
 
-      bluetoothState = "unknown";
-
-      if (activity != null) {
-        val activity = activity!!
-//        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
-//          Log.d("FlutterMIDICommand", "Show rationale for Bluetooth")
-//          bluetoothState = "unauthorized"
-//        } else {
-          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), PERMISSIONS_REQUEST_ACCESS_LOCATION)
-//        }
-      }
-
-    } else
-      if (Build.VERSION.SDK_INT < 31 && (context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
-
-      bluetoothState = "unknown";
-
-      if (activity != null) {
-        var activity = activity!!
-//        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_ADMIN) || activity.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-//          Log.d("FlutterMIDICommand", "Show rationale for Location")
-//          bluetoothState = "unauthorized"
-//        } else {
-          activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION), PERMISSIONS_REQUEST_ACCESS_LOCATION)
-
-//        }
-      }
-    } else {
-      Log.d("FlutterMIDICommand", "Already permitted")
-
-      blManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-
-      bluetoothAdapter = blManager!!.adapter
-      if (bluetoothAdapter != null) {
-        bluetoothState = "poweredOn";
-
-        bluetoothScanner = bluetoothAdapter!!.bluetoothLeScanner
-
-        if (bluetoothScanner != null) {
-          // Listen for changes in Bluetooth state
-          context.registerReceiver(broadcastReceiver, IntentFilter().apply {
-            addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-            addAction( BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-          })
-
-          startScanningLeDevices()
-        } else {
-          Log.d("FlutterMIDICommand", "bluetoothScanner is null")
-          return "bluetoothNotAvailable"
-        }
+    if (getBluetoothManager().getAdapter() != null) {
+      if (!isBluetoothEnabled()) {
+        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+        activity?.startActivityForResult(
+          enableBtIntent,
+          HW_ENABLE_BLUETOOTH
+        )
       } else {
-        bluetoothState = "unsupported";
-        Log.d("FlutterMIDICommand", "bluetoothAdapter is null")
+        Log.d("LOG", "cehck permissions")
+        bluetoothState = "poweredOn"
+        checkPermissions()
       }
+      return null
+    } else {
+      Log.d("FlutterMIDICommand", "This device has no Bluetooth hardware")
+      bluetoothState = "unsupported";
+      return "noBluetoothHardware"
     }
     return null
   }
@@ -316,7 +299,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           BluetoothAdapter.STATE_OFF -> {
             Log.d("FlutterMIDICommand", "BT is now off")
             bluetoothState = "poweredOff";
-            bluetoothScanner = null
+//            bluetoothScanner = null
           }
 
           BluetoothAdapter.STATE_TURNING_OFF -> {
@@ -348,69 +331,53 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     }
   }
 
-  private fun startScanningLeDevices() : String? {
-
-    if (bluetoothScanner == null) {
-      val errMsg = tryToInitBT()
-      errMsg?.let {
-        return it
-      }
-    } else {
-      stopScanningLeDevices()
+  private fun startScan() : String? {
+    handler.postDelayed({
       Log.d("FlutterMIDICommand", "Start BLE Scan")
-
-      bluetoothAdapter?.startDiscovery()
-
-      val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")).build()
-      val settings = ScanSettings.Builder().build()
-      bluetoothScanner?.startScan(listOf(filter), settings, bleScanner)
-    }
+      central?.scanForPeripheralsWithServices(
+        arrayOf<UUID>(
+          serviceUUID
+        )
+      )
+    }, 1000)
     return null
   }
 
   private fun stopScanningLeDevices() {
     Log.d("FlutterMIDICommand", "Stop BLE Scan")
-    bluetoothScanner?.stopScan(bleScanner)
+//    bluetoothScanner?.stopScan(bleScanner)
+    central?.stopScan()
     discoveredDevices.clear()
   }
 
-//fun onRequestPermissionsResult(p0: Int, p1: Array<(out) String!>, p2: IntArray): Boolean
-  override fun onRequestPermissionsResult(
-          requestCode: Int,
-          permissions: Array<out String>,
-          grantResults: IntArray): Boolean {
-    Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
-
-
-    if (requestCode == PERMISSIONS_REQUEST_ACCESS_LOCATION && grantResults?.get(0) == PackageManager.PERMISSION_GRANTED) {
-      startScanningLeDevices()
-      return true;
-    } else {
-      bluetoothState = "unauthorized"
-      Log.d("FlutterMIDICommand", "Perms failed")
-      return true;
-    }
-
-    return false;
-  }
 
   private fun connectToDevice(deviceId:String, type:String) : String? {
     Log.d("FlutterMIDICommand", "connect to $type device: $deviceId")
 
-    if (type == "BLE" || type == "bonded") {
-      val bleDevices = discoveredDevices.filter { it.address == deviceId }
-      if (bleDevices.isEmpty()) {
+    if (type == "BLE") {
 
-        var connectedGattDevice = blManager?.getConnectedDevices(GATT_SERVER)?.filter { it.address == deviceId }?.firstOrNull()
-        if (type == "bonded" && connectedGattDevice != null) {
-          midiManager.openBluetoothDevice(connectedGattDevice, deviceOpenedListener, handler)
+      // Connect using BLESSED
+      var peripheral = central?.getPeripheral(deviceId)
+      print("peripheral $peripheral")
+      if (peripheral != null) {
+        central?.connectPeripheral(peripheral, peripheralCallback)
+      } else {
+        Log.d("FlutterMIDICommand", "not found peripheral $deviceId")
+        return "Peripheral not found"
+      }
+    } else if (type == "bonded") {
+      // Connect directly to MidiManager
+      var peripheral = central?.getPeripheral(deviceId)
+      if (peripheral != null) {
+        var device = deviceForPeripheral(peripheral)
+        if (device != null) {
+          midiManager.openBluetoothDevice(device, deviceOpenedListener, handler)
         } else {
-          Log.d("FlutterMIDICommand", "Device not found ${deviceId}")
+          Log.d("FlutterMIDICommand", "not found device ${peripheral.getAddress()}")
           return "Device not found"
         }
       } else {
-        Log.d("FlutterMIDICommand", "Open device")
-        midiManager.openBluetoothDevice(bleDevices.first(), deviceOpenedListener, handler)
+        return "Device not found"
       }
     } else if (type == "native") {
       val devices =  midiManager.devices.filter { d -> d.id.toString() == deviceId }
@@ -427,36 +394,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     return null;
   }
 
-  private val bleScanner = object : ScanCallback() {
-    override fun onScanResult(callbackType: Int, result: ScanResult?) {
-      super.onScanResult(callbackType, result)
-      Log.d("FlutterMIDICommand", "onScanResult: ${result?.device?.address} - ${result?.device?.name}")
-      result?.also {
-        if (!discoveredDevices.contains(it.device)) {
-          discoveredDevices.add(it.device)
-          setupStreamHandler.send("deviceAppeared")
-        }
-      }
+  private fun deviceForPeripheral(peripheral:BluetoothPeripheral) : BluetoothDevice? {
+    var device = blManager?.getConnectedDevices(GATT_SERVER)?.filter { it.address == peripheral.address }
+    if (device?.isNotEmpty() == true) {
+      return device.first()
     }
-
-    override fun onScanFailed(errorCode: Int) {
-      super.onScanFailed(errorCode)
-
-      var messages = mapOf(
-        SCAN_FAILED_ALREADY_STARTED to "Scan already started",
-              SCAN_FAILED_APPLICATION_REGISTRATION_FAILED to "Application Registration Failed",
-              SCAN_FAILED_FEATURE_UNSUPPORTED to "Future Unsupported",
-              SCAN_FAILED_INTERNAL_ERROR to "Internal Error"
-//              SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES to "Out of HW Resources",
-//              SCAN_FAILED_SCANNING_TOO_FREQUENTLY to "Scanning too frequently"
-              )
-
-
-      Log.d("FlutterMIDICommand", "onScanFailed: $errorCode")
-      setupStreamHandler.send("BLE scan failed $errorCode ${messages[errorCode]}")
-    }
+    return null
   }
-
 
   fun teardown() {
     Log.d("FlutterMIDICommand", "teardown")
@@ -523,51 +467,43 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   fun listOfDevices() : List<Map<String, Any>> {
     var list = mutableMapOf<String, Map<String, Any>>()
 
-
     // Bonded BT devices
-    var connectedGattDeviceIds = mutableListOf<String>()
-    var connectedGattDevices = blManager?.getConnectedDevices(GATT_SERVER)
-    connectedGattDevices?.forEach {
-      Log.d("FlutterMIDICommand", "connectedGattDevice ${it.address} type ${it.type} name ${it.name}")
-      connectedGattDeviceIds.add(it.address)
-    }
-
   var bondedDeviceIds = mutableListOf<String>()
     var bondedDevices = bluetoothAdapter?.getBondedDevices()
     bondedDevices?.forEach {
-      Log.d("FlutterMIDICommand", "add bonded device ${it.address} type ${it.type} name ${it.name}")
+      Log.d("FlutterMIDICommand", "bonded device ${it.address} type ${it.type} name ${it.name}")
       bondedDeviceIds.add(it.address)
-
-      var id = it.address
-      if (connectedGattDeviceIds.contains(id)) {
-        list[id] = mapOf(
-          "name" to it.name,
-          "id" to id,
-          "type" to "bonded",
-          "connected" to if (connectedDevices.contains(it.address)) "true" else "false",///*if (connectedGattDeviceIds.contains(id)) "true" else*/ "false",
-          "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
-          "outputs" to listOf(mapOf("id" to 0, "connected" to false))
-        )
-      }
     }
 
-    // Discovered BLE devices
-    discoveredDevices.forEach {
-      var id = it.address;
-      Log.d("FlutterMIDICommand", "add discovered device $ type ${it.type}")
+    var connectedGattDevices = blManager?.getConnectedDevices(GATT_SERVER)
+    connectedGattDevices?.forEach {
+      Log.d("FlutterMIDICommand", "connectedGattDevice ${it.address} type ${it.type} name ${it.name}")
 
-      if (list.contains(id)) {
+      var id = it.address
+        if (list.containsKey(id)) {
+          Log.d("FlutterMIDICommand", "device already in list $id")
+        } else {
+          list[id] = mapOf(
+            "name" to it.name,
+            "id" to id,
+            "type" to if (bondedDeviceIds.contains(id)) "bonded" else "BLE",
+            "connected" to if (connectedDevices.contains(it.address)) "true" else "false",///*if (connectedGattDeviceIds.contains(id)) "true" else*/ "false",
+            "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
+            "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+          )
+        }
+    }
+
+
+    // Discovered BLE devices
+    discoveredDevices.entries.forEach {
+      var id:String = it.key
+      Log.d("FlutterMIDICommand", "add discovered device $id")
+
+      if (list.containsKey(id)) {
         Log.d("FlutterMIDICommand", "device already in list $id")
       } else {
-        Log.d("FlutterMIDICommand", "add native device $id type ${it.type}")
-        list[id] = mapOf(
-          "name" to it.name,
-          "id" to id,
-          "type" to "BLE",
-          "connected" to if (connectedDevices.contains(id)) "true" else "false",
-          "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
-          "outputs" to listOf(mapOf("id" to 0, "connected" to false))
-        )
+        list[id] = it.value
       }
     }
 
@@ -575,23 +511,23 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     val devs:Array<MidiDeviceInfo> = midiManager.devices
     devs.forEach {
       var id = Device.deviceIdForInfo(it)
-      Log.d("FlutterMIDICommand", "add device from midiManager id $id")
+      Log.d("FlutterMIDICommand", "add native device from midiManager id $id type ${it.type}")
 
-      if (list.contains(id)) {
+      if (list.containsKey(id)) {
         Log.d("FlutterMIDICommand", "device already in list $id")
       } else {
-        Log.d("FlutterMIDICommand", "add native device $id type ${it.type}")
 
         list[id] = mapOf(
           "name" to (it.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"),
           "id" to id,
-          "type" to if (bondedDeviceIds.contains(id)) "bonded" else "native",
+          "type" to "native",
           "connected" to if (connectedDevices.contains(id)) "true" else "false",
           "inputs" to listOfPorts(it.inputPortCount),
           "outputs" to listOfPorts(it.outputPortCount)
         )
       }
     }
+
 
     Log.d("FlutterMIDICommand", "list $list")
 
@@ -633,11 +569,259 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       }
       this@FlutterMidiCommandPlugin.setupStreamHandler.send(status.toString())
     }
+  }
 
+  private fun getBluetoothManager(): BluetoothManager {
+    return Objects.requireNonNull(
+      context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager,
+      "cannot get BluetoothManager"
+    )
+  }
 
+  private fun isBluetoothEnabled(): Boolean {
+    blManager = getBluetoothManager()
+    bluetoothAdapter = blManager!!.adapter
+      ?: return false
+    return bluetoothAdapter!!.isEnabled
+  }
+
+  private fun checkPermissions() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      val missingPermissions: Array<String> = getMissingPermissions(getRequiredPermissions())
+      if (missingPermissions.isNotEmpty()) {
+        activity?.requestPermissions(
+          missingPermissions,
+          PERMISSIONS_REQUEST_ACCESS_LOCATION
+        )
+      } else {
+        permissionsGranted()
+      }
+    }
+  }
+
+  private fun getMissingPermissions(requiredPermissions: Array<String>): Array<String> {
+    val missingPermissions: MutableList<String> = java.util.ArrayList()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      for (requiredPermission in requiredPermissions) {
+        if (context.checkSelfPermission(requiredPermission) !== PackageManager.PERMISSION_GRANTED) {
+          missingPermissions.add(requiredPermission)
+        }
+      }
+    }
+    return missingPermissions.toTypedArray()
+  }
+
+  private fun getRequiredPermissions(): Array<String> {
+    val targetSdkVersion: Int = context.applicationInfo.targetSdkVersion
+
+    Log.d("FlutterMidiCommand", "targetSDKVersion $targetSdkVersion Build.VERSION.SDK_INT ${Build.VERSION.SDK_INT} Build.VERSION_CODES.S ${Build.VERSION_CODES.S} Build.VERSION_CODES.Q ${Build.VERSION_CODES.Q}")
+
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && targetSdkVersion >= Build.VERSION_CODES.S) {
+      arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION)
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && targetSdkVersion >= Build.VERSION_CODES.Q) {
+      arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    } else arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION)
+  }
+
+  private fun permissionsGranted() {
+    // Check if Location services are on because they are required to make scanning work for SDK < 31
+    val targetSdkVersion: Int = context.applicationInfo.targetSdkVersion
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && targetSdkVersion < Build.VERSION_CODES.S) {
+      if (checkLocationServices()) {
+        initBluetoothHandler()
+      }
+    } else {
+      initBluetoothHandler()
+    }
+  }
+
+  private fun initBluetoothHandler() {
+    Log.d("FlutterMIDICommand", "init handler")
+    // Create BluetoothCentral
+    central = BluetoothCentralManager(context, bluetoothCentralManagerCallback, handler)
+  }
+
+  private fun areLocationServicesEnabled(): Boolean {
+    val locationManager =
+      context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    if (locationManager == null) {
+
+      Log.d("FlutterMIDICommand", "could not get location manager")
+      return false
+    }
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      locationManager.isLocationEnabled
+    } else {
+      val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+      val isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+      isGpsEnabled || isNetworkEnabled
+    }
+  }
+
+  private fun checkLocationServices(): Boolean {
+    return if (!areLocationServicesEnabled()) {
+      AlertDialog.Builder(activity)
+        .setTitle("Location services are not enabled")
+        .setMessage("Scanning for Bluetooth peripherals requires locations services to be enabled.") // Want to enable?
+        .setPositiveButton(
+          "Enable"
+        ) { dialogInterface, i ->
+          dialogInterface.cancel()
+          activity?.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+        }
+        .setNegativeButton(
+          "Cancel"
+        ) { dialog, which -> // if this button is clicked, just close
+          // the dialog box and do nothing
+          dialog.cancel()
+        }
+        .create()
+        .show()
+      false
+    } else {
+      true
+    }
+  }
+
+  override fun onRequestPermissionsResult(
+    requestCode: Int,
+    permissions: Array<String?>,
+    grantResults: IntArray
+  ) : Boolean {
+//    onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+    // Check if all permission were granted
+    var allGranted = true
+    for (result in grantResults) {
+      if (result != PackageManager.PERMISSION_GRANTED) {
+        allGranted = false
+        break
+      }
+    }
+    if (allGranted) {
+      permissionsGranted()
+      return true
+    } else {
+      AlertDialog.Builder(activity)
+        .setTitle("Permission is required for scanning Bluetooth peripherals")
+        .setMessage("Please grant permissions")
+        .setPositiveButton(
+          "Retry"
+        ) { dialogInterface, i ->
+          dialogInterface.cancel()
+          checkPermissions()
+        }
+        .create()
+        .show()
+    }
+    bluetoothState = "unauthorized"
+    return false
   }
 
 
+  private val bluetoothCentralManagerCallback: BluetoothCentralManagerCallback =
+    object : BluetoothCentralManagerCallback() {
+      override fun onConnectedPeripheral(peripheral: BluetoothPeripheral) {
+        Log.d("FlutterMIDICommand", "connected to ${peripheral.getName()}")
+
+        var id = peripheral.getAddress()
+        discoveredDevices.remove(id)
+
+        var device = deviceForPeripheral(peripheral)
+        if (device != null) {
+          Log.d("FlutterMIDICommand", "send device to midiManagaer ${device.name}")
+          midiManager.openBluetoothDevice(device, deviceOpenedListener, handler)
+        }
+      }
+
+      override fun onConnectionFailed(peripheral: BluetoothPeripheral, status: HciStatus) {
+        Log.d("FlutterMIDICommand", "connection '${peripheral.getName()}' failed with status $status")
+        setupStreamHandler.send("connectionFailed")
+      }
+
+      override fun onDisconnectedPeripheral(peripheral: BluetoothPeripheral, status: HciStatus) {
+        Log.d("FlutterMIDICommand", "disconnected '${peripheral.getName()}' with status $status")
+
+        connectedDevices.remove(peripheral.getAddress())
+        setupStreamHandler.send("deviceDisappeared")
+        // Reconnect to this device when it becomes available again
+//        handler.postDelayed({ central?.autoConnectPeripheral(peripheral, peripheralCallback) }, 5000)
+      }
+
+      override fun onDiscoveredPeripheral(peripheral: BluetoothPeripheral, scanResult: ScanResult) {
+        Log.d("FlutterMIDICommand", "Found peripheral ${peripheral.getName()}")
+//        central.stopScan()
+//          central.connectPeripheral(peripheral, peripheralCallback)
+        var id = peripheral.getAddress()
+        discoveredDevices[id] =
+          mapOf(
+            "name" to peripheral.getName(),
+            "id" to id,
+            "type" to "BLE",
+            "connected" to if (connectedDevices.contains(peripheral.address)) "true" else "false",
+            "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
+            "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+
+        )
+        setupStreamHandler.send("deviceAppeared")
+      }
+
+      override fun onBluetoothAdapterStateChanged(state: Int) {
+        Log.d("FlutterMIDICommand", "Bluetooth adapter changed state to $state")
+        if (state == BluetoothAdapter.STATE_ON) {
+          // Bluetooth is on now, start scanning again
+          // Scan for peripherals with a certain service UUIDs
+          central?.startPairingPopupHack()
+          startScan()
+          setupStreamHandler.send("deviceAppeared")
+        } else if (state == 10) {
+          bluetoothState = "poweredOff"
+        }
+//        bluetoothState = state.toString()
+      }
+
+      override fun onScanFailed(scanFailure: ScanFailure) {
+        Log.d("FlutterMIDICommand", "scanning failed with error $scanFailure")
+        setupStreamHandler.send("BLE scan failed ${scanFailure.value}")
+      }
+    }
+
+  private val peripheralCallback: BluetoothPeripheralCallback =
+    object : BluetoothPeripheralCallback() {
+
+      override fun onMtuChanged(peripheral: BluetoothPeripheral, mtu: Int, status: GattStatus) {
+        Log.d("FlutterMIDICommand","new MTU set: $mtu")
+      }
+
+      override fun onBondingStarted(peripheral: BluetoothPeripheral) {
+        Log.d("FlutterMIDICommand","onBondingStarted")
+      }
+
+      override fun onBondingSucceeded(peripheral: BluetoothPeripheral) {
+        Log.d("FlutterMIDICommand","onBondingSucceded")
+        setupStreamHandler.send("deviceBonded")
+      }
+
+      override fun onBondingFailed(peripheral: BluetoothPeripheral) {
+        Log.d("FlutterMIDICommand","onBondingFailed - disconnect")
+        peripheral.cancelConnection()
+        disconnectDevice(peripheral.getAddress())
+      }
+
+      override fun onBondLost(peripheral: BluetoothPeripheral) {
+        Log.d("FlutterMIDICommand","onBondLost")
+      }
+
+      override fun onConnectionUpdated(
+        peripheral: BluetoothPeripheral,
+        interval: Int,
+        latency: Int,
+        timeout: Int,
+        status: GattStatus
+      ) {
+        Log.d("FlutterMIDICommand","onConnectionUpdated status $status")
+      }
+    }
 }
 
 
