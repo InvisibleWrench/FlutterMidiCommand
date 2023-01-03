@@ -479,18 +479,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     }
   }
 
-  private val deviceOpenedListener = object : MidiManager.OnDeviceOpenedListener {
-    override fun onDeviceOpened(it: MidiDevice?) {
-      Log.d("FlutterMIDICommand", "onDeviceOpened")
-      it?.also {
-        val device = ConnectedDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
-        var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
-        device.connectWithStreamHandler(rxStreamHandler, result)
-        Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
-        connectedDevices[device.id] = device
-      }
-    }
-  }
+
 
   fun disconnectDevice(deviceId: String) {
     connectedDevices[deviceId]?.also {
@@ -599,12 +588,26 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     return list.values.toList()
   }
 
+
+  private val deviceOpenedListener = object : MidiManager.OnDeviceOpenedListener {
+    override fun onDeviceOpened(it: MidiDevice?) {
+      Log.d("FlutterMIDICommand", "onDeviceOpened")
+      it?.also {
+        val device = ConnectedDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
+        var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
+        device.connectWithStreamHandler(rxStreamHandler, result)
+        Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
+        connectedDevices[device.id] = device
+      }
+    }
+  }
+
   private val deviceConnectionCallback = object : MidiManager.DeviceCallback() {
 
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       device?.also {
-        Log.d("FlutterMIDICommand", "device added $it")
+        Log.d("FlutterMIDICommand", "MIDI device added $it")
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
       }
     }
@@ -612,7 +615,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
     override fun onDeviceRemoved(device: MidiDeviceInfo?) {
       super.onDeviceRemoved(device)
       device?.also {
-        Log.d("FlutterMIDICommand","device removed $it")
+        Log.d("FlutterMIDICommand","MIDI device removed $it")
         var id = Device.deviceIdForInfo(it)
         connectedDevices[id]?.also {
           Log.d("FlutterMIDICommand","remove removed device $it")
@@ -624,7 +627,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
     override fun onDeviceStatusChanged(status: MidiDeviceStatus?) {
       super.onDeviceStatusChanged(status)
-      Log.d("FlutterMIDICommand","device status changed ${status.toString()}")
+      Log.d("FlutterMIDICommand","MIDI device status changed ${status.toString()}")
 
       status?.also {
         connectedDevices[Device.deviceIdForInfo(it.deviceInfo)]?.also {
