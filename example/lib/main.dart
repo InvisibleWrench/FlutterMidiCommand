@@ -25,7 +25,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((data) async {
-      print("setup changed $data");
+      // print("setup changed $data");
       setState(() {});
     });
 
@@ -52,6 +52,8 @@ class _MyAppState extends State<MyApp> {
         return Icons.language;
       case "BLE":
         return Icons.bluetooth;
+      case "bonded":
+        return Icons.bluetooth_connected;
       default:
         return Icons.device_unknown;
     }
@@ -113,14 +115,14 @@ class _MyAppState extends State<MyApp> {
                     await _informUserAboutBluetoothPermissions(context);
 
                     // Start bluetooth
-                    print("start ble central");
+                    // print("start ble central");
                     await _midiCommand.startBluetoothCentral().catchError((err) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(err),
                       ));
                     });
 
-                    print("wait for init");
+                    // print("wait for init");
                     await _midiCommand.waitUntilBluetoothIsInitialized().timeout(Duration(seconds: 5), onTimeout: () {
                       print("Failed to initialize Bluetooth");
                     });
@@ -152,7 +154,7 @@ class _MyAppState extends State<MyApp> {
                       ));
                     }
 
-                    print("done");
+                    // print("done");
                     // If not show a message telling users what to do
                     setState(() {});
                   },
@@ -173,6 +175,10 @@ class _MyAppState extends State<MyApp> {
             builder: (BuildContext context, AsyncSnapshot snapshot) {
               if (snapshot.hasData && snapshot.data != null) {
                 var devices = snapshot.data as List<MidiDevice>;
+
+                // Sort by IDs
+                devices.sort((a, b) => a.id.compareTo(b.id));
+
                 return ListView.builder(
                   itemCount: devices.length,
                   itemBuilder: (context, index) {

@@ -33,8 +33,7 @@ class ConnectedDevice : Device {
             var serviceInfo = it.properties.getParcelable<ServiceInfo>("service_info")
             if (serviceInfo?.name == "com.invisiblewrench.fluttermidicommand.VirtualDeviceService") {
                 Log.d("FlutterMIDICommand", "Own virtual")
-                isOwnVirtualDevice = true
-            } else {
+33            } else {
                 if (it.inputPortCount > 0) {
                     Log.d("FlutterMIDICommand", "Open input port")
                     this.inputPort = this.midiDevice.openInputPort(0)
@@ -48,6 +47,7 @@ class ConnectedDevice : Device {
         }
 
         Handler().postDelayed({
+            Log.d("FlutterMIDICommand", "CONNECTED")
             connectResult?.success(null)
             setupStreamHandler?.send("deviceConnected")
         }, 2500)
