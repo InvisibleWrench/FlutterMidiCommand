@@ -90,6 +90,8 @@ class MidiCommand {
   ///
   /// Found devices will be included in the list returned by [devices]
   Future<void> waitUntilBluetoothIsInitialized() async {
+    var bleState = await _platform.bluetoothState();
+    _bluetoothState = BluetoothState.values.byName(bleState);
     bool isInitialized() => _bluetoothState != BluetoothState.unknown;
 
     print(_bluetoothState);
