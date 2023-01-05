@@ -58,11 +58,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
 
   var bluetoothAdapter:BluetoothAdapter? = null
-//  var bluetoothScanner:BluetoothLeScanner? = null
   var central: BluetoothCentralManager? = null
   private val HW_ENABLE_BLUETOOTH = 95452 // arbitrary
   private val PERMISSIONS_REQUEST_ACCESS_LOCATION = 95453 // arbitrary
-//  var discoveredDevices = mutableSetOf<BluetoothDevice>()
 var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   var ongoingConnections = mutableMapOf<String, Result>()
 
@@ -336,8 +334,16 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   }
 
   private fun startScan() : String? {
-      Log.d("FlutterMIDICommand", "Start BLE Scan")
-      central?.startPairingPopupHack()
+    Log.d("FlutterMIDICommand", "Start BLE Scan")
+
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
+      if (!checkLocationServices()) {
+        Log.d("FlutterMIDICommand", "Location services are required")
+        return "Location services are required"
+      }
+    }
+
+     central?.startPairingPopupHack()
      handler.postDelayed({
       // Scan for peripherals with a certain service UUIDs
       central?.scanForPeripheralsWithServices(
