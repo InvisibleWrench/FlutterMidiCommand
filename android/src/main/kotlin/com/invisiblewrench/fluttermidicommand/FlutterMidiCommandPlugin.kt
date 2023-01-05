@@ -106,6 +106,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 // Clean up references.
     print("onDetachedFromActivity")
     activity = null
+    central?.close()
   }
 
   //#endregion
