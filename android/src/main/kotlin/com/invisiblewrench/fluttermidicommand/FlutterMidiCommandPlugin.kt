@@ -340,7 +340,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     Log.d("FlutterMIDICommand", "Start BLE Scan")
 
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
-      if (!checkLocationServices()) {
+      if (!areLocationServicesEnabled()) {
         Log.d("FlutterMIDICommand", "Location services are required")
         return "Location services are required"
       }
