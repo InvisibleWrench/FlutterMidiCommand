@@ -346,6 +346,8 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       }
     }
 
+    discoveredDevices.clear()
+
      central?.startPairingPopupHack()
      handler.postDelayed({
       // Scan for peripherals with a certain service UUIDs
@@ -362,7 +364,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     Log.d("FlutterMIDICommand", "Stop BLE Scan")
 //    bluetoothScanner?.stopScan(bleScanner)
     central?.stopScan()
-    discoveredDevices.clear()
   }
 
 
