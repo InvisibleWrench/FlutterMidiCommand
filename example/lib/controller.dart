@@ -39,19 +39,24 @@ class MidiControlsState extends State<MidiControls> {
   var _pcValue = 0;
   var _pitchValue = 0.0;
 
-  // StreamSubscription<String> _setupSubscription;
+  StreamSubscription<String>? _setupSubscription;
   StreamSubscription<MidiPacket>? _rxSubscription;
   MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
     print('init controller');
+
+    _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((event) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(event)));
+    });
+
     _rxSubscription = _midiCommand.onMidiDataReceived?.listen((packet) {
-      print('received packet $packet');
+      // print('received packet $packet');
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+      print("data ${data.map((e) => e.toRadixString(16)).join(" ")} @ time $timestamp from device ${device.name}:${device.id}");
 
       var status = data[0];
 
@@ -100,7 +105,7 @@ class MidiControlsState extends State<MidiControls> {
   }
 
   void dispose() {
-    // _setupSubscription?.cancel();
+    _setupSubscription?.cancel();
     _rxSubscription?.cancel();
     super.dispose();
   }
