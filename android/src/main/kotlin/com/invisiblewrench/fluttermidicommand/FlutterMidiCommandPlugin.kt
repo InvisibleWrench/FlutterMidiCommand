@@ -6,7 +6,6 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.*
 import android.bluetooth.BluetoothGatt.*
-import android.bluetooth.BluetoothProfile.*
 import android.bluetooth.le.*
 import android.content.*
 import android.content.pm.PackageInfo
@@ -21,7 +20,6 @@ import com.welie.blessed.BluetoothCentralManager
 import com.welie.blessed.BluetoothCentralManagerCallback
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.BluetoothPeripheralCallback
-import com.welie.blessed.ConnectionPriority
 import com.welie.blessed.GattStatus
 import com.welie.blessed.HciStatus
 import com.welie.blessed.ScanFailure
@@ -67,8 +65,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
   var blManager:BluetoothManager? = null
 
-  var serviceUUID = UUID.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
-  var characteristicUUID = UUID.fromString("7772E5DB-3868-4112-A1A9-F2669D106BF3")
 
   //#region Lifetime functions
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -131,6 +127,10 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       instance.activity = registrar.activity()
       instance.setup()
     }
+
+    var serviceUUID = UUID.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
+    var characteristicUUID = UUID.fromString("7772E5DB-3868-4112-A1A9-F2669D106BF3")
+
 
     lateinit var rxStreamHandler:FMCStreamHandler
   }
@@ -371,12 +371,14 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     Log.d("FlutterMIDICommand", "connect to $type device: $deviceId")
 
     if (type == "BLE") {
-
       // Connect using BLESSED
       var peripheral = central?.getPeripheral(deviceId)
       print("peripheral $peripheral")
       if (peripheral != null) {
-        central?.connectPeripheral(peripheral, peripheralCallback)
+        var device = BLEDevice(peripheral, this@FlutterMidiCommandPlugin.setupStreamHandler, rxStreamHandler, this@FlutterMidiCommandPlugin.ongoingConnections[deviceId])
+        central?.connectPeripheral(peripheral, device.peripheralCallback)
+        connectedDevices[device.id] = device
+        discoveredDevices.remove(device.id)
       } else {
         Log.d("FlutterMIDICommand", "not found peripheral $deviceId")
         return "Peripheral not found"
@@ -450,7 +452,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     if (deviceId != null) {
       if (connectedDevices.containsKey(deviceId)) {
         connectedDevices[deviceId]?.let {
-          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
+//          Log.d("FlutterMIDICommand", "send midi to $it ${it.id}")
           it.send(data, timestamp)
         }
       } else {
@@ -491,17 +493,14 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
     var connectedGattDevices = blManager?.getConnectedDevices(GATT_SERVER)
     connectedGattDevices?.forEach {
-
       var id = it.address
-        if (list.containsKey(id)) {
-//          Log.d("FlutterMIDICommand", "device already in list $id")
-        } else {
-//      Log.d("FlutterMIDICommand", "add connectedGattDevice ${it.address} type ${it.type} name ${it.name}")
+//      Log.d("FlutterMIDICommand", "connected gatt device $id")
+      if (bondedDeviceIds.contains(id)) {
           list[id] = mapOf(
             "name" to it.name,
             "id" to id,
-            "type" to if (bondedDeviceIds.contains(id)) "bonded" else "BLE",
-            "connected" to if (connectedDevices.contains(it.address)) "true" else "false",///*if (connectedGattDeviceIds.contains(id)) "true" else*/ "false",
+            "type" to "bonded",
+            "connected" to if (connectedDevices.contains(it.address)) "true" else "false",
             "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
             "outputs" to listOf(mapOf("id" to 0, "connected" to false))
           )
@@ -513,6 +512,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     discoveredDevices.entries.forEach {
       var id:String = it.key
 
+//      Log.d("FlutterMIDICommand", "discovered device $id")
       if (list.containsKey(id)) {
 //        Log.d("FlutterMIDICommand", "device already in list $id")
       } else {
@@ -524,8 +524,8 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     // Generic MIDI devices
     val devs:Array<MidiDeviceInfo> = midiManager.devices
     devs.forEach {
-      var id = Device.deviceIdForInfo(it)
-
+      var id = NativeDevice.deviceIdForInfo(it)
+//      Log.d("FlutterMIDICommand", "native device $id")
       if (list.containsKey(id)) {
 //        Log.d("FlutterMIDICommand", "device already in list $id")
       } else {
@@ -542,6 +542,20 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       }
     }
 
+    connectedDevices.values.forEach{
+//      Log.d("FlutterMIDICommand", "connected device ${it.id}")
+      if (!list.containsKey(it.id)) {
+//        Log.d("FlutterMIDICommand", "add connected BLE device ${it.id}")
+        list[it.id] = mapOf(
+          "name" to it.name,
+          "id" to it.id,
+          "type" to "BLE",
+          "connected" to "true",
+          "inputs" to listOfPorts(1),
+          "outputs" to listOfPorts(1)
+        )
+      }
+    }
 
 //    Log.d("FlutterMIDICommand", "list $list")
 
@@ -554,7 +568,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     override fun onDeviceOpened(it: MidiDevice?) {
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
-        val device = ConnectedDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
+        val device = NativeDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
         var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
         device.connectWithStreamHandler(rxStreamHandler, result)
         Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
@@ -578,7 +592,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       super.onDeviceRemoved(device)
       device?.also {
         Log.d("FlutterMIDICommand","device removed $it")
-        var id = Device.deviceIdForInfo(it)
+        var id = NativeDevice.deviceIdForInfo(it)
         connectedDevices[id]?.also {
           Log.d("FlutterMIDICommand","remove removed device $it")
           connectedDevices.remove(id)
@@ -592,7 +606,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       Log.d("FlutterMIDICommand","device status changed ${status.toString()}")
 
       status?.also {
-        connectedDevices[Device.deviceIdForInfo(it.deviceInfo)]?.also {
+        connectedDevices[NativeDevice.deviceIdForInfo(it.deviceInfo)]?.also {
           Log.d("FlutterMIDICommand", "update device status $status")
 //          it.status = status
         }
@@ -673,7 +687,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   private fun initBluetoothHandler() {
     Log.d("FlutterMIDICommand", "init handler")
     // Create BluetoothCentral
-    central = BluetoothCentralManager(context, bluetoothCentralManagerCallback, handler)
+    central = BluetoothCentralManager(context, bluetoothCentralManagerCallback, Handler(Looper.getMainLooper()))
   }
 
   private fun areLocationServicesEnabled(): Boolean {
@@ -760,7 +774,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     object : BluetoothCentralManagerCallback() {
       override fun onConnectedPeripheral(peripheral: BluetoothPeripheral) {
         Log.d("FlutterMIDICommand", "connected to ${peripheral.getName()}")
-
         var id = peripheral.getAddress()
         discoveredDevices.remove(id)
       }
@@ -775,7 +788,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         Log.d("FlutterMIDICommand", "disconnected '${peripheral.getName()}' with status $status")
         connectedDevices.remove(peripheral.getAddress())
         ongoingConnections.remove(peripheral.getAddress())
-        setupStreamHandler.send("deviceDisappeared")
+        setupStreamHandler.send("deviceDisconnected")
       }
 
       override fun onDiscoveredPeripheral(peripheral: BluetoothPeripheral, scanResult: ScanResult) {
@@ -813,97 +826,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       }
     }
 
-  private val peripheralCallback: BluetoothPeripheralCallback =
-    object : BluetoothPeripheralCallback() {
-
-      override fun onServicesDiscovered(peripheral: BluetoothPeripheral) {
-        Log.d("FlutterMIDICommand","onServicesDiscovered")
-
-        // Request a higher MTU, iOS always asks for 185
-//        peripheral.requestMtu(185)
-
-        // Request a new connection priority
-//        peripheral.requestConnectionPriority(ConnectionPriority.HIGH)
-//        peripheral.setPreferredPhy(PhyType.LE_2M, PhyType.LE_2M, PhyOptions.S2)
-//        peripheral.readPhy()
-
-        // Start to listen for notfications, this might trigger bonding on Pixels
-        Log.d("FlutterMIDICommand", "Enable notify on MIDI characteristic")
-        peripheral.setNotify(serviceUUID, characteristicUUID, true)
-      }
-
-     override fun onNotificationStateUpdate(
-        peripheral: BluetoothPeripheral,
-        characteristic: BluetoothGattCharacteristic,
-        status: GattStatus
-      ) {
-        if (status === GattStatus.SUCCESS) {
-          val isNotifying: Boolean = peripheral.isNotifying(characteristic)
-          Log.d("FlutterMIDICommand","SUCCESS: Notify set to $isNotifying for ${characteristic.uuid}");
-
-          if (isNotifying) {
-            Log.d("FlutterMIDICommand","Turn off notify for ${characteristic.uuid}");
-            peripheral.setNotify(serviceUUID, characteristicUUID, false)
-            var device = deviceForPeripheral(peripheral)
-            if (device != null) {
-              Log.d("FlutterMIDICommand", "send device to MIDI Manager ${device.name}")
-              midiManager.openBluetoothDevice(device, deviceOpenedListener, handler)
-            } else {
-              ongoingConnections.remove(peripheral.getAddress())
-            }
-          }
-
-        } else {
-          Log.d("FlutterMIDICommand","ERROR: Changing notification state failed for ${characteristic.uuid} ($status)");
-        }
-      }
-
-      override fun onCharacteristicUpdate(
-        peripheral: BluetoothPeripheral,
-        value: ByteArray,
-        characteristic: BluetoothGattCharacteristic,
-        status: GattStatus
-      ) {
-
-        if (status !== GattStatus.SUCCESS) return
-        val characteristicUUID = characteristic.uuid
-        Log.d("FlutterMIDICommand", "Update value from ${characteristicUUID}: $value")
-      }
-
-
-      override fun onMtuChanged(peripheral: BluetoothPeripheral, mtu: Int, status: GattStatus) {
-        Log.d("FlutterMIDICommand","new MTU set: $mtu")
-      }
-
-      override fun onBondingStarted(peripheral: BluetoothPeripheral) {
-        Log.d("FlutterMIDICommand","onBondingStarted")
-      }
-
-      override fun onBondingSucceeded(peripheral: BluetoothPeripheral) {
-        Log.d("FlutterMIDICommand","onBondingSucceded")
-        setupStreamHandler.send("deviceBonded")
-      }
-
-      override fun onBondingFailed(peripheral: BluetoothPeripheral) {
-        Log.d("FlutterMIDICommand","onBondingFailed - disconnect")
-        peripheral.cancelConnection()
-        disconnectDevice(peripheral.getAddress())
-      }
-
-      override fun onBondLost(peripheral: BluetoothPeripheral) {
-        Log.d("FlutterMIDICommand","onBondLost")
-      }
-
-      override fun onConnectionUpdated(
-        peripheral: BluetoothPeripheral,
-        interval: Int,
-        latency: Int,
-        timeout: Int,
-        status: GattStatus
-      ) {
-        Log.d("FlutterMIDICommand","onConnectionUpdated status $status")
-      }
-    }
 
   //endregion
 }

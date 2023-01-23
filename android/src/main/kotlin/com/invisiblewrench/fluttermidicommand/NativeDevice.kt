@@ -6,18 +6,30 @@ import android.os.Handler
 import android.util.Log
 import io.flutter.plugin.common.MethodChannel.Result
 
-class ConnectedDevice : Device {
+class NativeDevice : Device {
     var inputPort: MidiInputPort? = null
     var outputPort: MidiOutputPort? = null
+    var midiDevice: MidiDevice
+    var receiver:MidiReceiver? = null
 
     private var isOwnVirtualDevice = false;
 
-    constructor(device:MidiDevice, setupStreamHandler: FMCStreamHandler) : super(deviceIdForInfo(device.info), device.info.type.toString()) {
+
+    companion object {
+        fun deviceIdForInfo(info: MidiDeviceInfo): String {
+            var isBluetoothDevice = info.type == MidiDeviceInfo.TYPE_BLUETOOTH
+            var deviceId: String = if (isBluetoothDevice) info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else info.id.toString()
+            return deviceId
+        }
+    }
+
+    constructor(device:MidiDevice, setupStreamHandler: FMCStreamHandler) : super(deviceIdForInfo(device.info), device.info.type.toString(), device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-") {
         this.midiDevice = device
         this.setupStreamHandler = setupStreamHandler
     }
 
-    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler, connectResult:Result?) {
+
+    fun connectWithStreamHandler(streamHandler: FMCStreamHandler, connectResult:Result?) {
         Log.d("FlutterMIDICommand","connectWithHandler")
 
         this.midiDevice.info?.let {
