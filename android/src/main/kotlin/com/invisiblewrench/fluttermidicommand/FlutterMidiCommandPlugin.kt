@@ -482,20 +482,20 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         Manifest.permission.BLUETOOTH_CONNECT
       ) != PackageManager.PERMISSION_GRANTED
     ) {
-      checkPermissions()
+      Log.d("FlutterMIDICommand", "Missing permissions for BLUETOOTH_CONNECT (bonded device list)")
     } else {
      var bondedDevices = bluetoothAdapter?.getBondedDevices()
      bondedDevices?.forEach {
 //      Log.d("FlutterMIDICommand", "bonded device ${it.address} type ${it.type} name ${it.name}")
        bondedDeviceIds.add(it.address)
      }
-   }
 
-    var connectedGattDevices = blManager?.getConnectedDevices(GATT_SERVER)
-    connectedGattDevices?.forEach {
-      var id = it.address
-//      Log.d("FlutterMIDICommand", "connected gatt device $id")
-      if (bondedDeviceIds.contains(id)) {
+
+      var connectedGattDevices = blManager?.getConnectedDevices(GATT_SERVER)
+      connectedGattDevices?.forEach {
+        var id = it.address
+  //      Log.d("FlutterMIDICommand", "connected gatt device $id")
+        if (bondedDeviceIds.contains(id)) {
           list[id] = mapOf(
             "name" to it.name,
             "id" to id,
@@ -505,6 +505,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
             "outputs" to listOf(mapOf("id" to 0, "connected" to false))
           )
         }
+      }
     }
 
 
@@ -649,7 +650,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   }
 
   private fun getMissingPermissions(requiredPermissions: Array<String>): Array<String> {
-    val missingPermissions: MutableList<String> = java.util.ArrayList()
+    val missingPermissions = mutableListOf<String>()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       for (requiredPermission in requiredPermissions) {
         if (context.checkSelfPermission(requiredPermission) !== PackageManager.PERMISSION_GRANTED) {
@@ -688,6 +689,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     Log.d("FlutterMIDICommand", "init handler")
     // Create BluetoothCentral
     central = BluetoothCentralManager(context, bluetoothCentralManagerCallback, Handler(Looper.getMainLooper()))
+    setupStreamHandler.send("bleCentralUp")
   }
 
   private fun areLocationServicesEnabled(): Boolean {
