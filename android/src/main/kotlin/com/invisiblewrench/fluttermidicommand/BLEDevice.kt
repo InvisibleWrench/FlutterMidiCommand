@@ -36,16 +36,17 @@ class BLEDevice  : Device {
         if (characteristic != null) {
 
             var packetSize = peripheral.getMaximumWriteValueLength(WriteType.WITHOUT_RESPONSE)
+//            Log.d("FlutterMIDICommand", "Packetsize: $packetSize")
 
             var dataBytes = data.toMutableList()
-
-//            Log.d("FlutterMIDICommand", "Bytes first ${data.first().toPositiveInt()} last ${data.last().toPositiveInt()}")
 
             if (data.first().toPositiveInt() == 0xF0 && data.last().toPositiveInt() == 0xF7) { //  this is a sysex message, handle carefully
                 if (data.size > packetSize-3) { // Split into multiple messages of 20 bytes total
                     Log.d("FlutterMIDICommand", "Multi packet SysEx")
+
+//                    Log.d("FlutterMIDICommand", "Databytes: [${dataBytes.joinToString { "%02x".format(it) }}]")
                     // First packet
-                    var packet = dataBytes.slice(IntRange(0, packetSize-1)).toMutableList()
+                    var packet = dataBytes.slice(IntRange(0, packetSize-3)).toMutableList()
 
                     // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
                     packet.add(0, 0x80.toByte())
@@ -55,13 +56,12 @@ class BLEDevice  : Device {
 
                     dataBytes = dataBytes.subList(packetSize-2, dataBytes.size)
 
+//                    Log.d("FlutterMIDICommand", "Databytes: [${dataBytes.joinToString { "%02x".format(it) }}]")
+
                     // More packets
                     while (dataBytes.size > 0) {
 
-                        print("count ${dataBytes.size}")
-
                         var pickCount = min(dataBytes.size, packetSize-1)
-//                            print("pickCount \(pickCount)")
                         packet = dataBytes.subList(0, pickCount) // Pick bytes for packet
 
                         // Insert header
@@ -69,21 +69,17 @@ class BLEDevice  : Device {
 
                         if (packet.size < packetSize) { // Last packet
                             // Timestamp before Sysex End byte
-                            print("insert end")
                             packet.add(packet.size-1, 0x80.toByte())
                         }
 
-//                            print("packet \(hexEncodedString(packet))")
-
                         // Wait for buffer to clear
-//                        enqueueMidiData(bytes: packet)
+//                        Log.d("FlutterMIDICommand", "Other Packet: [${packet.joinToString { "%02x".format(it) }}]")
                         sendPacket(packet.toByteArray())
 
                         if (dataBytes.size > packetSize-2) {
                             dataBytes = dataBytes.subList(pickCount, dataBytes.size) // Advance buffer
                         }
                         else {
-                            print("done")
                             return
                         }
                     }
