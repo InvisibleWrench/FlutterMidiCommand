@@ -9,6 +9,9 @@ import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.BluetoothPeripheralCallback
 import com.welie.blessed.GattStatus
 import com.welie.blessed.WriteType
+import com.welie.blessed.ConnectionPriority
+import com.welie.blessed.PhyOptions;
+import com.welie.blessed.PhyType;
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlin.math.min
 
@@ -144,6 +147,16 @@ class BLEDevice  : Device {
             override fun onServicesDiscovered(peripheral: BluetoothPeripheral) {
                 Log.d("FlutterMIDICommand","onServicesDiscovered")
 
+                // Request a higher MTU, iOS always asks for 185
+                peripheral.requestMtu(185);
+
+                // Request a new connection priority
+                peripheral.requestConnectionPriority(ConnectionPriority.HIGH);
+
+                peripheral.setPreferredPhy(PhyType.LE_2M, PhyType.LE_2M, PhyOptions.S2);
+
+                peripheral.readPhy();
+
                 // Start to listen for notfications, this might trigger bonding on Pixels
                 Log.d("FlutterMIDICommand", "Enable notify on MIDI characteristic")
                 peripheral.setNotify(serviceUUID, characteristicUUID, true)
@@ -249,21 +262,12 @@ class BLEDevice  : Device {
 
         if (packet.isNotEmpty())
         {
-
-            if (packet.size == 1 && packet[0].toPositiveInt() == 0xF7 && !bleSysExHasFinished) {
-                sysExBuffer.add(packet[0])
-                Log.d("FlutterMIDICommand","pre finalize sysex ${ sysExBuffer.joinToString { "%02x".format(it)}}")
-                createMessageEvent(sysExBuffer, 0)
-                return;
-            }
-
             // parse BLE message
             bleHandlerState = BLE_HANDLER_STATE.HEADER
 
             var header:Byte = packet[0]
             var statusByte:Int = 0
-
-
+            
             for (i in 1 until packet.size) {
 
                 var midiByte:Int = packet[i].toPositiveInt()
