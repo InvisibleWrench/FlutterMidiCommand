@@ -84,7 +84,7 @@ class BLEDevice  : Device {
                         }
                     }
                 } else {
-                    Log.d("FlutterMIDICommand", "Single packet SysEx")
+//                    Log.d("FlutterMIDICommand", "Single packet SysEx")
                     // Insert timestamp low in front of Sysex End-byte
                     dataBytes.add(data.size-1, 0x80.toByte())
 
@@ -245,15 +245,24 @@ class BLEDevice  : Device {
     var bleSysExHasFinished:Boolean = true
 
     private fun parseBLEPacket(packet: ByteArray) {
-//        Log.d("FlutterMIDICommand","parse packet [${packet.joinToString { "%02x".format(it) }}]")
+        Log.d("FlutterMIDICommand","parse packet [${packet.joinToString { "%02x".format(it) }}]")
 
-        if (packet.size > 1)
+        if (packet.isNotEmpty())
         {
+
+            if (packet.size == 1 && packet[0].toPositiveInt() == 0xF7 && !bleSysExHasFinished) {
+                sysExBuffer.add(packet[0])
+                Log.d("FlutterMIDICommand","pre finalize sysex ${ sysExBuffer.joinToString { "%02x".format(it)}}")
+                createMessageEvent(sysExBuffer, 0)
+                return;
+            }
+
             // parse BLE message
             bleHandlerState = BLE_HANDLER_STATE.HEADER
 
             var header:Byte = packet[0]
             var statusByte:Int = 0
+
 
             for (i in 1 until packet.size) {
 
@@ -327,12 +336,14 @@ class BLEDevice  : Device {
                                 bleSysExHasFinished = true
                                 bleHandlerState = BLE_HANDLER_STATE.SYSEX_END
                             } else {
+//                                Log.d("FlutterMIDICommand","State -> SYSTEM_RT byte: $midiByte")
                                 bleHandlerState = BLE_HANDLER_STATE.SYSTEM_RT
                             }
                         }
 
                         BLE_HANDLER_STATE.SYSTEM_RT -> {
                             if (!bleSysExHasFinished) { // Continue incomplete Sysex
+//                                Log.d("FlutterMIDICommand","Continue incomplete Sysex")
                                 bleHandlerState = BLE_HANDLER_STATE.SYSEX
                             }
                         }
@@ -373,7 +384,7 @@ class BLEDevice  : Device {
                 }
 
                 BLE_HANDLER_STATE.STATUS_RUNNING -> {
-                    Log.d("FlutterMIDICommand","set running status")
+//                    Log.d("FlutterMIDICommand","set running status")
                     bleMidiPacketLength = lengthOfMessageType(statusByte)
                     bleMidiBuffer.clear()
                     bleMidiBuffer.add(statusByte.toByte())
@@ -403,7 +414,7 @@ class BLEDevice  : Device {
                 }
 
                 BLE_HANDLER_STATE.SYSTEM_RT -> {
-//                print("handle RT")
+//                    Log.d("FlutterMIDICommand","handle RT")
                     createMessageEvent(listOf(midiByte.toByte()), timestamp)
                 }
 
@@ -431,7 +442,7 @@ class BLEDevice  : Device {
 
 
     fun createMessageEvent(packet: List<Byte>, timestamp:Long) {
-//        Log.d("FlutterMIDICommand","rx event ${packet.joinToString { "%02x".format(it) }}")
+        Log.d("FlutterMIDICommand","rx event ${packet.joinToString { "%02x".format(it) }}")
         val deviceInfo = mapOf("id" to peripheral.address, "name" to peripheral.name, "type" to "BLE")
         dataStreamHandler.send( mapOf("data" to packet.toList(), "timestamp" to timestamp, "device" to deviceInfo))
     }
