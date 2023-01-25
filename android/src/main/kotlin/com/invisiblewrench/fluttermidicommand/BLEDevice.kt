@@ -35,7 +35,7 @@ class BLEDevice  : Device {
     fun Byte.toPositiveInt() = toInt() and 0xFF
 
     override fun send(data: ByteArray, timestamp: Long?) {
-        Log.d("FlutterMIDICommand", "Send data to MIDI device [${data.joinToString { "%02x".format(it) }}]")
+//        Log.d("FlutterMIDICommand", "Send data to MIDI device [${data.joinToString { "%02x".format(it) }}]")
         if (characteristic != null) {
 
             var packetSize = peripheral.getMaximumWriteValueLength(WriteType.WITHOUT_RESPONSE)
@@ -258,7 +258,7 @@ class BLEDevice  : Device {
     var bleSysExHasFinished:Boolean = true
 
     private fun parseBLEPacket(packet: ByteArray) {
-        Log.d("FlutterMIDICommand","parse packet [${packet.joinToString { "%02x".format(it) }}]")
+//        Log.d("FlutterMIDICommand","parse packet [${packet.joinToString { "%02x".format(it) }}]")
 
         if (packet.isNotEmpty())
         {
@@ -267,7 +267,7 @@ class BLEDevice  : Device {
 
             var header:Byte = packet[0]
             var statusByte:Int = 0
-            
+
             for (i in 1 until packet.size) {
 
                 var midiByte:Int = packet[i].toPositiveInt()
@@ -446,7 +446,7 @@ class BLEDevice  : Device {
 
 
     fun createMessageEvent(packet: List<Byte>, timestamp:Long) {
-        Log.d("FlutterMIDICommand","rx event ${packet.joinToString { "%02x".format(it) }}")
+//        Log.d("FlutterMIDICommand","rx event ${packet.joinToString { "%02x".format(it) }}")
         val deviceInfo = mapOf("id" to peripheral.address, "name" to peripheral.name, "type" to "BLE")
         dataStreamHandler.send( mapOf("data" to packet.toList(), "timestamp" to timestamp, "device" to deviceInfo))
     }
