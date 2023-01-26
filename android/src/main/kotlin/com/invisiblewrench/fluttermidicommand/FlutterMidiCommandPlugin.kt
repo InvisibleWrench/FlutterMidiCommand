@@ -272,7 +272,9 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     }
 
     if (getBluetoothManager().getAdapter() != null) {
-      Log.d("FlutterMIDICommand", "Adapter is there")
+      Log.d("FlutterMIDICommand", "Adapter is there - register for state changes")
+      context.registerReceiver(broadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+
       if (!isBluetoothEnabled()) {
         Log.d("FlutterMIDICommand", "Bluetooth is not enabled - ask")
         val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -283,7 +285,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       } else {
         Log.d("LOG", "cehck permissions")
         bluetoothState = "poweredOn"
-        checkPermissions()
       }
       return null
     } else {
@@ -300,11 +301,12 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
         val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
 
+        Log.d("FlutterMIDICommand", "BT connection state changed $state")
+
         when (state) {
           BluetoothAdapter.STATE_OFF -> {
             Log.d("FlutterMIDICommand", "BT is now off")
             bluetoothState = "poweredOff";
-//            bluetoothScanner = null
           }
 
           BluetoothAdapter.STATE_TURNING_OFF -> {
@@ -316,28 +318,14 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
             Log.d("FlutterMIDICommand", "BT is now on")
           }
         }
-      } else
-
-      if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
-        val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-        val previousBondState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1)
-        val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1)
-        val bondTransition = "${previousBondState.toBondStateDescription()} to " + bondState.toBondStateDescription()
-        Log.d("Bond state change", "${device?.address} bond state changed | $bondTransition")
-        setupStreamHandler.send(bondState.toBondStateDescription())
       }
-    }
-
-    private fun Int.toBondStateDescription() = when(this) {
-      BluetoothDevice.BOND_BONDED -> "BONDED"
-      BluetoothDevice.BOND_BONDING -> "BONDING"
-      BluetoothDevice.BOND_NONE -> "NOT BONDED"
-      else -> "ERROR: $this"
     }
   }
 
   private fun startScan() : String? {
     Log.d("FlutterMIDICommand", "Start BLE Scan")
+
+    checkPermissions()
 
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
       if (!areLocationServicesEnabled()) {
@@ -362,7 +350,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
   private fun stopScanningLeDevices() {
     Log.d("FlutterMIDICommand", "Stop BLE Scan")
-//    bluetoothScanner?.stopScan(bleScanner)
     central?.stopScan()
   }
 
@@ -632,6 +619,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     blManager = getBluetoothManager()
     bluetoothAdapter = blManager!!.adapter
       ?: return false
+
     return bluetoothAdapter!!.isEnabled
   }
 
@@ -809,25 +797,11 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         setupStreamHandler.send("deviceAppeared")
       }
 
-      override fun onBluetoothAdapterStateChanged(state: Int) {
-        Log.d("FlutterMIDICommand", "Bluetooth adapter changed state to $state")
-        if (state == BluetoothAdapter.STATE_ON) {
-          // Bluetooth is on now, start scanning again
-          // Scan for peripherals with a certain service UUIDs
-          central?.startPairingPopupHack()
-          startScan()
-          bluetoothState = "poweredOn"
-        } else if (state == 10) {
-          bluetoothState = "poweredOff"
-        }
-      }
-
       override fun onScanFailed(scanFailure: ScanFailure) {
         Log.d("FlutterMIDICommand", "scanning failed with error $scanFailure")
         setupStreamHandler.send("BLE scan failed ${scanFailure.value}")
       }
     }
-
 
   //endregion
 }
