@@ -38,6 +38,8 @@ class MidiControlsState extends State<MidiControls> {
   var _ccValue = 0;
   var _pcValue = 0;
   var _pitchValue = 0.0;
+  var _nrpnValue = 0;
+  var _nrpnCtrl = 0;
 
   // StreamSubscription<String> _setupSubscription;
   StreamSubscription<MidiPacket>? _rxSubscription;
@@ -117,6 +119,11 @@ class MidiControlsState extends State<MidiControls> {
         SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
         SlidingSelector('Value', _ccValue, 0, 127, _onValueChanged),
         Divider(),
+        Text("NRPN", style: Theme.of(context).textTheme.headline6),
+        SteppedSelector('Parameter', _nrpnCtrl, 0, 16383, _onNRPNCtrlChanged),
+        SlidingSelector('Parameter', _nrpnCtrl, 0, 16383, _onNRPNCtrlChanged),
+        SlidingSelector('Value', _nrpnValue, 0, 16383, _onNRPNValueChanged),
+        Divider(),
         Text("PC", style: Theme.of(context).textTheme.headline6),
         SteppedSelector('Program', _pcValue, 0, 127, _onProgramChanged),
         Divider(),
@@ -172,11 +179,24 @@ class MidiControlsState extends State<MidiControls> {
     CCMessage(channel: _channel, controller: _controller, value: _ccValue).send();
   }
 
+  _onNRPNValueChanged(int newValue) {
+    setState(() {
+      _nrpnValue = newValue;
+    });
+    NRPNMessage(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue).send();
+  }
+
+  _onNRPNCtrlChanged(int newValue) {
+    setState(() {
+      _nrpnCtrl = newValue;
+    });
+  }
+
   _onPitchChanged(double newValue) {
     setState(() {
       _pitchValue = newValue;
     });
-    PitchBendMessage(channel: _channel, bend: newValue).send();
+    PitchBendMessage(channel: _channel, bend: _pitchValue).send();
   }
 }
 

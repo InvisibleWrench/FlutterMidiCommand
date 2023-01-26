@@ -1,19 +1,8 @@
 import 'dart:typed_data';
+
 import 'flutter_midi_command.dart';
 
-enum MessageType {
-  CC,
-  PC,
-  NoteOn,
-  NoteOff,
-  NRPN,
-  RPN,
-  SYSEX,
-  Beat,
-  PolyAT,
-  AT,
-  PitchBend
-}
+enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, RPN, SYSEX, Beat, PolyAT, AT, PitchBend }
 
 class MidiMessage {
   /// Byte data of the message
@@ -24,6 +13,7 @@ class MidiMessage {
 
   /// Send the message bytes to all connected devices
   void send() {
+    print("send $data");
     MidiCommand().sendData(data);
   }
 }
@@ -151,26 +141,35 @@ class NRPNMessage extends MidiMessage {
 
   @override
   void send() {
-    data = Uint8List(12);
+    parameter = parameter.clamp(0, 16383);
+    int parameterMSB = parameter ~/ 128;
+    int parameterLSB = parameter & 0x7F;
+
+    value = value.clamp(0, 16383);
+    int valueMSB = value ~/ 128;
+    int valueLSB = value & 0x7F;
+
+    var length = value > 127 ? 9 : 7;
+
+    data = Uint8List(length);
     // Data Entry MSB
     data[0] = 0xB0 + channel;
     data[1] = 0x63;
-    data[2] = parameter >> 7;
+    data[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x62;
-    data[5] = parameter & 0x7F;
+    data[3] = 0x62;
+    data[4] = parameterLSB;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = value >> 7;
+    data[5] = 0x06;
+    data[6] = value > 127 ? valueMSB : value;
 
-    // Data Value LSB
-    data[9] = 0xB0 + channel;
-    data[10] = 0x38;
-    data[11] = value & 0x7F;
+    // Data Value MSB
+    if (value > 127) {
+      data[7] = 0x38;
+      data[8] = valueLSB;
+    }
 
     super.send();
   }
