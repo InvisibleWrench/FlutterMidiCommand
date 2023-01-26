@@ -1,3 +1,7 @@
+## 0.4.10
+Fixed NRPN Messages
+Added NRPN to example app
+
 ## 0.4.9
 Updated Android permissions.
 Example fix
