@@ -131,13 +131,13 @@ class SysExMessage extends MidiMessage {
   }
 }
 
-class NRPNMessage extends MidiMessage {
+class NRPN4Message extends MidiMessage {
   int channel;
   int parameter;
   int value;
 
-  /// NRPN Message
-  NRPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
+  /// NRPN Message with Value MSB and LSB bytes
+  NRPN4Message({this.channel = 0, this.parameter = 0, this.value = 0});
 
   @override
   void send() {
@@ -149,31 +149,57 @@ class NRPNMessage extends MidiMessage {
     int valueMSB = value ~/ 128;
     int valueLSB = value & 0x7F;
 
-    // var length = value > 127 ? 9 : 7;
-    var length = value > 127 ? 12 : 9;
-
-    data = Uint8List(length);
+    data = Uint8List(9);
     // Data Entry MSB
     data[0] = 0xB0 + channel;
     data[1] = 0x63;
     data[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x62;
-    data[5] = parameterLSB;
+    data[3] = 0x62;
+    data[4] = parameterLSB;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = value > 127 ? valueMSB : value;
+    data[5] = 0x06;
+    data[6] = valueMSB;
 
-    // Data Value MSB
-    if (value > 127) {
-      data[9] = 0xB0 + channel;
-      data[10] = 0x38;
-      data[11] = valueLSB;
-    }
+    // Data Value LSB
+    data[7] = 0x26;
+    data[8] = valueLSB;
+
+    super.send();
+  }
+}
+
+class NRPN3Message extends MidiMessage {
+  int channel;
+  int parameter;
+  int value;
+
+  /// NRPN Message with single value byte
+  NRPN3Message({this.channel = 0, this.parameter = 0, this.value = 0});
+
+  @override
+  void send() {
+    parameter = parameter.clamp(0, 16383);
+    int parameterMSB = parameter ~/ 128;
+    int parameterLSB = parameter & 0x7F;
+
+    value = value & 0x7F;
+
+    data = Uint8List(7);
+    // Data Entry MSB
+    data[0] = 0xB0 + channel;
+    data[1] = 0x63;
+    data[2] = parameterMSB;
+
+    // Data Entry LSB
+    data[3] = 0x62;
+    data[4] = parameterLSB;
+
+    // Data Value
+    data[5] = 0x06;
+    data[6] = value;
 
     super.send();
   }
@@ -197,29 +223,23 @@ class NRPNHexMessage extends MidiMessage {
 
   @override
   void send() {
-    var length = valueLSB > -1 ? 12 : 9;
-    data = Uint8List(length);
+    data = Uint8List(9);
     // Data Entry MSB
     data[0] = 0xB0 + channel;
     data[1] = 0x63;
     data[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x62;
-    data[5] = parameterLSB;
+    data[3] = 0x62;
+    data[4] = parameterLSB;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = valueMSB;
+    data[5] = 0x06;
+    data[6] = valueMSB;
 
     // Data Value LSB
-    if (valueLSB > -1) {
-      data[9] = 0xB0 + channel;
-      data[10] = 0x38;
-      data[11] = valueLSB;
-    }
+    data[7] = 0x26;
+    data[8] = valueLSB;
 
     super.send();
   }

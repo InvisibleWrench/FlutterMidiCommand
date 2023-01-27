@@ -183,7 +183,7 @@ class MidiControlsState extends State<MidiControls> {
     setState(() {
       _nrpnValue = newValue;
     });
-    NRPNMessage(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue).send();
+    NRPN4Message(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue).send();
   }
 
   _onNRPNCtrlChanged(int newValue) {
