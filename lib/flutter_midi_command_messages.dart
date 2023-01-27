@@ -149,7 +149,8 @@ class NRPNMessage extends MidiMessage {
     int valueMSB = value ~/ 128;
     int valueLSB = value & 0x7F;
 
-    var length = value > 127 ? 9 : 7;
+    // var length = value > 127 ? 9 : 7;
+    var length = value > 127 ? 12 : 9;
 
     data = Uint8List(length);
     // Data Entry MSB
@@ -158,17 +159,20 @@ class NRPNMessage extends MidiMessage {
     data[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0x62;
-    data[4] = parameterLSB;
+    data[3] = 0xB0 + channel;
+    data[4] = 0x62;
+    data[5] = parameterLSB;
 
     // Data Value MSB
-    data[5] = 0x06;
-    data[6] = value > 127 ? valueMSB : value;
+    data[6] = 0xB0 + channel;
+    data[7] = 0x06;
+    data[8] = value > 127 ? valueMSB : value;
 
     // Data Value MSB
     if (value > 127) {
-      data[7] = 0x38;
-      data[8] = valueLSB;
+      data[9] = 0xB0 + channel;
+      data[10] = 0x38;
+      data[11] = valueLSB;
     }
 
     super.send();
