@@ -658,7 +658,9 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && targetSdkVersion >= Build.VERSION_CODES.Q) {
       arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-    } else arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION)
+    } else  {
+      arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.BLUETOOTH_CONNECT)
+    }
   }
 
   private fun permissionsGranted() {
