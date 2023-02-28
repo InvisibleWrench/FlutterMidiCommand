@@ -153,10 +153,6 @@ class BLEDevice  : Device {
                 // Request a new connection priority
                 peripheral.requestConnectionPriority(ConnectionPriority.HIGH);
 
-                peripheral.setPreferredPhy(PhyType.LE_2M, PhyType.LE_2M, PhyOptions.S2);
-
-                peripheral.readPhy();
-
                 // Start to listen for notfications, this might trigger bonding on Pixels
                 Log.d("FlutterMIDICommand", "Enable notify on MIDI characteristic")
                 peripheral.setNotify(serviceUUID, characteristicUUID, true)
@@ -196,7 +192,7 @@ class BLEDevice  : Device {
                 status: GattStatus
             ) {
                 if (status !== GattStatus.SUCCESS) return
-                val characteristicUUID = characteristic.uuid
+//                val characteristicUUID = characteristic.uuid
 //                Log.d("FlutterMIDICommand", "Update value from ${characteristicUUID}: $status")
                 parseBLEPacket(value)
             }

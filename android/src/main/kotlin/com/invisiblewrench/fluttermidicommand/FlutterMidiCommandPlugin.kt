@@ -464,12 +464,12 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   var bondedDeviceIds = mutableListOf<String>()
 
     // Reading bonded devices requires BLUETOOTH_CONNECT permissions
-   if (ActivityCompat.checkSelfPermission(
+      if (ActivityCompat.checkSelfPermission(
         context,
         Manifest.permission.BLUETOOTH_CONNECT
       ) != PackageManager.PERMISSION_GRANTED
     ) {
-      Log.d("FlutterMIDICommand", "Missing permissions for BLUETOOTH_CONNECT (bonded device list)")
+//      Log.d("FlutterMIDICommand", "Missing permissions for BLUETOOTH_CONNECT (bonded device list)")
     } else {
      var bondedDevices = bluetoothAdapter?.getBondedDevices()
      bondedDevices?.forEach {
@@ -626,8 +626,11 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   private fun checkPermissions() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       val missingPermissions: Array<String> = getMissingPermissions(getRequiredPermissions())
+
+      Log.d("FlutterMidiCommand", "missing permissions ${missingPermissions.map { it }.toList()}")
+
       if (missingPermissions.isNotEmpty()) {
-        activity?.requestPermissions(
+        ActivityCompat.requestPermissions(activity!!,
           missingPermissions,
           PERMISSIONS_REQUEST_ACCESS_LOCATION
         )
@@ -657,9 +660,9 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && targetSdkVersion >= Build.VERSION_CODES.S) {
       arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && targetSdkVersion >= Build.VERSION_CODES.Q) {
-      arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+      arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.BLUETOOTH)
     } else  {
-      arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+      arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.BLUETOOTH)
     }
   }
 
