@@ -53,7 +53,8 @@ class MidiControlsState extends State<MidiControls> {
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+      print(
+          "data $data @ time $timestamp from device ${device.name}:${device.id}");
 
       var status = data[0];
 
@@ -112,22 +113,23 @@ class MidiControlsState extends State<MidiControls> {
     return ListView(
       padding: EdgeInsets.all(12),
       children: <Widget>[
-        Text("Channel", style: Theme.of(context).textTheme.headline6),
+        Text("Channel", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
         Divider(),
-        Text("CC", style: Theme.of(context).textTheme.headline6),
-        SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
+        Text("CC", style: Theme.of(context).textTheme.titleLarge),
+        SteppedSelector(
+            'Controller', _controller, 0, 127, _onControllerChanged),
         SlidingSelector('Value', _ccValue, 0, 127, _onValueChanged),
         Divider(),
-        Text("NRPN", style: Theme.of(context).textTheme.headline6),
+        Text("NRPN", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector('Parameter', _nrpnCtrl, 0, 16383, _onNRPNCtrlChanged),
         SlidingSelector('Parameter', _nrpnCtrl, 0, 16383, _onNRPNCtrlChanged),
         SlidingSelector('Value', _nrpnValue, 0, 16383, _onNRPNValueChanged),
         Divider(),
-        Text("PC", style: Theme.of(context).textTheme.headline6),
+        Text("PC", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector('Program', _pcValue, 0, 127, _onProgramChanged),
         Divider(),
-        Text("Pitch Bend", style: Theme.of(context).textTheme.headline6),
+        Text("Pitch Bend", style: Theme.of(context).textTheme.titleLarge),
         Slider(
             value: _pitchValue,
             max: 1,
@@ -176,14 +178,16 @@ class MidiControlsState extends State<MidiControls> {
     setState(() {
       _ccValue = newValue;
     });
-    CCMessage(channel: _channel, controller: _controller, value: _ccValue).send();
+    CCMessage(channel: _channel, controller: _controller, value: _ccValue)
+        .send();
   }
 
   _onNRPNValueChanged(int newValue) {
     setState(() {
       _nrpnValue = newValue;
     });
-    NRPN4Message(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue).send();
+    NRPN4Message(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue)
+        .send();
   }
 
   _onNRPNCtrlChanged(int newValue) {
@@ -207,7 +211,8 @@ class SteppedSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SteppedSelector(this.label, this.value, this.minValue, this.maxValue, this.callback);
+  SteppedSelector(
+      this.label, this.value, this.minValue, this.maxValue, this.callback);
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +247,8 @@ class SlidingSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SlidingSelector(this.label, this.value, this.minValue, this.maxValue, this.callback);
+  SlidingSelector(
+      this.label, this.value, this.minValue, this.maxValue, this.callback);
 
   @override
   Widget build(BuildContext context) {
