@@ -1,3 +1,6 @@
+## 0.4.11
+Merge PRs from anzbert, bringing example app and gradle settings up to date
+
 ## 0.4.10
 Fixed NRPN Messages
 Added NRPN to example app
