@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
@@ -8,13 +9,13 @@ import 'package:flutter_virtual_piano/flutter_virtual_piano.dart';
 class ControllerPage extends StatelessWidget {
   final MidiDevice device;
 
-  ControllerPage(this.device);
+  const ControllerPage(this.device, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Controls'),
+        title: const Text('Controls'),
       ),
       body: MidiControls(device),
     );
@@ -24,11 +25,11 @@ class ControllerPage extends StatelessWidget {
 class MidiControls extends StatefulWidget {
   final MidiDevice device;
 
-  MidiControls(this.device);
+  const MidiControls(this.device, {Key? key}) : super(key: key);
 
   @override
   MidiControlsState createState() {
-    return new MidiControlsState();
+    return MidiControlsState();
   }
 }
 
@@ -43,18 +44,24 @@ class MidiControlsState extends State<MidiControls> {
 
   // StreamSubscription<String> _setupSubscription;
   StreamSubscription<MidiPacket>? _rxSubscription;
-  MidiCommand _midiCommand = MidiCommand();
+  final MidiCommand _midiCommand = MidiCommand();
 
   @override
   void initState() {
-    print('init controller');
+    if (kDebugMode) {
+      print('init controller');
+    }
     _rxSubscription = _midiCommand.onMidiDataReceived?.listen((packet) {
-      print('received packet $packet');
+      if (kDebugMode) {
+        print('received packet $packet');
+      }
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      print(
-          "data $data @ time $timestamp from device ${device.name}:${device.id}");
+      if (kDebugMode) {
+        print(
+            "data $data @ time $timestamp from device ${device.name}:${device.id}");
+      }
 
       var status = data[0];
 
@@ -102,6 +109,7 @@ class MidiControlsState extends State<MidiControls> {
     super.initState();
   }
 
+  @override
   void dispose() {
     // _setupSubscription?.cancel();
     _rxSubscription?.cancel();
@@ -111,24 +119,24 @@ class MidiControlsState extends State<MidiControls> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       children: <Widget>[
         Text("Channel", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
-        Divider(),
+        const Divider(),
         Text("CC", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector(
             'Controller', _controller, 0, 127, _onControllerChanged),
         SlidingSelector('Value', _ccValue, 0, 127, _onValueChanged),
-        Divider(),
+        const Divider(),
         Text("NRPN", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector('Parameter', _nrpnCtrl, 0, 16383, _onNRPNCtrlChanged),
         SlidingSelector('Parameter', _nrpnCtrl, 0, 16383, _onNRPNCtrlChanged),
         SlidingSelector('Value', _nrpnValue, 0, 16383, _onNRPNValueChanged),
-        Divider(),
+        const Divider(),
         Text("PC", style: Theme.of(context).textTheme.titleLarge),
         SteppedSelector('Program', _pcValue, 0, 127, _onProgramChanged),
-        Divider(),
+        const Divider(),
         Text("Pitch Bend", style: Theme.of(context).textTheme.titleLarge),
         Slider(
             value: _pitchValue,
@@ -138,11 +146,11 @@ class MidiControlsState extends State<MidiControls> {
             onChangeEnd: (_) {
               _onPitchChanged(0);
             }),
-        Divider(),
+        const Divider(),
         SizedBox(
           height: 80,
           child: VirtualPiano(
-            noteRange: RangeValues(48, 76),
+            noteRange: const RangeValues(48, 76),
             onNotePressed: (note, vel) {
               NoteOnMessage(note: note, velocity: 100).send();
             },
@@ -211,8 +219,10 @@ class SteppedSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SteppedSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback);
+  const SteppedSelector(
+      this.label, this.value, this.minValue, this.maxValue, this.callback,
+      {Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -221,7 +231,7 @@ class SteppedSelector extends StatelessWidget {
       children: <Widget>[
         Text(label),
         IconButton(
-            icon: Icon(Icons.remove_circle),
+            icon: const Icon(Icons.remove_circle),
             onPressed: (value > minValue)
                 ? () {
                     callback(value - 1);
@@ -229,7 +239,7 @@ class SteppedSelector extends StatelessWidget {
                 : null),
         Text(value.toString()),
         IconButton(
-            icon: Icon(Icons.add_circle),
+            icon: const Icon(Icons.add_circle),
             onPressed: (value < maxValue)
                 ? () {
                     callback(value + 1);
@@ -247,8 +257,10 @@ class SlidingSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  SlidingSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback);
+  const SlidingSelector(
+      this.label, this.value, this.minValue, this.maxValue, this.callback,
+      {Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
