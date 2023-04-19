@@ -1683,7 +1683,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 
                 if ((((midiByte & 0x80) == 0x80) && (bleHandlerState != BLE_HANDLER_STATE.TIMESTAMP)) && (bleHandlerState != BLE_HANDLER_STATE.SYSEX_INT)) {
                     if (!bleSysExHasFinished) {
-                        if ((midiByte & 0xF7) == 0xF7)
+                        if ((midiByte & 0xFF) == 0xF7)
                         { // Sysex end
 //                            print("sysex end on byte \(midiByte)")
                           bleSysExHasFinished = true
@@ -1748,7 +1748,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                     break
 
                   case BLE_HANDLER_STATE.SYSEX_INT:
-                    if ((midiByte & 0xF7) == 0xF7)
+                    if ((midiByte & 0xFF) == 0xF7)
                     { // Sysex end
 //                        print("sysex end")
                       bleSysExHasFinished = true
