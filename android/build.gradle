@@ -25,6 +25,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
+    namespace 'com.invisiblewrench.flutter_midi_command'
+
     compileSdkVersion 31
 
     sourceSets {
