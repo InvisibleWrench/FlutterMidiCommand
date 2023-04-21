@@ -26,6 +26,8 @@ apply plugin: 'kotlin-android'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
+    namespace 'com.invisiblewrench.fluttermidicommand_example'
+
     compileSdkVersion 33
 
     sourceSets {
@@ -52,7 +54,7 @@ android {
     lint {
         disable 'InvalidPackage'
     }
-    namespace 'com.invisiblewrench.fluttermidicommand_example'
+    
 }
 
 flutter {
