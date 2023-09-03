@@ -540,8 +540,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" : id,
                 "type" : "BLE",
                 "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false]],
-                "outputs" : [["id":0, "connected":false]]
+                "inputs" : [["id":0, "connected":false] as [String:Any]],
+                "outputs" : [["id":0, "connected":false] as [String:Any]]
                 ])
         }
 
@@ -560,8 +560,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         "id" : key,
                         "type" : "BLE",
                         "connected":"true",
-                        "inputs" : [["id":0, "connected":true]],
-                        "outputs" : [["id":0, "connected":true]]
+                        "inputs" : [["id":0, "connected":true] as [String:Any]],
+                        "outputs" : [["id":0, "connected":true] as [String:Any]]
                         ])
                 }
             }
@@ -1656,7 +1656,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":[
                                                             "name" : peripheral.name ?? "-",
                                         "id":peripheral.identifier.uuidString,
-                                                                    "type":"BLE"]])
+                                                                    "type":"BLE"]] as [String:Any])
     }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
