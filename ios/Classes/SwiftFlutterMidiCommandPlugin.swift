@@ -963,9 +963,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 
 
       deviceInfo = ["name" : name,
-                        "id": String(id),
-                        "type":type,
-                        "connected": String(true),]
+                    "id": String(id),
+                    "type":type,
+                    "connected": String(true),]
 
     super.init(id: id, type: type, streamHandler: streamHandler)
   }
