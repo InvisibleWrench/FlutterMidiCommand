@@ -1079,9 +1079,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
                 sysExBuffer.append(midiByte)
                 if (midiInt == 0xF7) {
                   // Sysex complete
-//                print("rx sysex \(sysExBuffer)")
-                    streamHandler.send(data: ["data": sysExBuffer, "timestamp":timestamp, "device":deviceInfo])
-
+                  DispatchQueue.main.async {
+                    self.streamHandler.send(data: ["data": self.sysExBuffer, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
+                  }
                   parserState = PARSER_STATE.HEADER
                 }
                 break
@@ -1098,7 +1098,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     func finalizeMessageIfComplete(timestamp: UInt64) {
         if (midiBuffer.count == midiPacketLength) {
             let midiData = ["data": midiBuffer, "timestamp":timestamp, "device":deviceInfo] as [String : Any]
-            streamHandler.send(data: midiData)
+            DispatchQueue.main.async {
+                self.streamHandler.send(data: midiData)
+            }
           parserState = PARSER_STATE.HEADER
         }
       }
