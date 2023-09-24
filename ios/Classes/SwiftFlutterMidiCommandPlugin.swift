@@ -540,8 +540,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" : id,
                 "type" : "BLE",
                 "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false]],
-                "outputs" : [["id":0, "connected":false]]
+                "inputs" : [["id":0, "connected":false] as [String:Any]],
+                "outputs" : [["id":0, "connected":false] as [String:Any]]
                 ])
         }
 
@@ -560,8 +560,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         "id" : key,
                         "type" : "BLE",
                         "connected":"true",
-                        "inputs" : [["id":0, "connected":true]],
-                        "outputs" : [["id":0, "connected":true]]
+                        "inputs" : [["id":0, "connected":true] as [String:Any]],
+                        "outputs" : [["id":0, "connected":true] as [String:Any]]
                         ])
                 }
             }
@@ -963,9 +963,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 
 
       deviceInfo = ["name" : name,
-                        "id": String(id),
-                        "type":type,
-                        "connected": String(true),]
+                    "id": String(id),
+                    "type":type,
+                    "connected": String(true),]
 
     super.init(id: id, type: type, streamHandler: streamHandler)
   }
@@ -1079,9 +1079,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
                 sysExBuffer.append(midiByte)
                 if (midiInt == 0xF7) {
                   // Sysex complete
-//                print("rx sysex \(sysExBuffer)")
-                    streamHandler.send(data: ["data": sysExBuffer, "timestamp":timestamp, "device":deviceInfo])
-
+                  DispatchQueue.main.async {
+                    self.streamHandler.send(data: ["data": self.sysExBuffer, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
+                  }
                   parserState = PARSER_STATE.HEADER
                 }
                 break
@@ -1098,7 +1098,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     func finalizeMessageIfComplete(timestamp: UInt64) {
         if (midiBuffer.count == midiPacketLength) {
             let midiData = ["data": midiBuffer, "timestamp":timestamp, "device":deviceInfo] as [String : Any]
-            streamHandler.send(data: midiData)
+            DispatchQueue.main.async {
+                self.streamHandler.send(data: midiData)
+            }
           parserState = PARSER_STATE.HEADER
         }
       }
@@ -1656,7 +1658,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":[
                                                             "name" : peripheral.name ?? "-",
                                         "id":peripheral.identifier.uuidString,
-                                                                    "type":"BLE"]])
+                                                                    "type":"BLE"]] as [String:Any])
     }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
