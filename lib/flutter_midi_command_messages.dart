@@ -438,3 +438,43 @@ class ATMessage extends MidiMessage {
     super.send();
   }
 }
+
+class SenseMessage extends MidiMessage {
+  /// Sense Message
+
+  @override
+  void send() {
+    data = Uint8List(1);
+    data[0] = 0xFE;
+    super.send();
+  }
+}
+
+enum ClockType {beat, start, cont, stop}
+
+class ClockMessage extends MidiMessage {
+  ClockType type;
+
+  /// Clock Message
+  ClockMessage({this.type = ClockType.beat});
+
+  @override
+  void send() {
+    data = Uint8List(1);
+    switch (type) {
+      case ClockType.beat:
+        data[0] = 0xF8;
+        break;
+      case ClockType.start:
+        data[0] = 0xFA;
+        break;
+      case ClockType.cont:
+        data[0] = 0xFB;
+        break;
+      case ClockType.stop:
+        data[0] = 0xFC;
+        break;
+    }
+    super.send();
+  }
+}
