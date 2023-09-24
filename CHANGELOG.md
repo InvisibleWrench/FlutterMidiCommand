@@ -1,3 +1,6 @@
+## 0.4.12
+Fixed threading issue on iOS
+
 ## 0.4.11
 Merge PRs from anzbert, bringing example app and gradle settings up to date
 
