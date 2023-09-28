@@ -36,6 +36,8 @@ flutter:
         pluginClass: SwiftFlutterMidiCommandPlugin
       linux:
         default_package: flutter_midi_command_linux
+      windows:
+        default_package: flutter_midi_command_windows
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:
