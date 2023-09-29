@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_midi_command_platform_interface: ^0.4.0
+  flutter_midi_command_linux: any
 
 dev_dependencies:
   flutter_test: 
