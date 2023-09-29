@@ -1,3 +1,6 @@
+## 0.4.13
+Fixed Linux package dependency
+
 ## 0.4.12
 Fixed threading issue on iOS
 Added MIDI Sense and Clock messages
