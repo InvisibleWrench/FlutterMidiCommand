@@ -1,3 +1,7 @@
+## 0.5.0
+
+Added basic Windows support
+
 ## 0.4.12
 Fixed threading issue on iOS
 Added MIDI Sense and Clock messages
