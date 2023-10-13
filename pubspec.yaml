@@ -11,10 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_midi_command_platform_interface: ^0.4.0
-  flutter_midi_command_linux: ^0.1.5
+  flutter_midi_command_linux: ^0.3.0
 
 dev_dependencies:
-  flutter_test: 
+  flutter_test:
     sdk: flutter
 
 # For information on the generic Dart part of this file, see the
