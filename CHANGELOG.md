@@ -1,3 +1,10 @@
+## 0.4.15
+Fixed more threading bugs on iOS
+Added iOS specific API for enabling Network Session (not implemented on other platforms)
+
+## 0.4.14
+Updated FFI dependency for Linux to ^2.0.0
+
 ## 0.4.13
 Fixed Linux package dependency
 
