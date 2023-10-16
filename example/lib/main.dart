@@ -48,8 +48,6 @@ class MyAppState extends State<MyApp> {
     _updateNetworkSessionState();
   }
 
-
-
   @override
   void dispose() {
     _setupSubscription?.cancel();
@@ -126,7 +124,6 @@ class MyAppState extends State<MyApp> {
                   setState(() {
                     _iOSNetworkSessionEnabled = newValue;
                   });
-
                 }),
             Switch(
                 value: _virtualDeviceActivated,
