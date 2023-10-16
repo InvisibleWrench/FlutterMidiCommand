@@ -3,7 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 
-export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice, MidiPacket, MidiPort;
+export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
+    show MidiDevice, MidiPacket, MidiPort;
 
 enum BluetoothState {
   poweredOn,
@@ -43,14 +44,16 @@ class MidiCommand {
   BluetoothState _bluetoothState = BluetoothState.unknown;
   StreamSubscription? _onBluetoothStateChangedStreamSubscription;
   _listenToBluetoothState() async {
-    _onBluetoothStateChangedStreamSubscription = _platform.onBluetoothStateChanged?.listen((s) {
+    _onBluetoothStateChangedStreamSubscription =
+        _platform.onBluetoothStateChanged?.listen((s) {
       _bluetoothState = BluetoothState.values.byName(s);
       _bluetoothStateStream.add(_bluetoothState);
     });
 
     scheduleMicrotask(() async {
       if (_bluetoothState == BluetoothState.unknown) {
-        _bluetoothState = BluetoothState.values.byName(await _platform.bluetoothState());
+        _bluetoothState =
+            BluetoothState.values.byName(await _platform.bluetoothState());
         _bluetoothStateStream.add(_bluetoothState);
       }
     });
@@ -71,7 +74,8 @@ class MidiCommand {
   }
 
   /// Stream firing events whenever the bluetooth state changes
-  Stream<BluetoothState> get onBluetoothStateChanged => _bluetoothStateStream.stream.distinct();
+  Stream<BluetoothState> get onBluetoothStateChanged =>
+      _bluetoothStateStream.stream.distinct();
 
   /// Returns the state of the bluetooth central
   BluetoothState get bluetoothState => _bluetoothState;
