@@ -22,6 +22,9 @@ class MyAppState extends State<MyApp> {
   final MidiCommand _midiCommand = MidiCommand();
 
   bool _virtualDeviceActivated = false;
+  bool _iOSNetworkSessionEnabled = false;
+
+  bool _didAskForBluetoothPermissions = false;
 
   @override
   void initState() {
@@ -41,15 +44,26 @@ class MyAppState extends State<MyApp> {
       }
       setState(() {});
     });
+
+    _updateNetworkSessionState();
   }
 
-  bool _didAskForBluetoothPermissions = false;
+
 
   @override
   void dispose() {
     _setupSubscription?.cancel();
     _bluetoothStateSubscription?.cancel();
     super.dispose();
+  }
+
+  _updateNetworkSessionState() async {
+    var nse = await _midiCommand.isNetworkSessionEnabled;
+    if (nse != null) {
+      setState(() {
+        _iOSNetworkSessionEnabled = nse;
+      });
+    }
   }
 
   IconData _deviceIconForType(String type) {
@@ -105,6 +119,15 @@ class MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('FlutterMidiCommand Example'),
           actions: <Widget>[
+            Switch(
+                value: _iOSNetworkSessionEnabled,
+                onChanged: (newValue) {
+                  _midiCommand.setNetworkSessionEnabled(newValue);
+                  setState(() {
+                    _iOSNetworkSessionEnabled = newValue;
+                  });
+
+                }),
             Switch(
                 value: _virtualDeviceActivated,
                 onChanged: (newValue) {

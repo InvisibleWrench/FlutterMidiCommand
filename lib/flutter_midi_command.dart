@@ -176,4 +176,18 @@ class MidiCommand {
   void removeVirtualDevice({String? name}) {
     _platform.removeVirtualDevice(name: name);
   }
+
+  /// Returns the current state of the network session
+  ///
+  /// This is functional on iOS only, will return null on other platforms
+  Future<bool?> get isNetworkSessionEnabled {
+    return _platform.isNetworkSessionEnabled;
+  }
+
+  /// Sets the enabled state of the network session
+  ///
+  /// This is functional on iOS only
+  void setNetworkSessionEnabled(bool enabled) {
+    _platform.setNetworkSessionEnabled(enabled);
+  }
 }
