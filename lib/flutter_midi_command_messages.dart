@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+
 import 'flutter_midi_command.dart';
 
 enum MessageType {
@@ -24,6 +25,7 @@ class MidiMessage {
 
   /// Send the message bytes to all connected devices
   void send() {
+    print("send $data");
     MidiCommand().sendData(data);
   }
 }
@@ -141,36 +143,75 @@ class SysExMessage extends MidiMessage {
   }
 }
 
-class NRPNMessage extends MidiMessage {
+class NRPN4Message extends MidiMessage {
   int channel;
   int parameter;
   int value;
 
-  /// NRPN Message
-  NRPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
+  /// NRPN Message with Value MSB and LSB bytes
+  NRPN4Message({this.channel = 0, this.parameter = 0, this.value = 0});
 
   @override
   void send() {
-    data = Uint8List(12);
+    parameter = parameter.clamp(0, 16383);
+    int parameterMSB = parameter ~/ 128;
+    int parameterLSB = parameter & 0x7F;
+
+    value = value.clamp(0, 16383);
+    int valueMSB = value ~/ 128;
+    int valueLSB = value & 0x7F;
+
+    data = Uint8List(9);
     // Data Entry MSB
     data[0] = 0xB0 + channel;
     data[1] = 0x63;
-    data[2] = parameter >> 7;
+    data[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x62;
-    data[5] = parameter & 0x7F;
+    data[3] = 0x62;
+    data[4] = parameterLSB;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = value >> 7;
+    data[5] = 0x06;
+    data[6] = valueMSB;
 
     // Data Value LSB
-    data[9] = 0xB0 + channel;
-    data[10] = 0x38;
-    data[11] = value & 0x7F;
+    data[7] = 0x26;
+    data[8] = valueLSB;
+
+    super.send();
+  }
+}
+
+class NRPN3Message extends MidiMessage {
+  int channel;
+  int parameter;
+  int value;
+
+  /// NRPN Message with single value byte
+  NRPN3Message({this.channel = 0, this.parameter = 0, this.value = 0});
+
+  @override
+  void send() {
+    parameter = parameter.clamp(0, 16383);
+    int parameterMSB = parameter ~/ 128;
+    int parameterLSB = parameter & 0x7F;
+
+    value = value & 0x7F;
+
+    data = Uint8List(7);
+    // Data Entry MSB
+    data[0] = 0xB0 + channel;
+    data[1] = 0x63;
+    data[2] = parameterMSB;
+
+    // Data Entry LSB
+    data[3] = 0x62;
+    data[4] = parameterLSB;
+
+    // Data Value
+    data[5] = 0x06;
+    data[6] = value;
 
     super.send();
   }
@@ -194,29 +235,23 @@ class NRPNHexMessage extends MidiMessage {
 
   @override
   void send() {
-    var length = valueLSB > -1 ? 12 : 9;
-    data = Uint8List(length);
+    data = Uint8List(9);
     // Data Entry MSB
     data[0] = 0xB0 + channel;
     data[1] = 0x63;
     data[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x62;
-    data[5] = parameterLSB;
+    data[3] = 0x62;
+    data[4] = parameterLSB;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = valueMSB;
+    data[5] = 0x06;
+    data[6] = valueMSB;
 
     // Data Value LSB
-    if (valueLSB > -1) {
-      data[9] = 0xB0 + channel;
-      data[10] = 0x38;
-      data[11] = valueLSB;
-    }
+    data[7] = 0x26;
+    data[8] = valueLSB;
 
     super.send();
   }
@@ -412,6 +447,46 @@ class ATMessage extends MidiMessage {
     data = Uint8List(2);
     data[0] = 0xD0 + channel;
     data[1] = pressure;
+    super.send();
+  }
+}
+
+class SenseMessage extends MidiMessage {
+  /// Sense Message
+
+  @override
+  void send() {
+    data = Uint8List(1);
+    data[0] = 0xFE;
+    super.send();
+  }
+}
+
+enum ClockType { beat, start, cont, stop }
+
+class ClockMessage extends MidiMessage {
+  ClockType type;
+
+  /// Clock Message
+  ClockMessage({this.type = ClockType.beat});
+
+  @override
+  void send() {
+    data = Uint8List(1);
+    switch (type) {
+      case ClockType.beat:
+        data[0] = 0xF8;
+        break;
+      case ClockType.start:
+        data[0] = 0xFA;
+        break;
+      case ClockType.cont:
+        data[0] = 0xFB;
+        break;
+      case ClockType.stop:
+        data[0] = 0xFC;
+        break;
+    }
     super.send();
   }
 }

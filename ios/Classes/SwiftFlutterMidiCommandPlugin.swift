@@ -111,11 +111,22 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             self.handleMIDINotification(notification)
         }
 
-#if os(iOS)
-         session = MIDINetworkSession.default()
-         session?.isEnabled = true
-         session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
-         #endif
+        #if os(iOS)
+        session = MIDINetworkSession.default()
+        session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
+        #endif
+    }
+    
+    func updateSetupState(data: Any) {
+        DispatchQueue.main.async {
+            self.setupStreamHandler.send(data:data)
+        }
+    }
+    
+    func updateBluetoothState(data: Any) {
+        DispatchQueue.main.async {
+            self.bluetoothStateHandler.send(data:data)
+        }
     }
 
 
@@ -163,11 +174,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
 
+    
+    // BLE
     public func startBluetoothCentralWhenNeeded(){
         if(manager == nil){
             manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
 
-          bluetoothStateHandler.send(data: getBluetoothCentralStateAsString())
+            updateBluetoothState(data: getBluetoothCentralStateAsString())
         }
     }
 
@@ -286,7 +299,21 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let name = extractName(arguments: call.arguments) ?? appName()
             removeOwnVirtualDevice(name: name)
             result(nil)
-            break;            
+            break;
+        
+        case "enableNetworkSession":
+            if let enabled = call.arguments as? Bool {
+                #if os(iOS)
+                session?.isEnabled = enabled
+                #endif
+            }
+
+        case "isNetworkSessionEnabled":
+            #if os(iOS)
+                result(session?.isEnabled ?? false)
+            #else
+                result(nil)
+            #endif
                     
         default:
             result(FlutterMethodNotImplemented)
@@ -297,9 +324,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         for device in connectedDevices {
             disconnectDevice(deviceId: device.value.id)
         }
-        #if os(iOS)
-        session?.isEnabled = false
-        #endif
     }
 
 
@@ -323,7 +347,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if let device = device {
                 connectedDevices[device.id] = device
                 (device as ConnectedOwnVirtualDevice).isConnected = true
-                setupStreamHandler.send(data: "deviceConnected")
+                updateSetupState(data: "deviceConnected")
                 if let result = ongoingConnections[deviceId] {
                     result(nil)
                 }
@@ -334,7 +358,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 : ConnectedVirtualDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             print("connected to \(device) \(deviceId)")
             connectedDevices[deviceId] = device
-            setupStreamHandler.send(data: "deviceConnected")
+            updateSetupState(data: "deviceConnected")
             if let result = ongoingConnections[deviceId] {
                 result(nil)
             }
@@ -351,12 +375,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             } else if device.deviceType == "own-virtual" {
                 print("disconnected MIDI")
                 (device as! ConnectedOwnVirtualDevice).isConnected = false
-                setupStreamHandler.send(data: "deviceDisconnected")
+                updateSetupState(data: "deviceDisconnected")
             }
             else {
                 print("disconnected MIDI")
                 device.close()
-                setupStreamHandler.send(data: "deviceDisconnected")
+                updateSetupState(data: "deviceDisconnected")
             }
             connectedDevices.removeValue(forKey: deviceId)
         }
@@ -540,8 +564,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" : id,
                 "type" : "BLE",
                 "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false]],
-                "outputs" : [["id":0, "connected":false]]
+                "inputs" : [["id":0, "connected":false] as [String:Any]],
+                "outputs" : [["id":0, "connected":false] as [String:Any]]
                 ])
         }
 
@@ -560,8 +584,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         "id" : key,
                         "type" : "BLE",
                         "connected":"true",
-                        "inputs" : [["id":0, "connected":true]],
-                        "outputs" : [["id":0, "connected":true]]
+                        "inputs" : [["id":0, "connected":true] as [String:Any]],
+                        "outputs" : [["id":0, "connected":true] as [String:Any]]
                         ])
                 }
             }
@@ -670,7 +694,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         let notification = midiNotification.pointee
         print("MIDI Notify, messageId= \(notification.messageID) \(notification.messageSize)")
 
-        setupStreamHandler.send(data: "\(notification.messageID)")
+        updateSetupState(data: "\(notification.messageID)")
 
         switch notification.messageID {
 
@@ -845,7 +869,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 //                print("destination name \(name)")
                 //            }
             }
-            setupStreamHandler.send(data: "\(#function) \(notification)")
+            updateSetupState(data: "\(#function) \(notification)")
         }
 
     @objc func midiNetworkContactsChanged(notification:NSNotification) {
@@ -857,7 +881,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("contact \(con)")
             }
         }
-        setupStreamHandler.send(data: "\(#function) \(notification)")
+        updateSetupState(data: "\(#function) \(notification)")
     }
     #endif
 
@@ -866,14 +890,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     // Central
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         print("central did update state \(getBluetoothCentralStateAsString())")
-        bluetoothStateHandler.send(data: getBluetoothCentralStateAsString());
+        updateBluetoothState(data: getBluetoothCentralStateAsString());
     }
 
     public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         print("central didDiscover \(peripheral)")
         if !discoveredDevices.contains(peripheral) {
             discoveredDevices.insert(peripheral)
-            setupStreamHandler.send(data: "deviceAppeared")
+            updateSetupState(data: "deviceAppeared")
         }
     }
 
@@ -885,14 +909,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("central did fail to connect state \(peripheral) \(String(describing: error?.localizedDescription))")
 
-        setupStreamHandler.send(data: "connectionFailed")
+        updateSetupState(data: "connectionFailed")
         connectedDevices.removeValue(forKey: peripheral.identifier.uuidString)
     }
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
 
-        setupStreamHandler.send(data: "deviceDisconnected")
+        updateSetupState(data: "deviceDisconnected")
     }
 }
 
@@ -963,9 +987,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 
 
       deviceInfo = ["name" : name,
-                        "id": String(id),
-                        "type":type,
-                        "connected": String(true),]
+                    "id": String(id),
+                    "type":type,
+                    "connected": String(true),]
 
     super.init(id: id, type: type, streamHandler: streamHandler)
   }
@@ -1079,9 +1103,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
                 sysExBuffer.append(midiByte)
                 if (midiInt == 0xF7) {
                   // Sysex complete
-//                print("rx sysex \(sysExBuffer)")
-                    streamHandler.send(data: ["data": sysExBuffer, "timestamp":timestamp, "device":deviceInfo])
-
+                  DispatchQueue.main.async {
+                    self.streamHandler.send(data: ["data": self.sysExBuffer, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
+                  }
                   parserState = PARSER_STATE.HEADER
                 }
                 break
@@ -1098,7 +1122,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     func finalizeMessageIfComplete(timestamp: UInt64) {
         if (midiBuffer.count == midiPacketLength) {
             let midiData = ["data": midiBuffer, "timestamp":timestamp, "device":deviceInfo] as [String : Any]
-            streamHandler.send(data: midiData)
+            DispatchQueue.main.async {
+                self.streamHandler.send(data: midiData)
+            }
           parserState = PARSER_STATE.HEADER
         }
       }
@@ -1634,7 +1660,10 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 self.characteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
                 print("set up characteristic for device")
-                setupStream?.send(data: "deviceConnected")
+                DispatchQueue.main.async {
+                    self.setupStream?.send(data: "deviceConnected")
+                }
+                
                 if let res = connectResult {
                 print("callback result")
                     res(nil)
@@ -1653,10 +1682,12 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     func createMessageEvent(_ bytes:[UInt8], timestamp:UInt64, peripheral:CBPeripheral) {
 //        print("send rx event \(bytes)")
         let data = Data(bytes: bytes, count: Int(bytes.count))
-        streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":[
-                                                            "name" : peripheral.name ?? "-",
-                                        "id":peripheral.identifier.uuidString,
-                                                                    "type":"BLE"]])
+        DispatchQueue.main.async {
+            self.streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":[
+                "name" : peripheral.name ?? "-",
+                "id":peripheral.identifier.uuidString,
+                "type":"BLE"]] as [String:Any])
+        }
     }
 
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {

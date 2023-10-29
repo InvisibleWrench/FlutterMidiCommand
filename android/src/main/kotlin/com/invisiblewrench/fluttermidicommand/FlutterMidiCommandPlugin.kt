@@ -427,6 +427,8 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     }
   }
 
+
+
   fun disconnectDevice(deviceId: String) {
     print("disconnect device $deviceId")
     connectedDevices[deviceId]?.also {
@@ -571,7 +573,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       device?.also {
-        Log.d("FlutterMIDICommand", "device added $it")
+        Log.d("FlutterMIDICommand", "MIDI device added $it")
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceFound")
       }
     }
@@ -591,7 +593,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
     override fun onDeviceStatusChanged(status: MidiDeviceStatus?) {
       super.onDeviceStatusChanged(status)
-      Log.d("FlutterMIDICommand","device status changed ${status.toString()}")
+      Log.d("FlutterMIDICommand","MIDI device status changed ${status.toString()}")
 
       status?.also {
         connectedDevices[NativeDevice.deviceIdForInfo(it.deviceInfo)]?.also {

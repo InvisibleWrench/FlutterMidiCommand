@@ -1,3 +1,24 @@
+## 0.4.15
+Fixed more threading bugs on iOS
+Added iOS specific API for enabling Network Session (not implemented on other platforms)
+
+## 0.4.14
+Updated FFI dependency for Linux to ^2.0.0
+
+## 0.4.13
+Fixed Linux package dependency
+
+## 0.4.12
+Fixed threading issue on iOS
+Added MIDI Sense and Clock messages
+
+## 0.4.11
+Merge PRs from anzbert, bringing example app and gradle settings up to date
+
+## 0.4.10
+Fixed NRPN Messages
+Added NRPN to example app
+
 ## 0.4.9
 Updated Android permissions.
 Example fix

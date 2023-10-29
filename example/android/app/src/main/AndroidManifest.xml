@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.invisiblewrench.flutter_midi_command_example">
 
     <application
         android:label="fluttermidicommand_example"
