@@ -13,7 +13,7 @@ dependencies:
     sdk: flutter
   flutter_midi_command_platform_interface: ^0.4.1
   flutter_midi_command_linux: ^0.3.0
-  flutter_midi_command_windows: ^0.0.1-dev.7
+  flutter_midi_command_windows: ^0.0.1-dev.8
 
 dev_dependencies:
   flutter_test:
