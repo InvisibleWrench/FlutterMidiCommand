@@ -2,7 +2,19 @@ import 'dart:typed_data';
 
 import 'flutter_midi_command.dart';
 
-enum MessageType { CC, PC, NoteOn, NoteOff, NRPN, RPN, SYSEX, Beat, PolyAT, AT, PitchBend }
+enum MessageType {
+  CC,
+  PC,
+  NoteOn,
+  NoteOff,
+  NRPN,
+  RPN,
+  SYSEX,
+  Beat,
+  PolyAT,
+  AT,
+  PitchBend
+}
 
 class MidiMessage {
   /// Byte data of the message
@@ -450,7 +462,7 @@ class SenseMessage extends MidiMessage {
   }
 }
 
-enum ClockType {beat, start, cont, stop}
+enum ClockType { beat, start, cont, stop }
 
 class ClockMessage extends MidiMessage {
   ClockType type;
