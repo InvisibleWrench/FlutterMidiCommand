@@ -8,7 +8,7 @@ Supports
 | Transports | iOS | macos | Android | Linux | Windows |
 |---|---|---|---|---|---|
 | USB | &check; | &check; | &check; | &check; | &check; |
-| BLE | &check; | &check; | &check; | &cross; | &cross; |
+| BLE | &check; | &check; | &check; | &cross; | &check; |
 | Virtual | &check; | &check; | &check; | &cross; | &cross; |
 | Network Session | &check; | &check; | &cross; | &cross; | &cross; |
 
