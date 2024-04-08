@@ -998,8 +998,8 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     if let ep = outEndpoint {
       let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
       var packet = MIDIPacketListInit(packetList)
-      let time = timestamp ?? mach_absolute_time()
-      packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
+      let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
+      packet = MIDIPacketListAdd(packetList, MemoryLayout.size(ofValue: packetList), packet, time, bytes.count, bytes)
 
       let status = MIDISend(outputPort, ep, packetList)
       if(status != noErr){
