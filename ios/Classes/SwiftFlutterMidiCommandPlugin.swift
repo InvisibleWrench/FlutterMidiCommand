@@ -995,11 +995,14 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
   }
 
   override func send(bytes: [UInt8], timestamp: UInt64?) {
+      print("send \(bytes.count) bytes to \(String(describing: name))")
+      
     if let ep = outEndpoint {
       let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
       var packet = MIDIPacketListInit(packetList)
       let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
-      packet = MIDIPacketListAdd(packetList, MemoryLayout.size(ofValue: packetList), packet, time, bytes.count, bytes)
+    
+        packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
       let status = MIDISend(outputPort, ep, packetList)
       if(status != noErr){
@@ -1205,6 +1208,8 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         print("open native ports")
 
         if let e = entity {
+            
+            let ref = Unmanaged.passUnretained(self).toOpaque()
 
             if let ps = ports {
                 for port in ps {
@@ -1212,7 +1217,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
 
                     switch port.type {
                     case "MidiPortType.IN":
-                        let status = MIDIPortConnectSource(inputPort, inSource!, &name)
+                        let status = MIDIPortConnectSource(inputPort, inSource!, ref)
                         print("port open status \(status)")
                     case "MidiPortType.OUT":
                         outEndpoint = MIDIEntityGetDestination(e, port.id)
@@ -1225,7 +1230,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             } else {
                 print("open default ports")
                 inSource = MIDIEntityGetSource(e, 0)
-                let status = MIDIPortConnectSource(inputPort, inSource!, &name)
+                let status = MIDIPortConnectSource(inputPort, inSource!, ref)
                 if(status != noErr){
                     print("Error \(status) while calling MIDIPortConnectSource");
                 }
@@ -1307,7 +1312,8 @@ class ConnectedVirtualDevice : ConnectedVirtualOrNativeDevice {
   override func openPorts() {
 
     if(inSource != nil){
-        MIDIPortConnectSource(inputPort, inSource!, &name);
+        let ref = Unmanaged.passUnretained(self).toOpaque()
+        MIDIPortConnectSource(inputPort, inSource!, ref);
     }
   }
 }
