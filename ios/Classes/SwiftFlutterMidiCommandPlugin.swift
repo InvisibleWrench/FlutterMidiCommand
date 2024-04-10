@@ -1340,7 +1340,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
 
         let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
         var packet = MIDIPacketListInit(packetList)
-        let time = timestamp ?? mach_absolute_time()
+        let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
         packet = MIDIPacketListAdd(packetList, MemoryLayout.size(ofValue: packetList), packet, time, bytes.count, bytes)
 
         let status = MIDIReceived(virtualSourceEndpoint, packetList)
