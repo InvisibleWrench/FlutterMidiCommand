@@ -1000,88 +1000,51 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
       
     if let ep = outEndpoint {
         
-//        let sysExLength = bytes.count
-//        let sysExPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: sysExLength)
-//        sysExPointer.initialize(from: bytes, count: sysExLength)
-//        
-//        print("sysExPointer \(sysExPointer)")
-//        
-//        var sysExRequest = MIDISysexSendRequest(destination: ep, data: sysExPointer,
-//                                                bytesToSend: UInt32(sysExLength),
-//                                                complete: false,
-//                                                reserved: (0, 0, 0),
-//                                                completionProc: { (requestPointer) -> Void in
-//            // Handle completion. You may want to deallocate the SysEx message buffer here.
-//            print("done dealloc \(requestPointer)")
-////            requestPointer.pointee.data.deallocate()
-//        },
-//            completionRefCon: nil
-//        )
-////        sysExRequest.completionRefCon = UnsafeMutableRawPointer. sysExRequest
-//        
-//
-//        let result = MIDISendSysex(&sysExRequest)
-//        if result != noErr {
-//            print("Failed to send SysEx message: \(result)")
-//        }
+        let maxPacketSize = 256 // Maximum size for a single packet's data field
+        var offset = 0
         
-        let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
-        var packet = MIDIPacketListInit(packetList)
-        let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
-    
-        packet = MIDIPacketListAdd(packetList, 65650, packet, time, bytes.count, bytes)
-
-        let status = MIDISend(outputPort, ep, packetList)
-        
-//        do {
-//            let packetList = try packBytes(bytes)
-//            if let list = packetList {
-//                
-//                let unsafeMutablePointer = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
-//                unsafeMutablePointer.pointee = list
-//                
-//                let status = MIDISend(outputPort, ep, unsafeMutablePointer)
-//                print("sent some stuff")
-//                
-//                defer {
-//                    
-//                    unsafeMutablePointer.deallocate()
-//                    unsafeMutablePointer.deinitialize(count: 1)
-//                    
-//                }
-//                
-//                
-//                if(status != 0){
-//                    print("Error \(status) while sending MIDI to virtual or physical destination")
-//                }
-//            }
-//        } catch {
-//               print(error)
-//           }
-
-        print("send \(bytes.count) bytes on port \(outputPort) \(ep) status \(status)")
-        
-        
-            //       packetList.deallocate()
-//            packetList.deinitialize(count: 1)
+        while offset < bytes.count {
+            var packetList = MIDIPacketList()
+            
+            // Calculate the size of the current chunk
+            let chunkSize = min(maxPacketSize, bytes.count - offset)
+            let chunk = Array(bytes[offset..<offset + chunkSize])
+            let ts = timestamp ?? mach_absolute_time()
+            
+            // Create the packet
+            chunk.withUnsafeBufferPointer { buffer in
+                packetList = buffer.withMemoryRebound(to: UInt8.self) { dataBuffer in
+                    var tempPacketList = MIDIPacketList(numPackets: 1, packet: MIDIPacket())
+                    
+                    var packet = MIDIPacket()
+                    packet.timeStamp = ts
+                    packet.length = UInt16(dataBuffer.count)
+                    withUnsafeMutablePointer(to: &packet.data) {
+                        $0.withMemoryRebound(to: UInt8.self, capacity: dataBuffer.count) { dataPtr in
+                            for i in 0..<dataBuffer.count {
+                                dataPtr[i] = dataBuffer[i]
+                            }
+                        }
+                    }
+                    
+                    tempPacketList.packet = packet
+                    return tempPacketList
+                }
+            }
+            
+            // Send the packet
+            let res = withUnsafePointer(to: &packetList) { packetListPointer in
+                MIDISend(outputPort, ep, packetListPointer)
+            }
+            
+            // Move to the next chunk
+            offset += chunkSize
+        }
         
     } else {
       print("No MIDI destination for id \(name!)")
     }
   }
-    
-  func packBytes(_ bytes: [UInt8]) throws -> MIDIPacketList? {
-        let numberOfEvents: UInt32 = UInt32(bytes.count)
-        guard numberOfEvents > 0 else { return nil }
-        
-        let dataSize: Int = bytes.count
-
-        var outPackets = MIDIPacketList()
-        let writePacketPtr = MIDIPacketListInit(&outPackets)
-        MIDIPacketListAdd(&outPackets, Int(14 + dataSize), writePacketPtr, 0, dataSize, bytes)
-        
-        return outPackets
-    }
 
   override func close() {
     // We did not create the endpoint so we should not dispose it.
@@ -1414,7 +1377,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
         var packet = MIDIPacketListInit(packetList)
         let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
-        packet = MIDIPacketListAdd(packetList, MemoryLayout.size(ofValue: packetList), packet, time, bytes.count, bytes)
+        packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
 
         let status = MIDIReceived(virtualSourceEndpoint, packetList)
         if(status != noErr){

@@ -51,14 +51,7 @@ class _HomeViewState extends State<HomeView> {
     final data = Uint8List(length);
     data[0] = 0xF0;
     data[length - 1] = 0xF7;
-    _sendData(data);
-  }
-
-  void _sendData(Uint8List data) async {
-    final devices = await midi.devices ?? [];
-    for (final device in devices) {
-      midi.sendData(data, deviceId: device.id);
-    }
+    midi.sendData(data);
   }
 
   @override
