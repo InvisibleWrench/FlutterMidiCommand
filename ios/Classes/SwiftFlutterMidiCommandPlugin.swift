@@ -1033,7 +1033,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             }
             
             // Send the packet
-            let res = withUnsafePointer(to: &packetList) { packetListPointer in
+            _ = withUnsafePointer(to: &packetList) { packetListPointer in
                 MIDISend(outputPort, ep, packetListPointer)
             }
             
