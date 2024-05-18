@@ -461,10 +461,46 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     func createPortDict(count:Int) -> Array<Dictionary<String, Any>> {
         return (0..<count).map { (id) -> Dictionary<String, Any> in
-            return ["id": id, "connected" : false]
+            return ["id": id, "connected" : false, "name": ""]
         }
     }
 
+    private func createPortDictForDestinations(for entity: MIDIEntityRef) -> Array<Dictionary<String, Any>> {
+        let count = MIDIEntityGetNumberOfDestinations(entity)
+        var ports = [Dictionary<String, Any>]()
+        for index in 0..<count {
+            let endpoint = MIDIEntityGetDestination(entity, index)
+            let name = getMIDIEndpointName(endpoint)
+            ports.append(["id": index, "connected" : false, "name": name ?? ""])
+        }
+        return ports
+    }
+
+    private func createPortDictForSources(for entity: MIDIEntityRef) -> Array<Dictionary<String, Any>> {
+        let count = MIDIEntityGetNumberOfSources(entity)
+        var ports = [Dictionary<String, Any>]()
+        for index in 0..<count {
+            let endpoint = MIDIEntityGetSource(entity, index)
+            let name = getMIDIEndpointName(endpoint)
+            ports.append(["id": index, "connected" : false, "name": name ?? ""])
+        }
+        return ports
+    }
+
+    func getMIDIEndpointName(_ endpoint: MIDIEndpointRef) -> String? {
+        var cfName: Unmanaged<CFString>?
+        let result = MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, &cfName)
+        
+        if result != noErr {
+            return nil
+        }
+        
+        guard let cfString = cfName?.takeRetainedValue() else {
+            return nil
+        }
+        
+        return cfString as String
+    }
     
     func getDevices() -> [Dictionary<String, Any>] {
         var devices:[Dictionary<String, Any>] = []
@@ -522,7 +558,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" :  deviceId,
                 "type" : isNetwork ? "network" : "native",
                 "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
-                "outputs" : createPortDict(count: entityDestinationCount)
+                "outputs" : createPortDictForDestinations(for: entity)
                 ]
         }
         
@@ -570,7 +606,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             
             if var deviceDict = nativeDevices[entity] {
 //                print("add inputs to dict")
-                deviceDict["inputs"] = createPortDict(count: entitySourceCount)
+                deviceDict["inputs"] = createPortDictForSources(for: entity)
 //                print(type(of: createPortDict(count: entitySourceCount)))
                 nativeDevices[entity] = deviceDict
             } else {
@@ -580,7 +616,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                     "id" : deviceId,
                     "type" : isNetwork ? "network" : "native",
                     "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
-                    "inputs" : createPortDict(count: entitySourceCount)
+                    "inputs" : createPortDictForSources(for: entity)
                     ]
             }
         }
@@ -598,8 +634,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" : id,
                 "type" : "BLE",
                 "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false] as [String:Any]],
-                "outputs" : [["id":0, "connected":false] as [String:Any]]
+                "inputs" : [["id":0, "connected":false, "name": ""] as [String:Any]],
+                "outputs" : [["id":0, "connected":false, "name": ""] as [String:Any]]
                 ])
         }
 
@@ -618,8 +654,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         "id" : key,
                         "type" : "BLE",
                         "connected":"true",
-                        "inputs" : [["id":0, "connected":true] as [String:Any]],
-                        "outputs" : [["id":0, "connected":true] as [String:Any]]
+                        "inputs" : [["id":0, "connected":true, "name": ""] as [String:Any]],
+                        "outputs" : [["id":0, "connected":true, "name": ""] as [String:Any]]
                         ])
                 }
             }
