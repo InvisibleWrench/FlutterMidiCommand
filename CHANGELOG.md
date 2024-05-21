@@ -1,3 +1,6 @@
+## 0.4.16
+Fixed SysEx error on macOS when sending big data chunks of SysEx
+
 ## 0.4.15
 Fixed more threading bugs on iOS
 Added iOS specific API for enabling Network Session (not implemented on other platforms)
