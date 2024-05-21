@@ -1,9 +1,9 @@
 
 #if os(macOS)
-    import FlutterMacOS
- #else
-    import Flutter
- #endif
+import FlutterMacOS
+#else
+import Flutter
+#endif
 
 import CoreMIDI
 import os.log
@@ -19,14 +19,14 @@ import CoreVideo
 /// https://learn.sparkfun.com/tutorials/midi-ble-tutorial/all
 
 func isVirtualEndpoint(endpoint: MIDIEndpointRef) -> Bool {
-  var entity : MIDIEntityRef = 0
-  MIDIEndpointGetEntity(endpoint, &entity)
-  let result = entity == 0;
-  return result;
+    var entity : MIDIEntityRef = 0
+    MIDIEndpointGetEntity(endpoint, &entity)
+    let result = entity == 0;
+    return result;
 }
 
 func displayName(endpoint: MIDIEndpointRef) -> String {
-  return SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint);
+    return SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint);
 }
 
 func appName() -> String {
@@ -38,7 +38,7 @@ func stringToId(str: String) -> UInt32 {
 }
 
 public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, FlutterPlugin {
-
+    
     // MIDI
     var midiClient = MIDIClientRef()
     var connectedDevices = Dictionary<String, ConnectedDevice>()
@@ -46,76 +46,76 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     // Flutter
     var midiRXChannel:FlutterEventChannel?
     var rxStreamHandler = StreamHandler()
-
+    
     var midiSetupChannel:FlutterEventChannel?
     var setupStreamHandler = StreamHandler()
-
+    
     var bluetoothStateChannel: FlutterEventChannel?
     var bluetoothStateHandler = StreamHandler()
     
-
-    #if os(iOS)
+    
+#if os(iOS)
     // Network Session
     var session:MIDINetworkSession?
-    #endif
-
+#endif
+    
     // BLE
     var manager:CBCentralManager!
     var discoveredDevices:Set<CBPeripheral> = []
-
-
+    
+    
     var ongoingConnections = Dictionary<String, FlutterResult>()
     
-
+    
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
-
+    
     public static func register(with registrar: FlutterPluginRegistrar) {
-        #if os(macOS)
-            let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger)
-        #else
-            let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger())
-        #endif
+#if os(macOS)
+        let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger)
+#else
+        let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger())
+#endif
         let instance = SwiftFlutterMidiCommandPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
-
+        
         instance.setup(registrar)
     }
-
+    
     deinit {
         NotificationCenter.default.removeObserver(self)
         MIDIClientDispose(midiClient)
     }
-
+    
     func setup(_ registrar: FlutterPluginRegistrar) {
         // Stream setup
-        #if os(macOS)
-            midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger)
-        #else
-            midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger())
-        #endif
+#if os(macOS)
+        midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger)
+#else
+        midiRXChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/rx_channel", binaryMessenger: registrar.messenger())
+#endif
         midiRXChannel?.setStreamHandler(rxStreamHandler)
-
-
-        #if os(macOS)
-            midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger)
-            bluetoothStateChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state", binaryMessenger: registrar.messenger)
-        #else
-            midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger())
-            bluetoothStateChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state", binaryMessenger: registrar.messenger())
-        #endif
+        
+        
+#if os(macOS)
+        midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger)
+        bluetoothStateChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state", binaryMessenger: registrar.messenger)
+#else
+        midiSetupChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/setup_channel", binaryMessenger: registrar.messenger())
+        bluetoothStateChannel = FlutterEventChannel(name: "plugins.invisiblewrench.com/flutter_midi_command/bluetooth_central_state", binaryMessenger: registrar.messenger())
+#endif
         midiSetupChannel?.setStreamHandler(setupStreamHandler)
         bluetoothStateChannel?.setStreamHandler(bluetoothStateHandler)
-
-
+        
+        
         // MIDI client with notification handler
         MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &midiClient) { (notification) in
             self.handleMIDINotification(notification)
         }
-
-        #if os(iOS)
+        
+#if os(iOS)
         session = MIDINetworkSession.default()
         session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
-        #endif
+#endif
     }
     
     func updateSetupState(data: Any) {
@@ -129,8 +129,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             self.bluetoothStateHandler.send(data:data)
         }
     }
-
-
+    
+    
     func extractName(arguments: Any?) -> String?{
         var name: String? = nil
         if let packet = arguments as? Dictionary<String, Any> {
@@ -138,53 +138,53 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
         return name
     }
-
-
+    
+    
     // Create an own virtual device appearing in other apps.
     // Other apps can use that device to send and receive MIDI to and from this app.
     var ownVirtualDevices = Set<ConnectedOwnVirtualDevice>()
-
+    
     func findOrCreateOwnVirtualDevice(name: String) -> ConnectedOwnVirtualDevice{
         let existingDevice = ownVirtualDevices.first(where: { device in
             device.name == name
         })
-
+        
         let result = existingDevice ?? ConnectedOwnVirtualDevice(name: name, streamHandler: rxStreamHandler, client: midiClient);
         if(existingDevice == nil){
             ownVirtualDevices.insert(result)
         }
-
+        
         return result
     }
-
+    
     func removeOwnVirtualDevice(name: String){
         let existingDevice = ownVirtualDevices.first(where: { device in
             device.name == name
         })
-
+        
         if let existingDevice = existingDevice {
             existingDevice.close()
             ownVirtualDevices.remove(existingDevice)
         }
     }
-
+    
     // Check if an endpoint is an own virtual destination or source
     func isOwnVirtualEndpoint(endpoint: MIDIEndpointRef) -> Bool{
         return ownVirtualDevices.contains { device in
             device.virtualSourceEndpoint == endpoint || device.virtualDestinationEndpoint == endpoint
         }
     }
-
+    
     
     // BLE
     public func startBluetoothCentralWhenNeeded(){
         if(manager == nil){
             manager = CBCentralManager.init(delegate: self, queue: DispatchQueue.global(qos: .userInteractive))
-
+            
             updateBluetoothState(data: getBluetoothCentralStateAsString())
         }
     }
-
+    
     public func getBluetoothCentralStateAsString() -> String {
         startBluetoothCentralWhenNeeded();
         switch(manager.state){
@@ -204,17 +204,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             return "other"
         }
     }
-
+    
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-//        print("call method \(call.method)")
+        //        print("call method \(call.method)")
         switch call.method {
         case "startBluetoothCentral":
             startBluetoothCentralWhenNeeded();
             result(nil);
             break;
         case "bluetoothState":
-          result(getBluetoothCentralStateAsString());
-          break;
+            result(getBluetoothCentralStateAsString());
+            break;
         case "scanForDevices":
             startBluetoothCentralWhenNeeded();
             print("\(manager.state.rawValue)")
@@ -272,7 +272,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
             result(nil)
             break
-
+            
         case "sendData":
             if let packet = call.arguments as? Dictionary<String, Any> {
                 sendData(packet["data"] as! FlutterStandardTypedData, deviceId: packet["deviceId"] as? String, timestamp: packet["timestamp"] as? UInt64)
@@ -284,7 +284,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         case "teardown":
             teardown()
             break
-
+            
         case "addVirtualDevice":
             let name = extractName(arguments: call.arguments) ?? appName()
             let ownVirtualDevice = findOrCreateOwnVirtualDevice(name: name)
@@ -292,30 +292,30 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if(error != nil){
                 removeOwnVirtualDevice(name: name)
             }
-
+            
             result(error == nil ? error : FlutterError.init(code: "AUDIOERROR", message: error, details: call.arguments))
             break;
-
+            
         case "removeVirtualDevice":
             let name = extractName(arguments: call.arguments) ?? appName()
             removeOwnVirtualDevice(name: name)
             result(nil)
             break;
-        
+            
         case "enableNetworkSession":
             if let enabled = call.arguments as? Bool {
-                #if os(iOS)
+#if os(iOS)
                 session?.isEnabled = enabled
-                #endif
+#endif
             }
-
+            
         case "isNetworkSessionEnabled":
-            #if os(iOS)
-                result(session?.isEnabled ?? false)
-            #else
-                result(nil)
-            #endif
-                    
+#if os(iOS)
+            result(session?.isEnabled ?? false)
+#else
+            result(nil)
+#endif
+            
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -326,11 +326,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             disconnectDevice(deviceId: device.value.id)
         }
     }
-
-
+    
+    
     func connectToDevice(deviceId:String, type:String, ports:[Port]?) {
         print("connect \(deviceId) \(type)")
-                
+        
         if type == "BLE" {
             if let periph = discoveredDevices.filter({ (p) -> Bool in p.identifier.uuidString == deviceId }).first {
                 let device = ConnectedBLEDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, result:ongoingConnections[deviceId], peripheral: periph, ports:ports)
@@ -344,7 +344,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             let device = ownVirtualDevices.first { device in
                 String(device.id) == deviceId
             }
-
+            
             if let device = device {
                 connectedDevices[device.id] = device
                 (device as ConnectedOwnVirtualDevice).isConnected = true
@@ -356,7 +356,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         } else // if type == "native" || if type == "virtual"
         {
             let device = (type == "native" || type == "network") ? ConnectedNativeDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
-                : ConnectedVirtualDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
+            : ConnectedVirtualDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             print("connected to \(device) \(deviceId)")
             connectedDevices[deviceId] = device
             updateSetupState(data: "deviceConnected")
@@ -365,7 +365,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             }
         }
     }
-
+    
     func disconnectDevice(deviceId:String) {
         let device = connectedDevices[deviceId]
         print("disconnect \(String(describing: device)) for id \(deviceId)")
@@ -386,8 +386,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             connectedDevices.removeValue(forKey: deviceId)
         }
     }
-
-
+    
+    
     func sendData(_ data:FlutterStandardTypedData, deviceId: String?, timestamp: UInt64?) {
         let bytes = [UInt8](data.data)
         
@@ -402,7 +402,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
     }
     
-
+    
     static func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
         var param: Unmanaged<CFString>?
         var result: String = "Error"
@@ -410,45 +410,45 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         if err == OSStatus(noErr) { result = param!.takeRetainedValue() as String }
         return result
     }
-
-    static func isNetwork(device:MIDIObjectRef) -> Bool {
-            var isNetwork:Bool = false
-
-            var list: Unmanaged<CFPropertyList>?
-            MIDIObjectGetProperties(device, &list, true)
-            if let list = list {
-                let dict = list.takeRetainedValue() as! NSDictionary
-                if dict["apple.midirtp.session"] != nil {
-                    isNetwork = true
-                }
-            }
-            return isNetwork
-        }
     
-
+    static func isNetwork(device:MIDIObjectRef) -> Bool {
+        var isNetwork:Bool = false
+        
+        var list: Unmanaged<CFPropertyList>?
+        MIDIObjectGetProperties(device, &list, true)
+        if let list = list {
+            let dict = list.takeRetainedValue() as! NSDictionary
+            if dict["apple.midirtp.session"] != nil {
+                isNetwork = true
+            }
+        }
+        return isNetwork
+    }
+    
+    
     func createPortDict(count:Int) -> Array<Dictionary<String, Any>> {
         return (0..<count).map { (id) -> Dictionary<String, Any> in
             return ["id": id, "connected" : false]
         }
     }
-
+    
     
     func getDevices() -> [Dictionary<String, Any>] {
         var devices:[Dictionary<String, Any>] = []
-
+        
         // ######
         // Native
         // ######
-      
+        
         var nativeDevices = Dictionary<MIDIEntityRef, Dictionary<String, Any>>()
         
         let destinationCount = MIDIGetNumberOfDestinations()
         for d in 0..<destinationCount {
             let destination = MIDIGetDestination(d)
-//            print("dest \(destination) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: destination))")
-
+            //            print("dest \(destination) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: destination))")
+            
             if(isVirtualEndpoint(endpoint: destination)){
-              continue;
+                continue;
             }
             
             var entity : MIDIEntityRef = 0
@@ -456,7 +456,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if(status != noErr){
                 print("Error \(status) while calling MIDIEndpointGetEntity");
             }
-
+            
             let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
             
             var device : MIDIDeviceRef = 0
@@ -464,25 +464,25 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if(status != noErr){
                 print("Error \(status) while calling MIDIEntityGetDevice");
             }
-
+            
             let name = displayName(endpoint: destination);
-
+            
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
-//            print("entityCount \(entityCount)")
+            //            print("entityCount \(entityCount)")
             
             var entityIndex = 0;
             for e in 0..<entityCount {
                 let ent = MIDIDeviceGetEntity(device, e)
-//                print("ent \(ent)")
+                //                print("ent \(ent)")
                 if (ent == entity) {
                     entityIndex = e
                 }
             }
-//            print("entityIndex \(entityIndex)")
-             let deviceId = "\(device):\(entityIndex)"
+            //            print("entityIndex \(entityIndex)")
+            let deviceId = "\(device):\(entityIndex)"
             
             let entityDestinationCount = MIDIEntityGetNumberOfDestinations(entity)
-//            print("entiry dest count \(entityDestinationCount)")
+            //            print("entiry dest count \(entityDestinationCount)")
             
             nativeDevices[entity] = [
                 "name" : name,
@@ -490,17 +490,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "type" : isNetwork ? "network" : "native",
                 "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
                 "outputs" : createPortDict(count: entityDestinationCount)
-                ]
+            ]
         }
         
         
         let sourceCount = MIDIGetNumberOfSources()
         for s in 0..<sourceCount {
             let source = MIDIGetSource(s)
-//            print("src \(source) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: source))")
-
+            //            print("src \(source) \(SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: source))")
+            
             if(isVirtualEndpoint(endpoint: source)){
-              continue;
+                continue;
             }
             
             var entity : MIDIEntityRef = 0
@@ -516,39 +516,39 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             if(status != noErr){
                 print("Error \(status) while calling MIDIEntityGetDevice");
             }
-
+            
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
-//            print("entityCount \(entityCount)")
+            //            print("entityCount \(entityCount)")
             
             var entityIndex = 0;
             for e in 0..<entityCount {
                 let ent = MIDIDeviceGetEntity(device, e)
-//                print("ent \(ent)")
+                //                print("ent \(ent)")
                 if (ent == entity) {
                     entityIndex = e
                 }
             }
-//            print("entityIndex \(entityIndex)")
-
+            //            print("entityIndex \(entityIndex)")
+            
             let deviceId = "\(device):\(entityIndex)"
             
             let entitySourceCount = MIDIEntityGetNumberOfSources(entity)
-//            print("entiry source count \(entitySourceCount)")
+            //            print("entiry source count \(entitySourceCount)")
             
             if var deviceDict = nativeDevices[entity] {
-//                print("add inputs to dict")
+                //                print("add inputs to dict")
                 deviceDict["inputs"] = createPortDict(count: entitySourceCount)
-//                print(type(of: createPortDict(count: entitySourceCount)))
+                //                print(type(of: createPortDict(count: entitySourceCount)))
                 nativeDevices[entity] = deviceDict
             } else {
-//                print("create inputs dict")
+                //                print("create inputs dict")
                 nativeDevices[entity] = [
                     "name" : name,
                     "id" : deviceId,
                     "type" : isNetwork ? "network" : "native",
                     "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
                     "inputs" : createPortDict(count: entitySourceCount)
-                    ]
+                ]
             }
         }
         
@@ -557,7 +557,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         // ######
         // BLE
         // ######
-
+        
         for periph:CBPeripheral in discoveredDevices {
             let id = periph.identifier.uuidString
             devices.append([
@@ -567,14 +567,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
                 "inputs" : [["id":0, "connected":false] as [String:Any]],
                 "outputs" : [["id":0, "connected":false] as [String:Any]]
-                ])
+            ])
         }
-
-
+        
+        
         // ###########
         // CONNECTED BLE DEVICES (which are no longer discoverable)
         // ###########
-
+        
         connectedDevices.forEach({ (key: String, value: ConnectedDevice) in
             if (value.deviceType == "BLE" && !discoveredDevices.contains(where: { periph in
                 periph.identifier.uuidString == key
@@ -587,91 +587,91 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         "connected":"true",
                         "inputs" : [["id":0, "connected":true] as [String:Any]],
                         "outputs" : [["id":0, "connected":true] as [String:Any]]
-                        ])
+                    ])
                 }
             }
         })
-
+        
         // #######
         // VIRTUAL
         // #######
-
+        
         var virtualDevices = Dictionary<MIDIEntityRef, Dictionary<String, Any>>()
-
+        
         for d in 0..<destinationCount {
-          let destination = MIDIGetDestination(d)
-
-          if(!isVirtualEndpoint(endpoint: destination)){
-            continue;
-          }
-
-          if(isOwnVirtualEndpoint(endpoint: destination)){
-            continue;
-          }
-
-          let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: destination);
-          let id = stringToId(str: displayName); // Will cause conflicts when multiple virtual endpoints with the same name exist
-
-          virtualDevices[id] = [
-            "name" : displayName,
-            "id" : "\(destination)",
-            "type" : "virtual",
-            "connected":(connectedDevices.keys.contains(String(destination)) ? "true" : "false"),
-            "outputs" : createPortDict(count: 1)
-          ]
-        }
-
-
-        for s in 0..<sourceCount {
-          let source = MIDIGetSource(s)
-
-          if(!isVirtualEndpoint(endpoint: source)){
-            continue;
-          }
-
-          if(isOwnVirtualEndpoint(endpoint: source)){
-            continue;
-          }
-
-          let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: source);
-          let id = stringToId(str: displayName);  // Will cause conflicts when multiple virtual endpoints with the same name exist
-
-
-          if var deviceDict = virtualDevices[id] {
-            deviceDict["inputs"] = createPortDict(count: 1)
-            let destination = deviceDict["id"] as? String ?? ""
-            let id2 = "\(destination):\(source)"
-            deviceDict["id"] = id2
-            deviceDict["connected"] = (connectedDevices.keys.contains(id2) ? "true" : "false")
-            virtualDevices[id] = deviceDict
-
-          } else {
-            //                print("create inputs dict")
-            let id2 = ":\(source)"
+            let destination = MIDIGetDestination(d)
+            
+            if(!isVirtualEndpoint(endpoint: destination)){
+                continue;
+            }
+            
+            if(isOwnVirtualEndpoint(endpoint: destination)){
+                continue;
+            }
+            
+            let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: destination);
+            let id = stringToId(str: displayName); // Will cause conflicts when multiple virtual endpoints with the same name exist
+            
             virtualDevices[id] = [
-              "name" : displayName,
-              "id" : id2,
-              "type" : "virtual",
-              "connected":(connectedDevices.keys.contains(id2) ? "true" : "false"),
-              "inputs" : createPortDict(count: 1)
+                "name" : displayName,
+                "id" : "\(destination)",
+                "type" : "virtual",
+                "connected":(connectedDevices.keys.contains(String(destination)) ? "true" : "false"),
+                "outputs" : createPortDict(count: 1)
             ]
-          }
         }
-
+        
+        
+        for s in 0..<sourceCount {
+            let source = MIDIGetSource(s)
+            
+            if(!isVirtualEndpoint(endpoint: source)){
+                continue;
+            }
+            
+            if(isOwnVirtualEndpoint(endpoint: source)){
+                continue;
+            }
+            
+            let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: source);
+            let id = stringToId(str: displayName);  // Will cause conflicts when multiple virtual endpoints with the same name exist
+            
+            
+            if var deviceDict = virtualDevices[id] {
+                deviceDict["inputs"] = createPortDict(count: 1)
+                let destination = deviceDict["id"] as? String ?? ""
+                let id2 = "\(destination):\(source)"
+                deviceDict["id"] = id2
+                deviceDict["connected"] = (connectedDevices.keys.contains(id2) ? "true" : "false")
+                virtualDevices[id] = deviceDict
+                
+            } else {
+                //                print("create inputs dict")
+                let id2 = ":\(source)"
+                virtualDevices[id] = [
+                    "name" : displayName,
+                    "id" : id2,
+                    "type" : "virtual",
+                    "connected":(connectedDevices.keys.contains(id2) ? "true" : "false"),
+                    "inputs" : createPortDict(count: 1)
+                ]
+            }
+        }
+        
         devices.append(contentsOf: virtualDevices.values)
-
-
-
+        
+        
+        
         // ###########
         // OWN VIRTUAL
         // ###########
-
+        
         var ownVirtualDevices = Dictionary<MIDIEntityRef, Dictionary<String, Any>>()
-
+        
         for ownVirtualDevice in self.ownVirtualDevices {
             let displayName = ownVirtualDevice.deviceName
             let id = stringToId(str: displayName)
-
+            
             ownVirtualDevices[id] = [
                 "name" : displayName,
                 "id" : "\(id)",
@@ -681,25 +681,25 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "inputs" : createPortDict(count: 1),
             ]
         }
-
+        
         devices.append(contentsOf: ownVirtualDevices.values)
-
-
+        
+        
         return devices;
     }
-
-
+    
+    
     func handleMIDINotification(_ midiNotification: UnsafePointer<MIDINotification>) {
         print("\ngot a MIDINotification!")
-
+        
         let notification = midiNotification.pointee
         print("MIDI Notify, messageId= \(notification.messageID) \(notification.messageSize)")
-
+        
         updateSetupState(data: "\(notification.messageID)")
-
+        
         switch notification.messageID {
-
-        // Some aspect of the current MIDISetup has changed.  No data.  Should ignore this  message if messages 2-6 are handled.
+            
+            // Some aspect of the current MIDISetup has changed.  No data.  Should ignore this  message if messages 2-6 are handled.
         case .msgSetupChanged:
             print("MIDI setup changed")
             let ptr = UnsafeMutablePointer<MIDINotification>(mutating: midiNotification)
@@ -709,14 +709,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             print("id \(m.messageID)")
             print("size \(m.messageSize)")
             break
-
-
-        // A device, entity or endpoint was added. Structure is MIDIObjectAddRemoveNotification.
+            
+            
+            // A device, entity or endpoint was added. Structure is MIDIObjectAddRemoveNotification.
         case .msgObjectAdded:
-
+            
             print("added")
             //            let ptr = UnsafeMutablePointer<MIDIObjectAddRemoveNotification>(midiNotification)
-
+            
             midiNotification.withMemoryRebound(to: MIDIObjectAddRemoveNotification.self, capacity: 1) {
                 let m = $0.pointee
                 print(m)
@@ -730,16 +730,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 showMIDIObjectType(m.parentType)
                 //                print("childName \(String(describing: getDisplayName(m.child)))")
             }
-
-
+            
+            
             break
-
-        // A device, entity or endpoint was removed. Structure is MIDIObjectAddRemoveNotification.
+            
+            // A device, entity or endpoint was removed. Structure is MIDIObjectAddRemoveNotification.
         case .msgObjectRemoved:
             print("kMIDIMsgObjectRemoved")
             //            let ptr = UnsafeMutablePointer<MIDIObjectAddRemoveNotification>(midiNotification)
             midiNotification.withMemoryRebound(to: MIDIObjectAddRemoveNotification.self, capacity: 1) {
-
+                
                 let m = $0.pointee
                 print(m)
                 print("id \(m.messageID)")
@@ -748,16 +748,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("child type \(m.childType)")
                 print("parent \(m.parent)")
                 print("parentType \(m.parentType)")
-
+                
                 //                print("childName \(String(describing: getDisplayName(m.child)))")
             }
             break
-
-        // An object's property was changed. Structure is MIDIObjectPropertyChangeNotification.
+            
+            // An object's property was changed. Structure is MIDIObjectPropertyChangeNotification.
         case .msgPropertyChanged:
             print("kMIDIMsgPropertyChanged")
             midiNotification.withMemoryRebound(to: MIDIObjectPropertyChangeNotification.self, capacity: 1) {
-
+                
                 let m = $0.pointee
                 print(m)
                 print("id \(m.messageID)")
@@ -766,27 +766,27 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 print("objectType  \(m.objectType)")
                 print("propertyName  \(m.propertyName)")
                 print("propertyName  \(m.propertyName.takeUnretainedValue())")
-
+                
                 if m.propertyName.takeUnretainedValue() as String == "apple.midirtp.session" {
                     print("connected")
                 }
             }
-
+            
             break
-
-        //     A persistent MIDI Thru connection wasor destroyed.  No data.
+            
+            //     A persistent MIDI Thru connection wasor destroyed.  No data.
         case .msgThruConnectionsChanged:
             print("MIDI thru connections changed.")
             break
-
-        //A persistent MIDI Thru connection was created or destroyed.  No data.
+            
+            //A persistent MIDI Thru connection was created or destroyed.  No data.
         case .msgSerialPortOwnerChanged:
             print("MIDI serial port owner changed.")
             break
-
+            
         case .msgIOError:
             print("MIDI I/O error.")
-
+            
             //let ptr = UnsafeMutablePointer<MIDIIOErrorNotification>(midiNotification)
             midiNotification.withMemoryRebound(to: MIDIIOErrorNotification.self, capacity: 1) {
                 let m = $0.pointee
@@ -801,78 +801,78 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             break
         }
     }
-
+    
     func showMIDIObjectType(_ ot: MIDIObjectType) {
         switch ot {
         case .other:
             os_log("midiObjectType: Other", log: midiLog, type: .debug)
             break
-
+            
         case .device:
             os_log("midiObjectType: Device", log: midiLog, type: .debug)
             break
-
+            
         case .entity:
             os_log("midiObjectType: Entity", log: midiLog, type: .debug)
             break
-
+            
         case .source:
             os_log("midiObjectType: Source", log: midiLog, type: .debug)
             break
-
+            
         case .destination:
             os_log("midiObjectType: Destination", log: midiLog, type: .debug)
             break
-
+            
         case .externalDevice:
             os_log("midiObjectType: ExternalDevice", log: midiLog, type: .debug)
             break
-
+            
         case .externalEntity:
             print("midiObjectType: ExternalEntity")
             os_log("midiObjectType: ExternalEntity", log: midiLog, type: .debug)
             break
-
+            
         case .externalSource:
             os_log("midiObjectType: ExternalSource", log: midiLog, type: .debug)
             break
-
+            
         case .externalDestination:
             os_log("midiObjectType: ExternalDestination", log: midiLog, type: .debug)
             break
         @unknown default:
             break
         }
-
+        
     }
-
-    #if os(iOS)
+    
+#if os(iOS)
     /// MIDI Network Session
-     @objc func midiNetworkChanged(notification:NSNotification) {
-            print("\(#function)")
-            print("\(notification)")
-            if let session = notification.object as? MIDINetworkSession {
-                print("session \(session)")
-                for con in session.connections() {
-                    print("con \(con)")
-                }
-                print("isEnabled \(session.isEnabled)")
-                print("sourceEndpoint \(session.sourceEndpoint())")
-                print("destinationEndpoint \(session.destinationEndpoint())")
-                print("networkName \(session.networkName)")
-                print("localName \(session.localName)")
-
-                //            if let name = getDeviceName(session.sourceEndpoint()) {
-                //                print("source name \(name)")
-                //            }
-                //
-                //            if let name = getDeviceName(session.destinationEndpoint()) {
-                //                print("destination name \(name)")
-                //            }
+    @objc func midiNetworkChanged(notification:NSNotification) {
+        print("\(#function)")
+        print("\(notification)")
+        if let session = notification.object as? MIDINetworkSession {
+            print("session \(session)")
+            for con in session.connections() {
+                print("con \(con)")
             }
-            updateSetupState(data: "\(#function) \(notification)")
+            print("isEnabled \(session.isEnabled)")
+            print("sourceEndpoint \(session.sourceEndpoint())")
+            print("destinationEndpoint \(session.destinationEndpoint())")
+            print("networkName \(session.networkName)")
+            print("localName \(session.localName)")
+            
+            //            if let name = getDeviceName(session.sourceEndpoint()) {
+            //                print("source name \(name)")
+            //            }
+            //
+            //            if let name = getDeviceName(session.destinationEndpoint()) {
+            //                print("destination name \(name)")
+            //            }
         }
-
+        updateSetupState(data: "\(#function) \(notification)")
+    }
+    
     @objc func midiNetworkContactsChanged(notification:NSNotification) {
         print("\(#function)")
         print("\(notification)")
@@ -884,16 +884,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         }
         updateSetupState(data: "\(#function) \(notification)")
     }
-    #endif
-
+#endif
+    
     /// BLE handling
-
+    
     // Central
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         print("central did update state \(getBluetoothCentralStateAsString())")
         updateBluetoothState(data: getBluetoothCentralStateAsString());
     }
-
+    
     public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         print("central didDiscover \(peripheral)")
         if !discoveredDevices.contains(peripheral) {
@@ -901,45 +901,45 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             updateSetupState(data: "deviceAppeared")
         }
     }
-
+    
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print("central did connect \(peripheral)")
         (connectedDevices[peripheral.identifier.uuidString] as! ConnectedBLEDevice).setupBLE(stream: setupStreamHandler)
     }
-
+    
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("central did fail to connect state \(peripheral) \(String(describing: error?.localizedDescription))")
-
+        
         updateSetupState(data: "connectionFailed")
         connectedDevices.removeValue(forKey: peripheral.identifier.uuidString)
     }
-
+    
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("central didDisconnectPeripheral \(peripheral)")
-
+        
         updateSetupState(data: "deviceDisconnected")
     }
 }
 
 class StreamHandler : NSObject, FlutterStreamHandler {
-
+    
     var sink:FlutterEventSink?
-
+    
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         sink = events
         return nil
     }
-
+    
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
         sink = nil
         return nil
     }
-
+    
     func send(data: Any) {
         if let sink = sink {
             sink(data)
-//        } else {
-//            print("no sink")
+            //        } else {
+            //            print("no sink")
         }
     }
 }
@@ -947,61 +947,114 @@ class StreamHandler : NSObject, FlutterStreamHandler {
 class Port {
     var id:Int
     var type:String
-
+    
     init(id:Int, type:String) {
         self.id = id;
         self.type = type
     }
 }
 
- class ConnectedDevice : NSObject {
+class ConnectedDevice : NSObject {
     var id:String
     var deviceType:String
     var streamHandler : StreamHandler
-
+    
     init(id:String, type:String, streamHandler:StreamHandler) {
         self.id = id
         self.deviceType = type
         self.streamHandler = streamHandler
     }
-
+    
     func openPorts() {}
-
+    
     func send(bytes:[UInt8], timestamp: UInt64?) {}
-
+    
     func close() {}
 }
 
 class ConnectedVirtualOrNativeDevice : ConnectedDevice {
-  var ports:[Port]?
-  var outputPort = MIDIPortRef()
-  var inputPort = MIDIPortRef()
-  var client : MIDIClientRef
-  var name : String?
-  var outEndpoint : MIDIEndpointRef?
-  var inSource : MIDIEndpointRef?
+    var ports:[Port]?
+    var outputPort = MIDIPortRef()
+    var inputPort = MIDIPortRef()
+    var client : MIDIClientRef
+    var name : String?
+    var outEndpoint : MIDIEndpointRef?
+    var inSource : MIDIEndpointRef?
     var deviceInfo:Dictionary<String, String?>
-
-  init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
-    self.client = client
-    self.ports = ports
-
-
-      deviceInfo = ["name" : name,
-                    "id": String(id),
-                    "type":type,
-                    "connected": String(true),]
-
-    super.init(id: id, type: type, streamHandler: streamHandler)
-  }
-
-  override func send(bytes: [UInt8], timestamp: UInt64?) {
-      print("send \(bytes.count) bytes to \(String(describing: name))")
-      
-    if let ep = outEndpoint {
+    
+    init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
+        self.client = client
+        self.ports = ports
         
+        
+        deviceInfo = ["name" : name,
+                      "id": String(id),
+                      "type":type,
+                      "connected": String(true),]
+        
+        super.init(id: id, type: type, streamHandler: streamHandler)
+    }
+    
+    override func send(bytes: [UInt8], timestamp: UInt64?) {
+        print("send \(bytes.count) bytes to \(String(describing: name))")
+        
+        if let ep = outEndpoint {
+            
+            splitDataIntoChunks(bytes: bytes, timestamp: timestamp) { packetListPointer in
+                MIDISend(outputPort, ep, packetListPointer)
+            }
+            /*
+            let maxPacketSize = 256 // Maximum size for a single packet's data field
+            var offset = 0
+            let ts = timestamp ?? mach_absolute_time()
+            
+            while offset < bytes.count {
+                var packetList = MIDIPacketList()
+                
+                // Calculate the size of the current chunk
+                let chunkSize = min(maxPacketSize, bytes.count - offset)
+                let chunk = Array(bytes[offset..<offset + chunkSize])
+                
+                // Create the packet
+                chunk.withUnsafeBufferPointer { buffer in
+                    packetList = buffer.withMemoryRebound(to: UInt8.self) { dataBuffer in
+                        var tempPacketList = MIDIPacketList(numPackets: 1, packet: MIDIPacket())
+                        
+                        var packet = MIDIPacket()
+                        packet.timeStamp = ts
+                        packet.length = UInt16(dataBuffer.count)
+                        withUnsafeMutablePointer(to: &packet.data) {
+                            $0.withMemoryRebound(to: UInt8.self, capacity: dataBuffer.count) { dataPtr in
+                                for i in 0..<dataBuffer.count {
+                                    dataPtr[i] = dataBuffer[i]
+                                }
+                            }
+                        }
+                        
+                        tempPacketList.packet = packet
+                        return tempPacketList
+                    }
+                }
+                
+                // Send the packet
+                _ = withUnsafePointer(to: &packetList) { packetListPointer in
+                    MIDISend(outputPort, ep, packetListPointer)
+                }
+                
+                // Move to the next chunk
+                offset += chunkSize
+            }
+            */
+            
+        } else {
+            print("No MIDI destination for id \(name!)")
+        }
+    }
+    
+    func splitDataIntoChunks(bytes:[UInt8], timestamp: UInt64?, chunkFunction:(UnsafePointer<MIDIPacketList>) -> Void) {
         let maxPacketSize = 256 // Maximum size for a single packet's data field
         var offset = 0
+        let ts = timestamp ?? mach_absolute_time()
         
         while offset < bytes.count {
             var packetList = MIDIPacketList()
@@ -1009,7 +1062,6 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             // Calculate the size of the current chunk
             let chunkSize = min(maxPacketSize, bytes.count - offset)
             let chunk = Array(bytes[offset..<offset + chunkSize])
-            let ts = timestamp ?? mach_absolute_time()
             
             // Create the packet
             chunk.withUnsafeBufferPointer { buffer in
@@ -1033,179 +1085,175 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             }
             
             // Send the packet
-            _ = withUnsafePointer(to: &packetList) { packetListPointer in
-                MIDISend(outputPort, ep, packetListPointer)
+            withUnsafePointer(to: &packetList) { packetListPointer in
+                chunkFunction(packetListPointer)
             }
             
             // Move to the next chunk
             offset += chunkSize
         }
+    }
+    
+    override func close() {
+        // We did not create the endpoint so we should not dispose it.
+        // if let oEP = outEndpoint {
+        //   MIDIEndpointDispose(oEP)
+        // }
         
-    } else {
-      print("No MIDI destination for id \(name!)")
+        if let iS = inSource {
+            MIDIPortDisconnectSource(inputPort, iS)
+        }
+        
+        MIDIPortDispose(inputPort)
+        MIDIPortDispose(outputPort)
     }
-  }
-
-  override func close() {
-    // We did not create the endpoint so we should not dispose it.
-    // if let oEP = outEndpoint {
-    //   MIDIEndpointDispose(oEP)
-    // }
-
-    if let iS = inSource {
-      MIDIPortDisconnectSource(inputPort, iS)
+    
+    var buffer = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 2) // Don't know why I need to a capacity of 2 here. If I setup 1 I'm getting a crash.
+    
+    func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
+        let packets = packetList.pointee
+        let packet:MIDIPacket = packets.packet
+        var ap = buffer;
+        buffer.initialize(to:packet)
+        
+        for _ in 0 ..< packets.numPackets {
+            let p = ap.pointee
+            var tmp = p.data
+            let data = Data(bytes: &tmp, count: Int(p.length))
+            let timestamp = p.timeStamp
+            parseData(data: data, timestamp: timestamp)
+            ap = MIDIPacketNext(ap)
+        }
     }
-
-    MIDIPortDispose(inputPort)
-    MIDIPortDispose(outputPort)
-  }
-
-  var buffer = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 2) // Don't know why I need to a capacity of 2 here. If I setup 1 I'm getting a crash.
-
-  func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
-    let packets = packetList.pointee
-    let packet:MIDIPacket = packets.packet
-    var ap = buffer;
-    buffer.initialize(to:packet)
-
-    for _ in 0 ..< packets.numPackets {
-      let p = ap.pointee
-      var tmp = p.data
-      let data = Data(bytes: &tmp, count: Int(p.length))
-      let timestamp = p.timeStamp
-        parseData(data: data, timestamp: timestamp)
-      ap = MIDIPacketNext(ap)
-    }
-  }
-
+    
     enum PARSER_STATE
-       {
-         case HEADER
-         case PARAMS
-         case SYSEX
-       }
-
+    {
+        case HEADER
+        case PARAMS
+        case SYSEX
+    }
+    
     var parserState = PARSER_STATE.HEADER
     var sysExBuffer:[UInt8] = []
     var midiBuffer:[UInt8] = []
     var midiPacketLength:Int = 0
     var statusByte:UInt8 = 0
-
+    
     func parseData(data:Data, timestamp:UInt64) {
         if (data.count > 0) {
-          for i in 0...data.count-1 {
-            let midiByte:UInt8 = data[i]
-            let midiInt = midiByte & 0xFF
-
-//          Log.d("FlutterMIDICommand", "parserState $parserState byte $midiByte")
-
-            switch (parserState) {
-            case PARSER_STATE.HEADER:
-                if (midiInt == 0xF0) {
-                  parserState = PARSER_STATE.SYSEX
-                  sysExBuffer.removeAll()
-                  sysExBuffer.append(midiByte)
-                } else if (midiInt & 0x80 == 0x80) {
-                  // some kind of midi msg
-                  statusByte = midiByte
-                  midiPacketLength = lengthOfMessageType(type: midiInt)
-                  midiBuffer.removeAll()
-                  midiBuffer.append(midiByte)
-                  parserState = PARSER_STATE.PARAMS
+            for i in 0...data.count-1 {
+                let midiByte:UInt8 = data[i]
+                let midiInt = midiByte & 0xFF
+                
+                //          Log.d("FlutterMIDICommand", "parserState $parserState byte $midiByte")
+                
+                switch (parserState) {
+                case PARSER_STATE.HEADER:
+                    if (midiInt == 0xF0) {
+                        parserState = PARSER_STATE.SYSEX
+                        sysExBuffer.removeAll()
+                        sysExBuffer.append(midiByte)
+                    } else if (midiInt & 0x80 == 0x80) {
+                        // some kind of midi msg
+                        statusByte = midiByte
+                        midiPacketLength = lengthOfMessageType(type: midiInt)
+                        midiBuffer.removeAll()
+                        midiBuffer.append(midiByte)
+                        parserState = PARSER_STATE.PARAMS
+                        finalizeMessageIfComplete(timestamp: timestamp)
+                    } else {
+                        // in header state but no status byte, do running status
+                        midiBuffer.removeAll()
+                        midiBuffer.append(statusByte)
+                        midiBuffer.append(midiByte)
+                        parserState = PARSER_STATE.PARAMS
+                        finalizeMessageIfComplete(timestamp: timestamp)
+                    }
+                    break
+                    
+                    
+                case PARSER_STATE.SYSEX:
+                    //                if (midiInt == 0xF0) {
+                    //                  // Android can skip SysEx end bytes, when more sysex messages are coming in succession.
+                    //                  // in an attempt to save the situation, add an end byte to the current buffer and start a new one.
+                    //                  sysExBuffer.append(0xF7)
+                    ////                Log.d("FlutterMIDICommand", "sysex force finalized $sysExBuffer")
+                    //                    streamHandler.send(data: ["data": sysExBuffer, "timestamp":timestamp, "device":deviceInfo])
+                    //                  sysExBuffer.removeAll();
+                    //                }
+                    sysExBuffer.append(midiByte)
+                    if (midiInt == 0xF7) {
+                        // Sysex complete
+                        DispatchQueue.main.async {
+                            self.streamHandler.send(data: ["data": self.sysExBuffer, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
+                        }
+                        parserState = PARSER_STATE.HEADER
+                    }
+                    break
+                    
+                case PARSER_STATE.PARAMS:
+                    midiBuffer.append(midiByte)
                     finalizeMessageIfComplete(timestamp: timestamp)
-                } else {
-                  // in header state but no status byte, do running status
-                  midiBuffer.removeAll()
-                  midiBuffer.append(statusByte)
-                  midiBuffer.append(midiByte)
-                  parserState = PARSER_STATE.PARAMS
-                    finalizeMessageIfComplete(timestamp: timestamp)
+                    break
                 }
-                break
-
-
-            case PARSER_STATE.SYSEX:
-//                if (midiInt == 0xF0) {
-//                  // Android can skip SysEx end bytes, when more sysex messages are coming in succession.
-//                  // in an attempt to save the situation, add an end byte to the current buffer and start a new one.
-//                  sysExBuffer.append(0xF7)
-////                Log.d("FlutterMIDICommand", "sysex force finalized $sysExBuffer")
-//                    streamHandler.send(data: ["data": sysExBuffer, "timestamp":timestamp, "device":deviceInfo])
-//                  sysExBuffer.removeAll();
-//                }
-                sysExBuffer.append(midiByte)
-                if (midiInt == 0xF7) {
-                  // Sysex complete
-                  DispatchQueue.main.async {
-                    self.streamHandler.send(data: ["data": self.sysExBuffer, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
-                  }
-                  parserState = PARSER_STATE.HEADER
-                }
-                break
-
-            case PARSER_STATE.PARAMS:
-                midiBuffer.append(midiByte)
-                finalizeMessageIfComplete(timestamp: timestamp)
-              break
             }
-          }
         }
     }
-
+    
     func finalizeMessageIfComplete(timestamp: UInt64) {
         if (midiBuffer.count == midiPacketLength) {
             let midiData = ["data": midiBuffer, "timestamp":timestamp, "device":deviceInfo] as [String : Any]
             DispatchQueue.main.async {
                 self.streamHandler.send(data: midiData)
             }
-          parserState = PARSER_STATE.HEADER
+            parserState = PARSER_STATE.HEADER
         }
-      }
-
-  func lengthOfMessageType(type:UInt8) -> Int {
-    let midiType:UInt8 = type & 0xF0
-
-    switch (type) {
+    }
+    
+    func lengthOfMessageType(type:UInt8) -> Int {
+        let midiType:UInt8 = type & 0xF0
+        
+        switch (type) {
         case 0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE: return 1
         case 0xF1, 0xF3: return 2
         case 0xF2: return 3
-    default:
-        break
+        default:
+            break
+        }
+        
+        switch (midiType) {
+        case 0xC0, 0xD0: return 2
+        case 0x80, 0x90, 0xA0, 0xB0, 0xE0: return 3
+        default: break
+        }
+        return 0
     }
-
-    switch (midiType) {
-    case 0xC0, 0xD0: return 2
-    case 0x80, 0x90, 0xA0, 0xB0, 0xE0: return 3
-    default: break
-    }
-    return 0
-  }
-
+    
 }
 
 
 class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
-
+    
     var entity : MIDIEntityRef?
-
-
-  override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
-       super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
-
+    
+    
+    override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
+        super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
+        
         self.ports = ports
         let idParts = id.split(separator: ":")
-
+        
         // Store entity and get device/entity name
         if let deviceId = MIDIDeviceRef(idParts[0]) {
             if let entityId = Int(idParts[1]) {
                 entity = MIDIDeviceGetEntity(deviceId, entityId)
                 if let e = entity {
                     let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: e)
-
+                    
                     var device:MIDIDeviceRef = 0
                     MIDIEntityGetDevice(e, &device)
                     let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-
+                    
                     name = "\(deviceName) \(entityName)"
                 } else {
                     print("no entity")
@@ -1216,42 +1264,42 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         } else {
             print("no deviceId")
         }
-
-
-      deviceInfo = ["name" : name,
-                        "id": String(id),
-                        "type":"native"]
-
-
+        
+        
+        deviceInfo = ["name" : name,
+                      "id": String(id),
+                      "type":"native"]
+        
+        
         // MIDI Input with handler
-         MIDIInputPortCreateWithBlock(client, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
-             self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
-         }
-
+        MIDIInputPortCreateWithBlock(client, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
+            self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
+        }
+        
         // MIDI output
         MIDIOutputPortCreate(client, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
-
+        
         openPorts()
     }
-
+    
     override func openPorts() {
         print("open native ports")
-
+        
         if let e = entity {
             
             let ref = Unmanaged.passUnretained(self).toOpaque()
-
+            
             if let ps = ports {
                 for port in ps {
                     inSource = MIDIEntityGetSource(e, port.id)
-
+                    
                     switch port.type {
                     case "MidiPortType.IN":
                         let status = MIDIPortConnectSource(inputPort, inSource!, ref)
                         print("port open status \(status)")
                     case "MidiPortType.OUT":
                         outEndpoint = MIDIEntityGetDestination(e, port.id)
-    //                    print("port endpoint \(endpoint)")
+                        //                    print("port endpoint \(endpoint)")
                         break
                     default:
                         print("unknown port type \(port.type)")
@@ -1268,40 +1316,40 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             }
         }
     }
-
+    
     override func close() {
         /*
-        if let oEP = outEndpoint {
-            MIDIEndpointDispose(oEP)
-        }
-        */
+         if let oEP = outEndpoint {
+         MIDIEndpointDispose(oEP)
+         }
+         */
         if let iS = inSource {
             MIDIPortDisconnectSource(inputPort, iS)
         }
-
+        
         MIDIPortDispose(inputPort)
         MIDIPortDispose(outputPort)
     }
-
+    
     override func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
         let packets = packetList.pointee
         let packet:MIDIPacket = packets.packet
         var ap = buffer
         ap.initialize(to:packet)
-
-//        let deviceInfo = ["name" : name,
-//                          "id": String(id),
-//                          "type":"native"]
-
+        
+        //        let deviceInfo = ["name" : name,
+        //                          "id": String(id),
+        //                          "type":"native"]
+        
         var timestampFactor : Double = 1.0
         var tb = mach_timebase_info_data_t()
         let kError = mach_timebase_info(&tb)
         if (kError == 0) {
             timestampFactor = Double(tb.numer) / Double(tb.denom)
         }
-
-//        print("tb \(tb) timestamp \(timestampFactor)")
-
+        
+        //        print("tb \(tb) timestamp \(timestampFactor)")
+        
         for _ in 0 ..< packets.numPackets {
             let p = ap.pointee
             var tmp = p.data
@@ -1310,42 +1358,42 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             parseData(data: data, timestamp: timestamp)
             ap = MIDIPacketNext(ap)
         }
-
-//        ap.deallocate()
+        
+        //        ap.deallocate()
     }
 }
 
 class ConnectedVirtualDevice : ConnectedVirtualOrNativeDevice {
-
-  override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
-
-    super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
-
-    let idParts = id.split(separator: ":")
-    assert(idParts.count > 0);
-    outEndpoint = idParts.count > 0 && idParts[0].count > 0 ? MIDIEndpointRef(idParts[0]) : nil;
-    inSource = idParts.count > 1 && idParts[1].count > 0 ? MIDIEndpointRef(idParts[1]) : nil;
-
-    name = displayName(endpoint: outEndpoint ?? inSource ?? 0);
-
-    // MIDI Input with handler
-    MIDIInputPortCreateWithBlock(client, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
-      self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
+    
+    override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
+        
+        super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
+        
+        let idParts = id.split(separator: ":")
+        assert(idParts.count > 0);
+        outEndpoint = idParts.count > 0 && idParts[0].count > 0 ? MIDIEndpointRef(idParts[0]) : nil;
+        inSource = idParts.count > 1 && idParts[1].count > 0 ? MIDIEndpointRef(idParts[1]) : nil;
+        
+        name = displayName(endpoint: outEndpoint ?? inSource ?? 0);
+        
+        // MIDI Input with handler
+        MIDIInputPortCreateWithBlock(client, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
+            self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
+        }
+        
+        // MIDI output
+        MIDIOutputPortCreate(client, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
+        
+        openPorts()
     }
-
-    // MIDI output
-    MIDIOutputPortCreate(client, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
-
-    openPorts()
-  }
-
-  override func openPorts() {
-
-    if(inSource != nil){
-        let ref = Unmanaged.passUnretained(self).toOpaque()
-        MIDIPortConnectSource(inputPort, inSource!, ref);
+    
+    override func openPorts() {
+        
+        if(inSource != nil){
+            let ref = Unmanaged.passUnretained(self).toOpaque()
+            MIDIPortConnectSource(inputPort, inSource!, ref);
+        }
     }
-  }
 }
 
 class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
@@ -1357,44 +1405,53 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         initVirtualDestination()
         self.name = name
     }
-
+    
     override func openPorts() {}
-
+    
     var virtualSourceEndpoint: MIDIClientRef = 0
     var virtualDestinationEndpoint: MIDIClientRef = 0
     let midiClient: MIDIClientRef
     let deviceName: String
     var isConnected = false
     var errors: Array<String> = []
-
-
+    
+    
     override func send(bytes: [UInt8], timestamp: UInt64?) {
-
+        
         if(!isConnected){
             return;
         }
-
-        let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
-        var packet = MIDIPacketListInit(packetList)
-        let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
-        packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
-
-        let status = MIDIReceived(virtualSourceEndpoint, packetList)
-        if(status != noErr){
-            let error = "Error \(status) while publishing MIDI on own virtual source endpoint."
-            errors.append(error)
-            print(error)
+        
+        splitDataIntoChunks(bytes: bytes, timestamp: timestamp) { packetListPointer in
+            let status = MIDIReceived(virtualSourceEndpoint, packetListPointer)
+            if(status != noErr){
+                let error = "Error \(status) while publishing MIDI on own virtual source endpoint."
+                errors.append(error)
+                print(error)
+            }
         }
-
-        packetList.deallocate()
+        
+//        let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
+//        var packet = MIDIPacketListInit(packetList)
+//        let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
+//        packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
+        
+//        let status = MIDIReceived(virtualSourceEndpoint, packetList)
+//        if(status != noErr){
+//            let error = "Error \(status) while publishing MIDI on own virtual source endpoint."
+//            errors.append(error)
+//            print(error)
+//        }
+        
+//        packetList.deallocate()
     }
-
+    
     override func close() {
         closeVirtualSource()
         closeVirtualDestination()
     }
-
-
+    
+    
     func initVirtualSource(){
         let s = MIDISourceCreate(midiClient, deviceName as CFString, &virtualSourceEndpoint);
         if(s != noErr){
@@ -1403,22 +1460,22 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             print(error)
             return
         }
-
+        
         // Attempt to use saved unique ID
         let defaults = UserDefaults.standard
         var uniqueID = Int32(defaults.integer(forKey: "FlutterMIDICommand Saved Virtual Source ID \(deviceName)"))
-
+        
         //Set unique ID if available
         if ( uniqueID != 0 )
         {
             let s = MIDIObjectSetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, uniqueID);
-
+            
             if ( s == kMIDIIDNotUnique )
             {
                 uniqueID = 0;
             }
         }
-
+        
         // Create and save a new unique id
         if ( uniqueID == 0 ) {
             let s = MIDIObjectGetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, &uniqueID);
@@ -1427,13 +1484,13 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
                 errors.append(error)
                 print(error)
             }
-
+            
             if ( s == noErr ) {
                 defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Source ID \(deviceName)")
             }
         }
     }
-
+    
     func closeVirtualSource(){
         let s = MIDIEndpointDispose(virtualSourceEndpoint);
         if(s != noErr){
@@ -1442,17 +1499,17 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             print(error)
         }
     }
-
+    
     func initVirtualDestination(){
-
-
+        
+        
         let s = MIDIDestinationCreateWithBlock(midiClient, deviceName as CFString, &virtualDestinationEndpoint) { (packetList, srcConnRefCon) in
             if(self.isConnected){
-              self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
+                self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
             }
         }
-
-
+        
+        
         if ( s != noErr ) {
             if(s == -10844){
                 let error = "Error while creating virtual MIDI destination. You need to add the key 'UIBackgroundModes' with value 'audio' to your Info.plist file"
@@ -1461,11 +1518,11 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             }
             return;
         }
-
+        
         // Attempt to use saved unique ID
         let defaults = UserDefaults.standard
         var uniqueID = Int32(defaults.integer(forKey: "FlutterMIDICommand Saved Virtual Destination ID  \(deviceName)"))
-
+        
         if ( uniqueID != 0 )
         {
             let s = MIDIObjectSetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, uniqueID)
@@ -1477,7 +1534,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         // Save the ID
         if ( uniqueID == 0 ) {
             let s = MIDIObjectGetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, &uniqueID)
-
+            
             if ( s == noErr ) {
                 defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Destination ID \(deviceName)")
             }
@@ -1488,7 +1545,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             }
         }
     }
-
+    
     func closeVirtualDestination(){
         let s = MIDIEndpointDispose(virtualDestinationEndpoint);
         if(s != 0){
@@ -1502,8 +1559,8 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
 class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var peripheral:CBPeripheral
     var characteristic:CBCharacteristic?
-
-
+    
+    
     // BLE MIDI parsing
     enum BLE_HANDLER_STATE
     {
@@ -1517,88 +1574,88 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         case SYSEX_END
         case SYSEX_INT
     }
-
+    
     var bleHandlerState = BLE_HANDLER_STATE.HEADER
-
+    
     var sysExBuffer: [UInt8] = []
     var timestamp: UInt64 = 0
     var bleMidiBuffer:[UInt8] = []
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
-
+    
     var setupStream : StreamHandler?
     var connectResult : FlutterResult?
-
+    
     init(id:String, type:String, streamHandler:StreamHandler, result:FlutterResult?, peripheral:CBPeripheral, ports:[Port]?) {
         self.peripheral = peripheral
         self.connectResult = result
         super.init(id: id, type: type, streamHandler: streamHandler)
     }
-
+    
     func setupBLE(stream: StreamHandler) {
         setupStream = stream
         peripheral.delegate = self
         peripheral.discoverServices([CBUUID(string: "03B80E5A-EDE8-4B33-A751-6CE34EC4C700")])
     }
-
-
+    
+    
     override func close() {
         CBCentralManager().cancelPeripheralConnection(peripheral)
         characteristic = nil
     }
-
+    
     override func send(bytes:[UInt8], timestamp: UInt64?) {
         print("ble send \(id) \(bytes)")
         if (characteristic != nil) {
-
-
+            
+            
             let packetSize = peripheral.maximumWriteValueLength(for:writeType)
             // print("packetSize = \(packetSize)")
-
+            
             var dataBytes = Data(bytes)
-
+            
             if bytes.first == 0xF0 && bytes.last == 0xF7 { //  this is a sysex message, handle carefully
                 if bytes.count > packetSize-3 { // Split into multiple messages of 20 bytes total
-
+                    
                     // First packet
                     var packet = dataBytes.subdata(in: 0..<packetSize-2)
-
+                    
                     print("count \(dataBytes.count)")
-
+                    
                     // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
                     packet.insert(0x80, at: 0)
                     packet.insert(0x80, at: 0)
-
-//                        print("packet \(packet)")
-//                        print("packet \(hexEncodedString(packet))")
-
+                    
+                    //                        print("packet \(packet)")
+                    //                        print("packet \(hexEncodedString(packet))")
+                    
                     enqueueMidiData(bytes: packet)
-
+                    
                     dataBytes = dataBytes.advanced(by: packetSize-2)
-
+                    
                     // More packets
                     while dataBytes.count > 0 {
-
+                        
                         print("count \(dataBytes.count)")
-
+                        
                         let pickCount = min(dataBytes.count, packetSize-1)
-//                            print("pickCount \(pickCount)")
+                        //                            print("pickCount \(pickCount)")
                         packet = dataBytes.subdata(in: 0..<pickCount) // Pick bytes for packet
-
+                        
                         // Insert header
                         packet.insert(0x80, at: 0)
-
+                        
                         if (packet.count < packetSize) { // Last packet
                             // Timestamp before Sysex End byte
                             print("insert end")
                             packet.insert(0x80, at: packet.count-1)
                         }
-
-//                            print("packet \(hexEncodedString(packet))")
-
+                        
+                        //                            print("packet \(hexEncodedString(packet))")
+                        
                         // Wait for buffer to clear
                         enqueueMidiData(bytes: packet)
-
+                        
                         if (dataBytes.count > packetSize-2) {
                             dataBytes = dataBytes.advanced(by: pickCount) // Advance buffer
                         }
@@ -1610,21 +1667,21 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 } else {
                     // Insert timestamp low in front of Sysex End-byte
                     dataBytes.insert(0x80, at: bytes.count-1)
-
+                    
                     // Insert header(and empty timstamp high) and timestamp low in front of BLE Midi message
                     dataBytes.insert(0x80, at: 0)
                     dataBytes.insert(0x80, at: 0)
-
+                    
                     enqueueMidiData(bytes: dataBytes)
                 }
                 return
             }
-
+            
             // In bluetooth MIDI we need to send each midi command separately
             var currentBuffer = Data();
             for i in 0..<dataBytes.count {
                 let byte = dataBytes[i]
-
+                
                 // Insert header(and empty timstamp high) and timestamp
                 // low in front of BLE Midi message
                 if((byte & 0x80) != 0){
@@ -1632,11 +1689,11 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                     currentBuffer.insert(0x80, at: 0)
                 }
                 currentBuffer.append(byte);
-
+                
                 // Send each MIDI command separately
                 let endReached = i == (dataBytes.count - 1);
                 let isCompleteCommand = endReached || (dataBytes[i+1] & 0x80) != 0;
-
+                
                 if(isCompleteCommand){
                     enqueueMidiData(bytes: currentBuffer)
                     currentBuffer = Data()
@@ -1646,18 +1703,18 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
             print("No peripheral/characteristic in device")
         }
     }
-
+    
     let writeType = CBCharacteristicWriteType.withoutResponse
     var outboundMessageQueue = [Data]()
-
+    
     func enqueueMidiData(bytes:Data) {
         outboundMessageQueue.append(bytes)
-
+        
         if (peripheral.canSendWriteWithoutResponse) {
             dequeueMidiBytes()
         }
     }
-
+    
     func dequeueMidiBytes() {
         if (outboundMessageQueue.isEmpty) {
             print("Can't dequeue empty queue - return")
@@ -1666,29 +1723,29 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
         let messageBytes = outboundMessageQueue.removeFirst()
         peripheral.writeValue(messageBytes, for: characteristic!, type: writeType)
     }
-
+    
     func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
         if (outboundMessageQueue.isEmpty) {
             print("Queue empty - return")
             return
         }
-       dequeueMidiBytes()
+        dequeueMidiBytes()
     }
-
-
+    
+    
     public func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         if let err = error {
             print("error writing to characteristic \(String(describing: characteristic.properties)): \(err.localizedDescription)")
         }
     }
-
+    
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         print("perif didDiscoverServices  \(String(describing: peripheral.services))")
         for service:CBService in peripheral.services! {
             peripheral.discoverCharacteristics(nil, for: service)
         }
     }
-
+    
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         print("perif didDiscoverCharacteristicsFor  \(String(describing: service.characteristics))")
         for characteristic:CBCharacteristic in service.characteristics! {
@@ -1701,22 +1758,22 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 }
                 
                 if let res = connectResult {
-                print("callback result")
+                    print("callback result")
                     res(nil)
                 } else {
-                print("NO callback result")
+                    print("NO callback result")
                 }
                 return;
             }
         }
-
+        
         if let res = connectResult {
             res(FlutterError.init(code: "BLEERROR", message: "Did not discover MIDI characteristics", details: id))
         }
     }
-
+    
     func createMessageEvent(_ bytes:[UInt8], timestamp:UInt64, peripheral:CBPeripheral) {
-//        print("send rx event \(bytes)")
+        //        print("send rx event \(bytes)")
         let data = Data(bytes: bytes, count: Int(bytes.count))
         DispatchQueue.main.async {
             self.streamHandler.send(data: ["data": data, "timestamp":timestamp, "device":[
@@ -1725,215 +1782,215 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                 "type":"BLE"]] as [String:Any])
         }
     }
-
+    
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-       // print("perif didUpdateValueFor  \(String(describing: characteristic))")
+        // print("perif didUpdateValueFor  \(String(describing: characteristic))")
         if let value = characteristic.value {
             parseBLEPacket(value, peripheral:peripheral)
         }
     }
     
     func parseBLEPacket(_ packet:Data, peripheral:CBPeripheral) -> Void {
-//        print("parse \(packet.map { String(format: "%02hhx ", $0) }.joined())")
+        //        print("parse \(packet.map { String(format: "%02hhx ", $0) }.joined())")
         
         if (packet.count > 1)
-          {
+        {
             // parse BLE message
             bleHandlerState = BLE_HANDLER_STATE.HEADER
-
+            
             let header = packet[0]
             var statusByte:UInt8 = 0
-
+            
             for i in 1...packet.count-1 {
                 let midiByte:UInt8 = packet[i]
-//              print ("from bleHandlerState \(bleHandlerState) byte \(midiByte)")
+                //              print ("from bleHandlerState \(bleHandlerState) byte \(midiByte)")
                 
                 if ((((midiByte & 0x80) == 0x80) && (bleHandlerState != BLE_HANDLER_STATE.TIMESTAMP)) && (bleHandlerState != BLE_HANDLER_STATE.SYSEX_INT)) {
                     if (!bleSysExHasFinished) {
-//                      print("Set to SYSEX_INT")
+                        //                      print("Set to SYSEX_INT")
                         bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
                     } else {
                         bleHandlerState = BLE_HANDLER_STATE.TIMESTAMP
                     }
                 } else {
-
-                  // State handling
-                  switch (bleHandlerState)
-                  {
-                  case BLE_HANDLER_STATE.HEADER:
-                    if (!bleSysExHasFinished)
+                    
+                    // State handling
+                    switch (bleHandlerState)
                     {
-                      if ((midiByte & 0x80) == 0x80)
-                      { // System messages can interrupt ongoing sysex
-                        bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
-                      }
-                      else
-                      {
-                        // Sysex continue
-                        //print("sysex continue")
-                        bleHandlerState = BLE_HANDLER_STATE.SYSEX
-                      }
+                    case BLE_HANDLER_STATE.HEADER:
+                        if (!bleSysExHasFinished)
+                        {
+                            if ((midiByte & 0x80) == 0x80)
+                            { // System messages can interrupt ongoing sysex
+                                bleHandlerState = BLE_HANDLER_STATE.SYSEX_INT
+                            }
+                            else
+                            {
+                                // Sysex continue
+                                //print("sysex continue")
+                                bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                            }
+                        }
+                        break
+                        
+                    case BLE_HANDLER_STATE.TIMESTAMP:
+                        if ((midiByte & 0xFF) == 0xF0)
+                        { // Sysex start
+                            bleSysExHasFinished = false
+                            sysExBuffer.removeAll()
+                            bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                        }
+                        else if ((midiByte & 0x80) == 0x80)
+                        { // Status/System start
+                            bleHandlerState = BLE_HANDLER_STATE.STATUS
+                        }
+                        else
+                        {
+                            bleHandlerState = BLE_HANDLER_STATE.STATUS_RUNNING
+                        }
+                        break
+                        
+                    case BLE_HANDLER_STATE.STATUS:
+                        bleHandlerState = BLE_HANDLER_STATE.PARAMS
+                        break
+                        
+                    case BLE_HANDLER_STATE.STATUS_RUNNING:
+                        bleHandlerState = BLE_HANDLER_STATE.PARAMS
+                        break;
+                        
+                    case BLE_HANDLER_STATE.PARAMS: // After params can come TSlow or more params
+                        break
+                        
+                    case BLE_HANDLER_STATE.SYSEX:
+                        break
+                        
+                    case BLE_HANDLER_STATE.SYSEX_INT:
+                        if ((midiByte & 0xFF) == 0xF7)
+                        { // Sysex end
+                            //                        print("sysex end")
+                            bleSysExHasFinished = true
+                            bleHandlerState = BLE_HANDLER_STATE.SYSEX_END
+                        }
+                        else
+                        {
+                            bleHandlerState = BLE_HANDLER_STATE.SYSTEM_RT
+                        }
+                        break;
+                        
+                    case BLE_HANDLER_STATE.SYSTEM_RT:
+                        if (!bleSysExHasFinished)
+                        { // Continue incomplete Sysex
+                            bleHandlerState = BLE_HANDLER_STATE.SYSEX
+                        }
+                        break
+                        
+                    default:
+                        print ("Unhandled state \(bleHandlerState)")
+                        break
                     }
-                    break
-
-                  case BLE_HANDLER_STATE.TIMESTAMP:
-                    if ((midiByte & 0xFF) == 0xF0)
-                    { // Sysex start
-                      bleSysExHasFinished = false
-                        sysExBuffer.removeAll()
-                      bleHandlerState = BLE_HANDLER_STATE.SYSEX
-                    }
-                    else if ((midiByte & 0x80) == 0x80)
-                    { // Status/System start
-                      bleHandlerState = BLE_HANDLER_STATE.STATUS
-                    }
-                    else
-                    {
-                      bleHandlerState = BLE_HANDLER_STATE.STATUS_RUNNING
-                    }
-                    break
-
-                  case BLE_HANDLER_STATE.STATUS:
-                      bleHandlerState = BLE_HANDLER_STATE.PARAMS
-                    break
-
-                  case BLE_HANDLER_STATE.STATUS_RUNNING:
-                    bleHandlerState = BLE_HANDLER_STATE.PARAMS
-                    break;
-
-                  case BLE_HANDLER_STATE.PARAMS: // After params can come TSlow or more params
-                    break
-
-                  case BLE_HANDLER_STATE.SYSEX:
-                    break
-
-                  case BLE_HANDLER_STATE.SYSEX_INT:
-                    if ((midiByte & 0xFF) == 0xF7)
-                    { // Sysex end
-//                        print("sysex end")
-                      bleSysExHasFinished = true
-                      bleHandlerState = BLE_HANDLER_STATE.SYSEX_END
-                    }
-                    else
-                    {
-                        bleHandlerState = BLE_HANDLER_STATE.SYSTEM_RT
-                    }
-                    break;
-
-                  case BLE_HANDLER_STATE.SYSTEM_RT:
-                    if (!bleSysExHasFinished)
-                    { // Continue incomplete Sysex
-                      bleHandlerState = BLE_HANDLER_STATE.SYSEX
-                    }
-                    break
-
-                  default:
-                    print ("Unhandled state \(bleHandlerState)")
-                    break
-                  }
                 }
-
-//                print ("handle \(bleHandlerState) - \(midiByte) [\(String(format:"%02X", midiByte))]")
-
-              // Data handling
-              switch (bleHandlerState)
-              {
-              case BLE_HANDLER_STATE.TIMESTAMP:
-//                print ("set timestamp")
-                let tsHigh = header & 0x3f
-                let tsLow = midiByte & 0x7f
-                timestamp = UInt64(tsHigh) << 7 | UInt64(tsLow)
-//                print ("timestamp is \(timestamp)")
-                break
-
-              case BLE_HANDLER_STATE.STATUS:
-
-                bleMidiPacketLength = lengthOfMessageType(midiByte)
-//                print("message length \(bleMidiPacketLength)")
-                bleMidiBuffer.removeAll()
-                bleMidiBuffer.append(midiByte)
                 
-                if bleMidiPacketLength == 1 {
-                    createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral) // TODO Add timestamp
-                } else {
-//                    print ("set status")
-                    statusByte = midiByte
-                }
-                break
-
-              case BLE_HANDLER_STATE.STATUS_RUNNING:
-//                print("set running status")
-                bleMidiPacketLength = lengthOfMessageType(statusByte)
-                bleMidiBuffer.removeAll()
-                bleMidiBuffer.append(statusByte)
-                bleMidiBuffer.append(midiByte)
+                //                print ("handle \(bleHandlerState) - \(midiByte) [\(String(format:"%02X", midiByte))]")
                 
-                if bleMidiPacketLength == 2 {
-                    createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral)
+                // Data handling
+                switch (bleHandlerState)
+                {
+                case BLE_HANDLER_STATE.TIMESTAMP:
+                    //                print ("set timestamp")
+                    let tsHigh = header & 0x3f
+                    let tsLow = midiByte & 0x7f
+                    timestamp = UInt64(tsHigh) << 7 | UInt64(tsLow)
+                    //                print ("timestamp is \(timestamp)")
+                    break
+                    
+                case BLE_HANDLER_STATE.STATUS:
+                    
+                    bleMidiPacketLength = lengthOfMessageType(midiByte)
+                    //                print("message length \(bleMidiPacketLength)")
+                    bleMidiBuffer.removeAll()
+                    bleMidiBuffer.append(midiByte)
+                    
+                    if bleMidiPacketLength == 1 {
+                        createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral) // TODO Add timestamp
+                    } else {
+                        //                    print ("set status")
+                        statusByte = midiByte
+                    }
+                    break
+                    
+                case BLE_HANDLER_STATE.STATUS_RUNNING:
+                    //                print("set running status")
+                    bleMidiPacketLength = lengthOfMessageType(statusByte)
+                    bleMidiBuffer.removeAll()
+                    bleMidiBuffer.append(statusByte)
+                    bleMidiBuffer.append(midiByte)
+                    
+                    if bleMidiPacketLength == 2 {
+                        createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral)
+                    }
+                    break
+                    
+                case BLE_HANDLER_STATE.PARAMS:
+                    //                print ("add param \(midiByte)")
+                    bleMidiBuffer.append(midiByte)
+                    
+                    if bleMidiPacketLength == bleMidiBuffer.count {
+                        createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral)
+                        bleMidiBuffer.removeLast(Int(bleMidiPacketLength)-1) // Remove all but status, which might be used for running msgs
+                    }
+                    break
+                    
+                case BLE_HANDLER_STATE.SYSTEM_RT:
+                    //                print("handle RT")
+                    createMessageEvent([midiByte], timestamp: timestamp, peripheral:peripheral)
+                    break
+                    
+                case BLE_HANDLER_STATE.SYSEX:
+                    //                print("add sysex")
+                    sysExBuffer.append(midiByte)
+                    break
+                    
+                case BLE_HANDLER_STATE.SYSEX_INT:
+                    //                print("sysex int")
+                    break
+                    
+                case BLE_HANDLER_STATE.SYSEX_END:
+                    //                print("finalize sysex")
+                    sysExBuffer.append(midiByte)
+                    createMessageEvent(sysExBuffer, timestamp: 0, peripheral:peripheral)
+                    break
+                    
+                default:
+                    print ("Unhandled state (data) \(bleHandlerState)")
+                    break
                 }
-                break
-
-              case BLE_HANDLER_STATE.PARAMS:
-//                print ("add param \(midiByte)")
-                bleMidiBuffer.append(midiByte)
-                
-                if bleMidiPacketLength == bleMidiBuffer.count {
-                    createMessageEvent(bleMidiBuffer, timestamp: timestamp, peripheral:peripheral)
-                    bleMidiBuffer.removeLast(Int(bleMidiPacketLength)-1) // Remove all but status, which might be used for running msgs
-                }
-                break
-
-              case BLE_HANDLER_STATE.SYSTEM_RT:
-//                print("handle RT")
-                createMessageEvent([midiByte], timestamp: timestamp, peripheral:peripheral)
-                break
-
-              case BLE_HANDLER_STATE.SYSEX:
-//                print("add sysex")
-                sysExBuffer.append(midiByte)
-                break
-
-              case BLE_HANDLER_STATE.SYSEX_INT:
-//                print("sysex int")
-                break
-
-              case BLE_HANDLER_STATE.SYSEX_END:
-//                print("finalize sysex")
-                sysExBuffer.append(midiByte)
-                createMessageEvent(sysExBuffer, timestamp: 0, peripheral:peripheral)
-                break
-
-              default:
-                print ("Unhandled state (data) \(bleHandlerState)")
-                break
-              }
             }
-          }
         }
+    }
     
     func lengthOfMessageType(_ type:UInt8) -> UInt8 {
         let midiType:UInt8 = type & 0xF0
         
         switch (type) {
-            case 0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE:
-                return 1
-            case 0xF1, 0xF3:
-                    return 2
-            case 0xF2:
-                    return 3
-            default:
-                break
+        case 0xF6, 0xF8, 0xFA, 0xFB, 0xFC, 0xFF, 0xFE:
+            return 1
+        case 0xF1, 0xF3:
+            return 2
+        case 0xF2:
+            return 3
+        default:
+            break
         }
         
         switch (midiType) {
-            case 0xC0, 0xD0:
-                return 2
-            case 0x80, 0x90, 0xA0, 0xB0, 0xE0:
-                return 3
-            default:
-                break
+        case 0xC0, 0xD0:
+            return 2
+        case 0x80, 0x90, 0xA0, 0xB0, 0xE0:
+            return 3
+        default:
+            break
         }
         return 0
     }
-
+    
 }
