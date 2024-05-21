@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - flutter_midi_command (0.4.2):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - flutter_midi_command (from `.symlinks/plugins/flutter_midi_command/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  flutter_midi_command:
+    :path: ".symlinks/plugins/flutter_midi_command/ios"
+
+SPEC CHECKSUMS:
+  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
+  flutter_midi_command: 760f0ec4b7c6d3034982f6045e878d9b7d01674e
+
+PODFILE CHECKSUM: 4e8f8b2be68aeea4c0d5beb6ff1e79fface1d048
+
+COCOAPODS: 1.15.2
