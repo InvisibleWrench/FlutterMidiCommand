@@ -159,7 +159,7 @@ class MidiControlsState extends State<MidiControls> {
         ),
         const Divider(),
         Text("SysEx", style: Theme.of(context).textTheme.titleLarge),
-        ...[256, 512, 768, 1024]
+        ...[64, 128, 256, 512, 768, 1024]
             .map(
               (e) => Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -221,6 +221,7 @@ class MidiControlsState extends State<MidiControls> {
   }
 
   void _sendSysex(int length) {
+    print("Send $length SysEx bytes");
     final data = Uint8List(length);
     data[0] = 0xF0;
     for (int i = 0; i < length -1; i++) {

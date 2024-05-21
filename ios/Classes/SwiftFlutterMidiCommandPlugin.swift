@@ -999,59 +999,15 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
         print("send \(bytes.count) bytes to \(String(describing: name))")
         
         if let ep = outEndpoint {
-            
-            splitDataIntoChunks(bytes: bytes, timestamp: timestamp) { packetListPointer in
+            splitDataIntoMIDIPackets(bytes: bytes, timestamp: timestamp) { packetListPointer in
                 MIDISend(outputPort, ep, packetListPointer)
             }
-            /*
-            let maxPacketSize = 256 // Maximum size for a single packet's data field
-            var offset = 0
-            let ts = timestamp ?? mach_absolute_time()
-            
-            while offset < bytes.count {
-                var packetList = MIDIPacketList()
-                
-                // Calculate the size of the current chunk
-                let chunkSize = min(maxPacketSize, bytes.count - offset)
-                let chunk = Array(bytes[offset..<offset + chunkSize])
-                
-                // Create the packet
-                chunk.withUnsafeBufferPointer { buffer in
-                    packetList = buffer.withMemoryRebound(to: UInt8.self) { dataBuffer in
-                        var tempPacketList = MIDIPacketList(numPackets: 1, packet: MIDIPacket())
-                        
-                        var packet = MIDIPacket()
-                        packet.timeStamp = ts
-                        packet.length = UInt16(dataBuffer.count)
-                        withUnsafeMutablePointer(to: &packet.data) {
-                            $0.withMemoryRebound(to: UInt8.self, capacity: dataBuffer.count) { dataPtr in
-                                for i in 0..<dataBuffer.count {
-                                    dataPtr[i] = dataBuffer[i]
-                                }
-                            }
-                        }
-                        
-                        tempPacketList.packet = packet
-                        return tempPacketList
-                    }
-                }
-                
-                // Send the packet
-                _ = withUnsafePointer(to: &packetList) { packetListPointer in
-                    MIDISend(outputPort, ep, packetListPointer)
-                }
-                
-                // Move to the next chunk
-                offset += chunkSize
-            }
-            */
-            
         } else {
             print("No MIDI destination for id \(name!)")
         }
     }
     
-    func splitDataIntoChunks(bytes:[UInt8], timestamp: UInt64?, chunkFunction:(UnsafePointer<MIDIPacketList>) -> Void) {
+    func splitDataIntoMIDIPackets(bytes:[UInt8], timestamp: UInt64?, packetCallback:(UnsafePointer<MIDIPacketList>) -> Void) {
         let maxPacketSize = 256 // Maximum size for a single packet's data field
         var offset = 0
         let ts = timestamp ?? mach_absolute_time()
@@ -1086,7 +1042,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             
             // Send the packet
             withUnsafePointer(to: &packetList) { packetListPointer in
-                chunkFunction(packetListPointer)
+                packetCallback(packetListPointer)
             }
             
             // Move to the next chunk
@@ -1422,7 +1378,8 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             return;
         }
         
-        splitDataIntoChunks(bytes: bytes, timestamp: timestamp) { packetListPointer in
+        
+        splitDataIntoMIDIPackets(bytes: bytes, timestamp: timestamp) { packetListPointer in
             let status = MIDIReceived(virtualSourceEndpoint, packetListPointer)
             if(status != noErr){
                 let error = "Error \(status) while publishing MIDI on own virtual source endpoint."
@@ -1583,6 +1540,8 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     var bleMidiPacketLength:UInt8 = 0
     var bleSysExHasFinished = true
     
+    var isBusy = false
+    
     var setupStream : StreamHandler?
     var connectResult : FlutterResult?
     
@@ -1605,12 +1564,12 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     }
     
     override func send(bytes:[UInt8], timestamp: UInt64?) {
-        print("ble send \(id) \(bytes)")
+//        print("ble send \(id) \(bytes)")
         if (characteristic != nil) {
             
             
             let packetSize = peripheral.maximumWriteValueLength(for:writeType)
-            // print("packetSize = \(packetSize)")
+//             print("packetSize = \(packetSize)")
             
             var dataBytes = Data(bytes)
             
@@ -1620,7 +1579,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
                     // First packet
                     var packet = dataBytes.subdata(in: 0..<packetSize-2)
                     
-                    print("count \(dataBytes.count)")
+//                    print("count \(dataBytes.count)")
                     
                     // Insert header(and empty timstamp high) and timestamp low in front Sysex Start
                     packet.insert(0x80, at: 0)
@@ -1710,7 +1669,7 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     func enqueueMidiData(bytes:Data) {
         outboundMessageQueue.append(bytes)
         
-        if (peripheral.canSendWriteWithoutResponse) {
+        if (peripheral.canSendWriteWithoutResponse && !isBusy){
             dequeueMidiBytes()
         }
     }
@@ -1718,17 +1677,15 @@ class ConnectedBLEDevice : ConnectedDevice, CBPeripheralDelegate {
     func dequeueMidiBytes() {
         if (outboundMessageQueue.isEmpty) {
             print("Can't dequeue empty queue - return")
+            isBusy = false
             return
         }
+        isBusy = true
         let messageBytes = outboundMessageQueue.removeFirst()
         peripheral.writeValue(messageBytes, for: characteristic!, type: writeType)
     }
     
     func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
-        if (outboundMessageQueue.isEmpty) {
-            print("Queue empty - return")
-            return
-        }
         dequeueMidiBytes()
     }
     
