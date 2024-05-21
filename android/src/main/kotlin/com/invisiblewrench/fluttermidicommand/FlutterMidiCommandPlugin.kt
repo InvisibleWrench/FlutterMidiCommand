@@ -507,7 +507,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   }
 
   fun listOfPorts(count: Int) :  List<Map<String, Any>> {
-    return (0 until count).map { mapOf("id" to it, "connected" to false) }
+    return (0 until count).map { mapOf("id" to it, "connected" to false, "name" to "") }
+  }
+
+  fun mapForPorts(ports: List<MidiDeviceInfo.PortInfo>) : List<Map<String, Any>> {
+    return ports.mapIndexed { _, portInfo ->
+      mapOf("id" to portInfo.portNumber, "connected" to false, "name" to portInfo.name)
+    }
   }
 
   fun listOfDevices() : List<Map<String, Any>> {
@@ -535,8 +541,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           "id" to id,
           "type" to "bonded",
           "connected" to if (connectedDevices.contains(it.address)) "true" else "false",///*if (connectedGattDeviceIds.contains(id)) "true" else*/ "false",
-          "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
-          "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+          "inputs" to listOf(mapOf("id" to 0, "connected" to false, "name" to "")),
+          "outputs" to listOf(mapOf("id" to 0, "connected" to false, "name" to ""))
         )
       }
     }
@@ -555,30 +561,33 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           "id" to id,
           "type" to "BLE",
           "connected" to if (connectedDevices.contains(id)) "true" else "false",
-          "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
-          "outputs" to listOf(mapOf("id" to 0, "connected" to false))
+          "inputs" to listOf(mapOf("id" to 0, "connected" to false, "name" to "")),
+          "outputs" to listOf(mapOf("id" to 0, "connected" to false, "name" to ""))
         )
       }
     }
 
     // Generic MIDI devices
     val devs:Array<MidiDeviceInfo> = midiManager.devices
-    devs.forEach {
-      var id = Device.deviceIdForInfo(it)
+    devs.forEach { device ->
+      var id = Device.deviceIdForInfo(device)
       Log.d("FlutterMIDICommand", "add device from midiManager id $id")
 
       if (list.contains(id)) {
         Log.d("FlutterMIDICommand", "device already in list $id")
       } else {
-        Log.d("FlutterMIDICommand", "add native device $id type ${it.type}")
+        Log.d("FlutterMIDICommand", "add native device $id type ${device.type}")
+
+        var inputPorts = device.ports.filter { it.type == MidiDeviceInfo.PortInfo.TYPE_INPUT }
+        var outputPorts = device.ports.filter { it.type == MidiDeviceInfo.PortInfo.TYPE_OUTPUT }
 
         list[id] = mapOf(
-          "name" to (it.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"),
+          "name" to (device.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"),
           "id" to id,
           "type" to if (bondedDeviceIds.contains(id)) "bonded" else "native",
           "connected" to if (connectedDevices.contains(id)) "true" else "false",
-          "inputs" to listOfPorts(it.inputPortCount),
-          "outputs" to listOfPorts(it.outputPortCount)
+          "inputs" to mapForPorts(inputPorts),
+          "outputs" to mapForPorts(outputPorts),
         )
       }
     }

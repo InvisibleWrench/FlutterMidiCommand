@@ -314,6 +314,40 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             #else
                 result(nil)
             #endif
+
+        case "enableRawMidiDataReceiving":
+            guard let arguments = call.arguments as? Dictionary<String, Any> else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse arguments", details: call.arguments))
+                return
+            }
+            guard let deviceId = arguments["deviceId"] as? String else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not find `deviceId` in arguments", details: call.arguments))
+                return
+            }
+            guard let enabled = arguments["enabled"] as? Bool else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not find `enabled` in arguments", details: call.arguments))
+                return
+            }
+            guard let device = connectedDevices[deviceId] else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not find device with `deviceId", details: call.arguments))
+                return
+            }
+            device.isRawMidiDataReceivingEnabled = enabled
+
+        case "getRawMidiDataReceivingEnabled":
+            guard let arguments = call.arguments as? Dictionary<String, Any> else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not parse arguments", details: call.arguments))
+                return
+            }
+            guard let deviceId = arguments["deviceId"] as? String else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not find `deviceId` in arguments", details: call.arguments))
+                return
+            }
+            guard let device = connectedDevices[deviceId] else {
+                result(FlutterError.init(code: "MESSAGEERROR", message: "Could not find device with `deviceId", details: call.arguments))
+                return
+            }
+            result(device.isRawMidiDataReceivingEnabled)
                     
         default:
             result(FlutterMethodNotImplemented)
@@ -427,10 +461,46 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
 
     func createPortDict(count:Int) -> Array<Dictionary<String, Any>> {
         return (0..<count).map { (id) -> Dictionary<String, Any> in
-            return ["id": id, "connected" : false]
+            return ["id": id, "connected" : false, "name": ""]
         }
     }
 
+    private func createPortDictForDestinations(for entity: MIDIEntityRef) -> Array<Dictionary<String, Any>> {
+        let count = MIDIEntityGetNumberOfDestinations(entity)
+        var ports = [Dictionary<String, Any>]()
+        for index in 0..<count {
+            let endpoint = MIDIEntityGetDestination(entity, index)
+            let name = getMIDIEndpointName(endpoint)
+            ports.append(["id": index, "connected" : false, "name": name ?? ""])
+        }
+        return ports
+    }
+
+    private func createPortDictForSources(for entity: MIDIEntityRef) -> Array<Dictionary<String, Any>> {
+        let count = MIDIEntityGetNumberOfSources(entity)
+        var ports = [Dictionary<String, Any>]()
+        for index in 0..<count {
+            let endpoint = MIDIEntityGetSource(entity, index)
+            let name = getMIDIEndpointName(endpoint)
+            ports.append(["id": index, "connected" : false, "name": name ?? ""])
+        }
+        return ports
+    }
+
+    func getMIDIEndpointName(_ endpoint: MIDIEndpointRef) -> String? {
+        var cfName: Unmanaged<CFString>?
+        let result = MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, &cfName)
+        
+        if result != noErr {
+            return nil
+        }
+        
+        guard let cfString = cfName?.takeRetainedValue() else {
+            return nil
+        }
+        
+        return cfString as String
+    }
     
     func getDevices() -> [Dictionary<String, Any>] {
         var devices:[Dictionary<String, Any>] = []
@@ -488,7 +558,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" :  deviceId,
                 "type" : isNetwork ? "network" : "native",
                 "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
-                "outputs" : createPortDict(count: entityDestinationCount)
+                "outputs" : createPortDictForDestinations(for: entity)
                 ]
         }
         
@@ -536,7 +606,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
             
             if var deviceDict = nativeDevices[entity] {
 //                print("add inputs to dict")
-                deviceDict["inputs"] = createPortDict(count: entitySourceCount)
+                deviceDict["inputs"] = createPortDictForSources(for: entity)
 //                print(type(of: createPortDict(count: entitySourceCount)))
                 nativeDevices[entity] = deviceDict
             } else {
@@ -546,7 +616,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                     "id" : deviceId,
                     "type" : isNetwork ? "network" : "native",
                     "connected":(connectedDevices.keys.contains(deviceId) ? "true" : "false"),
-                    "inputs" : createPortDict(count: entitySourceCount)
+                    "inputs" : createPortDictForSources(for: entity)
                     ]
             }
         }
@@ -564,8 +634,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                 "id" : id,
                 "type" : "BLE",
                 "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false] as [String:Any]],
-                "outputs" : [["id":0, "connected":false] as [String:Any]]
+                "inputs" : [["id":0, "connected":false, "name": ""] as [String:Any]],
+                "outputs" : [["id":0, "connected":false, "name": ""] as [String:Any]]
                 ])
         }
 
@@ -584,8 +654,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
                         "id" : key,
                         "type" : "BLE",
                         "connected":"true",
-                        "inputs" : [["id":0, "connected":true] as [String:Any]],
-                        "outputs" : [["id":0, "connected":true] as [String:Any]]
+                        "inputs" : [["id":0, "connected":true, "name": ""] as [String:Any]],
+                        "outputs" : [["id":0, "connected":true, "name": ""] as [String:Any]]
                         ])
                 }
             }
@@ -957,11 +1027,13 @@ class Port {
     var id:String
     var deviceType:String
     var streamHandler : StreamHandler
+    var isRawMidiDataReceivingEnabled: Bool
 
     init(id:String, type:String, streamHandler:StreamHandler) {
         self.id = id
         self.deviceType = type
         self.streamHandler = streamHandler
+        self.isRawMidiDataReceivingEnabled = false
     }
 
     func openPorts() {}
@@ -979,7 +1051,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
   var name : String?
   var outEndpoint : MIDIEndpointRef?
   var inSource : MIDIEndpointRef?
-    var deviceInfo:Dictionary<String, String?>
+  var deviceInfo:Dictionary<String, String?>
 
   init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
     self.client = client
@@ -1040,7 +1112,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
       var tmp = p.data
       let data = Data(bytes: &tmp, count: Int(p.length))
       let timestamp = p.timeStamp
-        parseData(data: data, timestamp: timestamp)
+      parseData(data: data, timestamp: timestamp)
       ap = MIDIPacketNext(ap)
     }
   }
@@ -1060,6 +1132,18 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 
     func parseData(data:Data, timestamp:UInt64) {
         if (data.count > 0) {
+          if isRawMidiDataReceivingEnabled {
+            midiBuffer.removeAll()
+            data.withUnsafeBytes { bufferPointer in
+               midiBuffer.append(contentsOf: bufferPointer)
+            }
+            let midiData = ["data": midiBuffer, "timestamp":timestamp, "device":deviceInfo] as [String : Any]
+            DispatchQueue.main.async {
+                self.streamHandler.send(data: midiData)
+            }
+            return
+          }
+
           for i in 0...data.count-1 {
             let midiByte:UInt8 = data[i]
             let midiInt = midiByte & 0xFF

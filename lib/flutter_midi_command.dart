@@ -194,4 +194,15 @@ class MidiCommand {
   void setNetworkSessionEnabled(bool enabled) {
     _platform.setNetworkSessionEnabled(enabled);
   }
+
+  /// Returns the current state of the raw MIDI packet receiving flag.
+  Future<bool?> getRawMidiDataReceivingEnabled(String deviceId) {
+    return _platform.getRawMidiDataReceivingEnabled(deviceId);
+  }
+
+  /// When enabled all incoming MIDI packets are transmitted exactly as received,
+  /// without compiling them into well formed MIDI messages.
+  Future<void> setRawMidiDataReceivingEnabled(String deviceId, bool enabled) {
+    return _platform.setRawMidiDataReceivingEnabled(deviceId, enabled);
+  }
 }
