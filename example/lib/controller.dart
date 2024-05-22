@@ -59,8 +59,7 @@ class MidiControlsState extends State<MidiControls> {
       var timestamp = packet.timestamp;
       var device = packet.device;
       if (kDebugMode) {
-        print(
-            "data $data @ time $timestamp from device ${device.name}:${device.id}");
+        print("data $data @ time $timestamp from device ${device.name}:${device.id}");
       }
 
       var status = data[0];
@@ -125,8 +124,7 @@ class MidiControlsState extends State<MidiControls> {
         SteppedSelector('Channel', _channel + 1, 1, 16, _onChannelChanged),
         const Divider(),
         Text("CC", style: Theme.of(context).textTheme.titleLarge),
-        SteppedSelector(
-            'Controller', _controller, 0, 127, _onControllerChanged),
+        SteppedSelector('Controller', _controller, 0, 127, _onControllerChanged),
         SlidingSelector('Value', _ccValue, 0, 127, _onValueChanged),
         const Divider(),
         Text("NRPN", style: Theme.of(context).textTheme.titleLarge),
@@ -158,7 +156,20 @@ class MidiControlsState extends State<MidiControls> {
               NoteOffMessage(note: note).send();
             },
           ),
-        )
+        ),
+        const Divider(),
+        Text("SysEx", style: Theme.of(context).textTheme.titleLarge),
+        ...[64, 128, 256, 512, 768, 1024]
+            .map(
+              (e) => Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ElevatedButton(
+                  onPressed: () => _sendSysex(e),
+                  child: Text('Send $e bytes'),
+                ),
+              ),
+            )
+            .toList(),
       ],
     );
   }
@@ -186,16 +197,14 @@ class MidiControlsState extends State<MidiControls> {
     setState(() {
       _ccValue = newValue;
     });
-    CCMessage(channel: _channel, controller: _controller, value: _ccValue)
-        .send();
+    CCMessage(channel: _channel, controller: _controller, value: _ccValue).send();
   }
 
   _onNRPNValueChanged(int newValue) {
     setState(() {
       _nrpnValue = newValue;
     });
-    NRPN4Message(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue)
-        .send();
+    NRPN4Message(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue).send();
   }
 
   _onNRPNCtrlChanged(int newValue) {
@@ -210,6 +219,17 @@ class MidiControlsState extends State<MidiControls> {
     });
     PitchBendMessage(channel: _channel, bend: _pitchValue).send();
   }
+
+  void _sendSysex(int length) {
+    print("Send $length SysEx bytes");
+    final data = Uint8List(length);
+    data[0] = 0xF0;
+    for (int i = 0; i < length -1; i++) {
+      data[i+1] = i % 0x80;
+    }
+    data[length - 1] = 0xF7;
+    _midiCommand.sendData(data);
+  }
 }
 
 class SteppedSelector extends StatelessWidget {
@@ -219,10 +239,7 @@ class SteppedSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  const SteppedSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback,
-      {Key? key})
-      : super(key: key);
+  const SteppedSelector(this.label, this.value, this.minValue, this.maxValue, this.callback, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -257,10 +274,7 @@ class SlidingSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  const SlidingSelector(
-      this.label, this.value, this.minValue, this.maxValue, this.callback,
-      {Key? key})
-      : super(key: key);
+  const SlidingSelector(this.label, this.value, this.minValue, this.maxValue, this.callback, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
