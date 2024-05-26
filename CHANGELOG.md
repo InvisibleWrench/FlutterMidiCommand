@@ -1,6 +1,11 @@
 ## 0.5.0
+Added Windows support
 
-Added basic Windows support
+## 0.4.17
+Updated Android Gradle
+
+## 0.4.16
+Fixed SysEx error on macOS when sending big data chunks of SysEx
 
 ## 0.4.15
 Fixed more threading bugs on iOS

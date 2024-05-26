@@ -13,15 +13,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
 
     <application>
-                <service android:name=".VirtualDeviceService"
-                    android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE"
-                    android:enabled="false"
-                    android:exported="true">
-                    <intent-filter>
-                        <action android:name="android.media.midi.MidiDeviceService" />
-                    </intent-filter>
-                    <meta-data android:name="android.media.midi.MidiDeviceService"
-                        android:resource="@xml/virtual_device_info" />
-                </service>
+        <service android:name="com.invisiblewrench.fluttermidicommand.VirtualDeviceService"
+            android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.midi.MidiDeviceService" />
+            </intent-filter>
+            <meta-data android:name="android.media.midi.MidiDeviceService"
+                android:resource="@xml/virtual_device_info" />
+        </service>
     </application>
 </manifest>

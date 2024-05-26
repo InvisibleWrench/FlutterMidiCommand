@@ -154,6 +154,19 @@ class MidiControlsState extends State<MidiControls> {
             },
           ),
         ),
+        const Divider(),
+        Text("SysEx", style: Theme.of(context).textTheme.titleLarge),
+        ...[64, 128, 256, 512, 768, 1024]
+            .map(
+              (e) => Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ElevatedButton(
+                  onPressed: () => _sendSysex(e),
+                  child: Text('Send $e bytes'),
+                ),
+              ),
+            )
+            .toList(),
       ],
     );
   }
@@ -202,6 +215,17 @@ class MidiControlsState extends State<MidiControls> {
       _pitchValue = newValue;
     });
     PitchBendMessage(channel: _channel, bend: _pitchValue).send();
+  }
+
+  void _sendSysex(int length) {
+    print("Send $length SysEx bytes");
+    final data = Uint8List(length);
+    data[0] = 0xF0;
+    for (int i = 0; i < length -1; i++) {
+      data[i+1] = i % 0x80;
+    }
+    data[length - 1] = 0xF7;
+    _midiCommand.sendData(data);
   }
 }
 
