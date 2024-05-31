@@ -150,10 +150,10 @@ class MidiControlsState extends State<MidiControls> {
           child: VirtualPiano(
             noteRange: const RangeValues(48, 76),
             onNotePressed: (note, vel) {
-              NoteOnMessage(note: note, velocity: 100).send();
+              NoteOnMessage(channel: _channel, note: note, velocity: 100).send();
             },
             onNoteReleased: (note) {
-              NoteOffMessage(note: note).send();
+              NoteOffMessage(channel: _channel, note: note).send();
             },
           ),
         ),
