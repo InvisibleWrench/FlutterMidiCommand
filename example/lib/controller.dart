@@ -52,9 +52,6 @@ class MidiControlsState extends State<MidiControls> {
       print('init controller');
     }
     _rxSubscription = _midiCommand.onMidiDataReceived?.listen((packet) {
-      if (kDebugMode) {
-        print('received packet $packet');
-      }
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;

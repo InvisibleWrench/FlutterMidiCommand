@@ -1,3 +1,9 @@
+## 0.5.1
+Added BLE support on Windows
+
+## 0.5.0
+Added Windows support
+
 ## 0.4.17
 Updated Android Gradle
 
