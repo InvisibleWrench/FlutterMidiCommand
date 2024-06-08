@@ -215,6 +215,14 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         stopVirtualService()
       }
 
+      "isNetworkSessionEnabled" -> {
+        result.success(false)
+      }
+
+      "enableNetworkSession" -> {
+        result.success(null)
+      }
+
       else -> {
         result.notImplemented()
       }
