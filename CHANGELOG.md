@@ -1,5 +1,7 @@
-## 0.5.0
+## 0.5.1
+Added BLE support on Windows
 
+## 0.5.0
 Added basic Windows support
 
 ## 0.4.15
