@@ -1,3 +1,7 @@
+## 0.5.2
+Added Recorder to Example App
+Merge PR #118, Thanks to Donkermand
+
 ## 0.5.1
 Added BLE support on Windows
 
