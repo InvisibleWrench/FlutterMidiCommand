@@ -16,7 +16,7 @@ class ControllerPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Controls'),
+        title: Text(device.name),
       ),
       body: MidiControls(device),
     );
@@ -179,7 +179,6 @@ class MidiControlsState extends State<MidiControls> {
               Expanded(child: Container()),
               Switch(value: _recorder.recording, onChanged: (newValue){
                 setState(() {
-
                   if (newValue) {
                     _recorder.startRecording();
                   } else {
