@@ -1,5 +1,6 @@
 package com.invisiblewrench.fluttermidicommand
 
+import android.bluetooth.BluetoothDevice
 import android.content.pm.ServiceInfo
 import android.media.midi.*
 import android.os.Handler
