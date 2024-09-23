@@ -195,6 +195,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         val errorMsg =  connectToDevice(deviceId, device["type"].toString())
         if (errorMsg != null) {
           result.error("ERROR", errorMsg, null)
+        } else {
+          result.success(null)
         }
       }
       "disconnectDevice" -> {
@@ -602,8 +604,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
         val device = ConnectedDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
-        var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
-        device.connectWithStreamHandler(rxStreamHandler, result)
+        device.connectWithStreamHandler(rxStreamHandler)
         Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
         connectedDevices[device.id] = device
       }
@@ -628,6 +629,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         connectedDevices[id]?.also {
           Log.d("FlutterMIDICommand","remove removed device $it")
           connectedDevices.remove(id)
+          discoveredDevices.removeIf { discoveredDevice -> discoveredDevice.address == id }
+          ongoingConnections.remove(id)
         }
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceLost")
       }

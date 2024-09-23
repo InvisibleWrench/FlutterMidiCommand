@@ -1,5 +1,6 @@
 package com.invisiblewrench.fluttermidicommand
 
+import android.bluetooth.BluetoothDevice
 import android.media.midi.MidiDevice
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiReceiver
@@ -26,7 +27,7 @@ abstract class Device {
     companion object {
         fun deviceIdForInfo(info: MidiDeviceInfo): String {
             var isBluetoothDevice = info.type == MidiDeviceInfo.TYPE_BLUETOOTH
-            var deviceId: String = if (isBluetoothDevice) info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else info.id.toString()
+            var deviceId: String = if (isBluetoothDevice) (info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE) as BluetoothDevice).address else info.id.toString()
             return deviceId
         }
     }

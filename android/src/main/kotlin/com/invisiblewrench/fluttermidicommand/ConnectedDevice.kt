@@ -17,7 +17,7 @@ class ConnectedDevice : Device {
         this.setupStreamHandler = setupStreamHandler
     }
 
-    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler, connectResult:Result?) {
+    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler) {
         Log.d("FlutterMIDICommand","connectWithHandler")
 
         this.midiDevice.info?.let {
@@ -48,7 +48,6 @@ class ConnectedDevice : Device {
         }
 
         Handler().postDelayed({
-            connectResult?.success(null)
             setupStreamHandler?.send("deviceConnected")
         }, 2500)
     }
@@ -115,7 +114,11 @@ class ConnectedDevice : Device {
     class RXReceiver(stream: FMCStreamHandler, device: MidiDevice) : MidiReceiver() {
         val stream = stream
         var isBluetoothDevice = device.info.type == MidiDeviceInfo.TYPE_BLUETOOTH
-        val deviceInfo = mapOf("id" to if(isBluetoothDevice) device.info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE).toString() else device.info.id.toString(), "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME), "type" to if(isBluetoothDevice) "BLE" else "native")
+        val deviceInfo = mapOf(
+            "id" to if (isBluetoothDevice) (device.info.properties.get(MidiDeviceInfo.PROPERTY_BLUETOOTH_DEVICE) as BluetoothDevice).address else device.info.id.toString(),
+            "name" to device.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME),
+            "type" to if (isBluetoothDevice) "BLE" else "native"
+        )
 
         // MIDI parsing
         enum class PARSER_STATE
