@@ -23,7 +23,7 @@ apply plugin: "kotlin-android"
 
 android {
     if (project.android.hasProperty("namespace")) {
-        namespace = "com.invisiblewrench.flutter_midi_command"
+        namespace = "com.invisiblewrench.fluttermidicommand"
     }
 
     compileSdk = 34
