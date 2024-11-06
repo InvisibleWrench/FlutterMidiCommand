@@ -187,7 +187,7 @@ class _MyAppState extends State<MyApp> {
                     return ListTile(
                       title: Text(
                         device.name,
-                        style: Theme.of(context).textTheme.headline5,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       subtitle: Text("ins:${device.inputPorts.length} outs:${device.outputPorts.length}, ${device.id}, ${device.type}"),
                       leading: Icon(device.connected ? Icons.radio_button_on : Icons.radio_button_off),

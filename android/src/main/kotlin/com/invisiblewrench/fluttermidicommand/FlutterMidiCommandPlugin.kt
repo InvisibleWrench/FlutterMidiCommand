@@ -239,6 +239,14 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         stopVirtualService()
       }
 
+      "isNetworkSessionEnabled" -> {
+        result.success(false)
+      }
+
+      "enableNetworkSession" -> {
+        result.success(null)
+      }
+
       else -> {
         result.notImplemented()
       }

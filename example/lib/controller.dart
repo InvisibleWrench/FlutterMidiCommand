@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
+import 'package:flutter_midi_command_example/recorder.dart';
 import 'package:flutter_virtual_piano/flutter_virtual_piano.dart';
 
 class ControllerPage extends StatelessWidget {
@@ -15,7 +16,7 @@ class ControllerPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Controls'),
+        title: Text(device.name),
       ),
       body: MidiControls(device),
     );
@@ -46,21 +47,20 @@ class MidiControlsState extends State<MidiControls> {
   StreamSubscription<MidiPacket>? _rxSubscription;
   final MidiCommand _midiCommand = MidiCommand();
 
+  final MidiRecorder _recorder = MidiRecorder();
+
   @override
   void initState() {
     if (kDebugMode) {
       print('init controller');
     }
     _rxSubscription = _midiCommand.onMidiDataReceived?.listen((packet) {
-      if (kDebugMode) {
-        print('received packet $packet');
-      }
       var data = packet.data;
       var timestamp = packet.timestamp;
       var device = packet.device;
-      if (kDebugMode) {
-        print("data $data @ time $timestamp from device ${device.name}:${device.id}");
-      }
+      // if (kDebugMode) {
+      //   print("data $data @ time $timestamp from device ${device.name}:${device.id}");
+      // }
 
       var status = data[0];
 
@@ -150,10 +150,10 @@ class MidiControlsState extends State<MidiControls> {
           child: VirtualPiano(
             noteRange: const RangeValues(48, 76),
             onNotePressed: (note, vel) {
-              NoteOnMessage(note: note, velocity: 100).send();
+              NoteOnMessage(channel: _channel, note: note, velocity: 100).send();
             },
             onNoteReleased: (note) {
-              NoteOffMessage(note: note).send();
+              NoteOffMessage(channel: _channel, note: note).send();
             },
           ),
         ),
@@ -170,6 +170,32 @@ class MidiControlsState extends State<MidiControls> {
               ),
             )
             .toList(),
+        const Divider(),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Text("Recorder", style: Theme.of(context).textTheme.titleLarge),
+              Expanded(child: Container()),
+              Switch(value: _recorder.recording, onChanged: (newValue){
+                setState(() {
+                  if (newValue) {
+                    _recorder.startRecording();
+                  } else {
+                    _recorder.stopRecording();
+                  }
+                });
+              }),
+              TextButton(onPressed: (){
+                _recorder.exportRecording();
+              }, child: const Text("Export CSV")),
+              TextButton(onPressed: (){
+                _recorder.clearRecording();
+              }, child: const Text("Clear"))
+            ],
+
+          ),
+        )
       ],
     );
   }

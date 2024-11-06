@@ -1140,8 +1140,9 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
                     sysExBuffer.append(midiByte)
                     if (midiInt == 0xF7) {
                         // Sysex complete
+                        let sysExBufferCopy:[UInt8] = self.sysExBuffer; // local copy of data to be handled async
                         DispatchQueue.main.async {
-                            self.streamHandler.send(data: ["data": self.sysExBuffer, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
+                            self.streamHandler.send(data: ["data": sysExBufferCopy, "timestamp":timestamp, "device":self.deviceInfo] as [String:Any])
                         }
                         parserState = PARSER_STATE.HEADER
                     }
@@ -1191,7 +1192,6 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
     
     var entity : MIDIEntityRef?
-    
     
     override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
         super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
@@ -1288,11 +1288,6 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
     }
     
     override func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
-        let packets = packetList.pointee
-        let packet:MIDIPacket = packets.packet
-        var ap = buffer
-        ap.initialize(to:packet)
-        
         //        let deviceInfo = ["name" : name,
         //                          "id": String(id),
         //                          "type":"native"]
@@ -1304,19 +1299,60 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             timestampFactor = Double(tb.numer) / Double(tb.denom)
         }
         
-        //        print("tb \(tb) timestamp \(timestampFactor)")
-        
-        for _ in 0 ..< packets.numPackets {
-            let p = ap.pointee
-            var tmp = p.data
-            let data = Data(bytes: &tmp, count: Int(p.length))
-            let timestamp = UInt64(round(Double(p.timeStamp) * timestampFactor))
-            parseData(data: data, timestamp: timestamp)
-            ap = MIDIPacketNext(ap)
+        // New implementation: Handles packages with a size larger then 256 bytes
+        if #available(macOS 10.15, iOS 13.0, *) {
+            let packetListSize = MIDIPacketList.sizeInBytes(pktList: packetList)
+            
+            // Copy raw data from packetList
+            let packetListAsRawData = Data(bytes: packetList, count: packetListSize)
+            var packetNumber = 0
+            
+            for packet in packetList.unsafeSequence() {
+                let offsetStart = getOffsetForPackageData(packetList: packetList, packageNumber: (Int)(packetNumber))
+                let offsetEnd = (offsetStart + (Int)(packet.pointee.length) - 1)
+                let packetData = packetListAsRawData.subdata(in: Range(offsetStart...offsetEnd))
+
+                let timestamp = UInt64(round(Double(packet.pointee.timeStamp) * timestampFactor))
+                
+                parseData(data: packetData, timestamp: timestamp)
+                
+                packetNumber += 1
+            }
+        } else {
+            // Original implementation: This implementation will not work with packages larger than 256 bytes
+            // The issue is due to the line (see below): let packet:MIDIPacket = packets.packet
+            // which will only copy the first 256 bytes from the received data
+            let packets = packetList.pointee
+            let packet:MIDIPacket = packets.packet // This will only copy the first 256 bytes!
+            var ap = buffer
+            ap.initialize(to:packet)
+            
+            //        print("tb \(tb) timestamp \(timestampFactor)")
+            for _ in 0 ..< packets.numPackets {
+                let p = ap.pointee
+                var tmp = p.data
+                let data = Data(bytes: &tmp, count: Int(p.length))
+                let timestamp = UInt64(round(Double(p.timeStamp) * timestampFactor))
+                parseData(data: data, timestamp: timestamp)
+                ap = MIDIPacketNext(ap)
+            }
+            //        ap.deallocate()
         }
-        
-        //        ap.deallocate()
     }
+    
+    func getOffsetForPackageData(packetList: UnsafePointer<MIDIPacketList>, packageNumber: Int) -> Int {
+            if #available(macOS 10.15, iOS 13.0, *) {
+                var packageCount = 0
+                for packet in packetList.unsafeSequence() {
+                    if (packageCount == packageNumber) {
+                        return (Int)(UInt(bitPattern:Int(Int(bitPattern: packet))) - UInt(bitPattern:Int(Int(bitPattern: packetList)))) + MemoryLayout.offset(of: \MIDIPacket.data)!
+                    }
+                        
+                    packageCount += 1
+                }
+            }
+            return -1
+        }
 }
 
 class ConnectedVirtualDevice : ConnectedVirtualOrNativeDevice {

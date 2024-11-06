@@ -1,3 +1,16 @@
+## 0.5.2
+Added Recorder to Example App
+Merge PR #118, Thanks to Donkermand
+
+## 0.5.1
+Added BLE support on Windows
+
+## 0.5.0
+Added Windows support
+
+## 0.4.17
+Updated Android Gradle
+
 ## 0.4.16
 Fixed SysEx error on macOS when sending big data chunks of SysEx
 
