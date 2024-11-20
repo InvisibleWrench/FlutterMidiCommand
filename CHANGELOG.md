@@ -1,3 +1,6 @@
+## Next
+Adds a runtime check to ensure MIDI is available on the android device before starting. See #125 for further details.
+
 ## 0.5.2
 Added Recorder to Example App
 Merge PR #118, Thanks to Donkermand
