@@ -13,7 +13,7 @@ rootProject.allprojects {
 
 android {
     namespace = "com.invisiblewrench.flutter_midi_command_example"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34 // use flutter.compileSdkVersion  when Flutter 3.27.0 is widely used
 
     sourceSets {
         getByName("main").java.srcDirs("src/main/kotlin")

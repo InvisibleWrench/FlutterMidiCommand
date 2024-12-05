@@ -18,7 +18,7 @@ val flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "
 val flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0"
 
 android {
-  compileSdk = flutter.compileSdkVersion
+  compileSdk = 34 // use flutter.compileSdkVersion  when Flutter 3.27.0 is widely used
 
   namespace = "com.invisiblewrench.fluttermidicommand_example"
   sourceSets { getByName("main").java.srcDirs("src/main/kotlin") }
