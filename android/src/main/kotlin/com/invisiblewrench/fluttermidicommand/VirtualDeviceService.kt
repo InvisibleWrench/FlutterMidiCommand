@@ -11,7 +11,7 @@ class VirtualDeviceService() : MidiDeviceService() {
     override fun onGetInputPortReceivers(): Array<MidiReceiver> {
         Log.d("FlutterMIDICommand", "Create recevier $this")
         if (receiver == null) {
-            receiver = VirtualRXReceiver(FlutterMidiCommandPlugin.rxStreamHandler)
+            receiver = VirtualRXReceiver(rxStreamHandler)
         }
         return  arrayOf(receiver!!)
     }
@@ -42,6 +42,12 @@ class VirtualDeviceService() : MidiDeviceService() {
             Log.d("FlutterMIDICommand", "Send override")
             super.send(msg, offset, count)
         }
+    }
+
+    companion
+
+    object {
+      lateinit var rxStreamHandler: FMCStreamHandler
     }
 
 }
