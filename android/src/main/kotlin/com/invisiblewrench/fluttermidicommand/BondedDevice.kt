@@ -27,7 +27,7 @@ class BondedDevice  : Device {
 
         this.receiver = receiver
 
-        connectResult.success(null)
+        connectResult?.success(null)
     }
 
 
