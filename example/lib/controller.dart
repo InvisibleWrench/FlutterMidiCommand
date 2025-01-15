@@ -169,7 +169,7 @@ class MidiControlsState extends State<MidiControls> {
                 ),
               ),
             )
-            .toList(),
+            ,
         const Divider(),
         Padding(
           padding: const EdgeInsets.all(8.0),

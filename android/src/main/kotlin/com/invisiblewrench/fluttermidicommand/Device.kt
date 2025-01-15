@@ -17,5 +17,4 @@ abstract class Device {
 
     abstract fun close()
 
-
 }

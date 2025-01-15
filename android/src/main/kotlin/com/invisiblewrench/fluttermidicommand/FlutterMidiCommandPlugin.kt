@@ -29,51 +29,54 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.*
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.PluginRegistry.Registrar
-import java.util.*
 
 /** FlutterMidiCommandPlugin */
 class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.RequestPermissionsResultListener {
 
   lateinit var context: Context
-  private var activity:Activity? = null
-  lateinit var  messenger:BinaryMessenger
+  private var activity: Activity? = null
+  lateinit var messenger: BinaryMessenger
 
-  private lateinit var midiManager:MidiManager
+  private lateinit var midiManager: MidiManager
   private lateinit var handler: Handler
+
+  private var isSupported: Boolean = false
 
   private var connectedDevices = mutableMapOf<String, Device>()
 
-  lateinit var rxChannel:EventChannel
-  lateinit var setupChannel:EventChannel
-  lateinit var setupStreamHandler:FMCStreamHandler
-  lateinit var bluetoothStateChannel:EventChannel
-  lateinit var bluetoothStateHandler:FMCStreamHandler
+  lateinit var rxChannel: EventChannel
+  lateinit var setupChannel: EventChannel
+  lateinit var setupStreamHandler: FMCStreamHandler
+  lateinit var bluetoothStateChannel: EventChannel
+  lateinit var bluetoothStateHandler: FMCStreamHandler
+  lateinit var rxStreamHandler: FMCStreamHandler
   var bluetoothState: String = "unknown"
     set(value) {
-      bluetoothStateHandler.send(value);
+      bluetoothStateHandler.send(value)
       field = value
     }
 
+  var bluetoothAdapter: BluetoothAdapter? = null
+  var bluetoothScanner: BluetoothLeScanner? = null
 
   var bluetoothAdapter:BluetoothAdapter? = null
   var central: BluetoothCentralManager? = null
   private val HW_ENABLE_BLUETOOTH = 95452 // arbitrary
   private val PERMISSIONS_REQUEST_ACCESS_LOCATION = 95453 // arbitrary
 var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
+  var discoveredDevices = mutableSetOf<BluetoothDevice>()
   var ongoingConnections = mutableMapOf<String, Result>()
 
   var blManager:BluetoothManager? = null
 
-
-  //#region Lifetime functions
-  override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-    messenger = flutterPluginBinding.binaryMessenger
-    context = flutterPluginBinding.applicationContext
+  // #region Lifetime functions
+  override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    messenger = binding.binaryMessenger
+    context = binding.applicationContext
   }
 
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-    print("detached from engine")
+    teardownChannels()
   }
 
   override fun onAttachedToActivity(p0: ActivityPluginBinding) {
@@ -106,41 +109,21 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     central?.close()
   }
 
-  //#endregion
-
-
-  // This static function is optional and equivalent to onAttachedToEngine. It supports the old
-  // pre-Flutter-1.12 Android projects. You are encouraged to continue supporting
-  // plugin registration via this function while apps migrate to use the new Android APIs
-  // post-flutter-1.12 via https://flutter.dev/go/android-project-migration.
-  //
-  // It is encouraged to share logic between onAttachedToEngine and registerWith to keep
-  // them functionally equivalent. Only one of onAttachedToEngine or registerWith will be called
-  // depending on the user's project. onAttachedToEngine or registerWith must both be defined
-  // in the same class.
-  companion object {
-    @JvmStatic
-    fun registerWith(registrar: Registrar) {
-      var instance = FlutterMidiCommandPlugin()
-      instance.messenger = registrar.messenger()
-      instance.context = registrar.activeContext()
-      instance.activity = registrar.activity()
-      instance.setup()
-    }
-
-    var serviceUUID = UUID.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
-    var characteristicUUID = UUID.fromString("7772E5DB-3868-4112-A1A9-F2669D106BF3")
-
-
-    lateinit var rxStreamHandler:FMCStreamHandler
-  }
-
-
+  // #endregion
 
   fun setup() {
     print("setup")
+
+    isSupported =
+      context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI) &&
+      context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)
+
     val channel = MethodChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command")
     channel.setMethodCallHandler(this)
+
+    if (!isSupported) {
+      return
+    }
 
     handler = Handler(context.mainLooper)
     midiManager = context.getSystemService(Context.MIDI_SERVICE) as MidiManager
@@ -148,7 +131,8 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
     rxStreamHandler = FMCStreamHandler(handler)
     rxChannel = EventChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command/rx_channel")
-    rxChannel.setStreamHandler( rxStreamHandler )
+    rxChannel.setStreamHandler(rxStreamHandler)
+    VirtualDeviceService.rxStreamHandler = rxStreamHandler
 
     setupStreamHandler = FMCStreamHandler(handler)
     setupChannel = EventChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command/setup_channel")
@@ -162,6 +146,11 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
   override fun onMethodCall(call: MethodCall, result: Result): Unit {
 //    Log.d("FlutterMIDICommand","call method ${call.method}")
+
+    if (!isSupported) {
+      result.error("ERROR", "MIDI not supported", null)
+      return
+    }
 
     when (call.method) {
       "sendData" -> {
@@ -216,7 +205,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
           result.error("ERROR", "Already connecting to device", deviceId)
         }
         ongoingConnections[deviceId] = result
-        val errorMsg =  connectToDevice(deviceId, device["type"].toString())
+        val errorMsg = connectToDevice(deviceId, device["type"].toString())
         if (errorMsg != null) {
           result.error("ERROR", errorMsg, null)
         }
@@ -259,6 +248,10 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     pm.setComponentEnabledSetting(comp, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.SYNCHRONOUS or PackageManager.DONT_KILL_APP)
   }
 
+  private fun teardownChannels() {
+    // Teardown channels
+  }
+
   fun stopVirtualService() {
     val comp = ComponentName(context, "com.invisiblewrench.fluttermidicommand.VirtualDeviceService")
     val pm = context.packageManager
@@ -268,7 +261,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   fun appName() : String {
     val pm: PackageManager = context.getPackageManager()
     val info: PackageInfo = pm.getPackageInfo(context.getPackageName(), 0)
-    return info.applicationInfo.loadLabel(pm).toString()
+    return info.applicationInfo?.loadLabel(pm).toString()
   }
 
   private fun tryToInitBT() : String? {
@@ -569,6 +562,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         val device = NativeDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
         var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
         device.connectWithStreamHandler(rxStreamHandler, result)
+
         Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
         connectedDevices[device.id] = device
         ongoingConnections.remove(device.id)
@@ -594,6 +588,8 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         connectedDevices[id]?.also {
           Log.d("FlutterMIDICommand","remove removed device $it")
           connectedDevices.remove(id)
+          discoveredDevices.removeIf { discoveredDevice -> discoveredDevice.address == id }
+          ongoingConnections.remove(id)
         }
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceLost")
       }
