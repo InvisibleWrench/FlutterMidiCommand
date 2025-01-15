@@ -38,7 +38,7 @@ android {
 
   defaultConfig {
     applicationId = "com.invisiblewrench.fluttermidicommand_example"
-    minSdkVersion(24)
+    minSdkVersion(28)
     targetSdk = flutter.targetSdkVersion
     versionCode = flutter.versionCode
     versionName = flutter.versionName

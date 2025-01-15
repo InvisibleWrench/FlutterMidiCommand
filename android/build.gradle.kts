@@ -3,11 +3,17 @@ plugins {
     id("kotlin-android")
 }
 
+dependencies {
+    implementation("com.github.weliem:blessed-android:2.5.0")
+    implementation("com.jakewharton.timber:timber:5.0.1")
+}
+
 rootProject.allprojects {
     repositories {
         google()
         jcenter()
         mavenCentral()
+        maven { setUrl("https://jitpack.io") }
     }
 }
 

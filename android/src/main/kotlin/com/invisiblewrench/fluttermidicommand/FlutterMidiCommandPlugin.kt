@@ -64,7 +64,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   private val HW_ENABLE_BLUETOOTH = 95452 // arbitrary
   private val PERMISSIONS_REQUEST_ACCESS_LOCATION = 95453 // arbitrary
 var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
-  var discoveredDevices = mutableSetOf<BluetoothDevice>()
   var ongoingConnections = mutableMapOf<String, Result>()
 
   var blManager:BluetoothManager? = null
