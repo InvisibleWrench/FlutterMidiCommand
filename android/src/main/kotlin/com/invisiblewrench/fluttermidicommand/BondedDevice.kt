@@ -11,22 +11,17 @@ class BondedDevice  : Device {
     lateinit var device: BluetoothDevice
     lateinit var context: Context
 
-    var result:Result? = null
-
     var socket: BluetoothSocket? = null
-
     constructor(device: BluetoothDevice, context: Context) : super(device.address, "Bonded") {
         this.device = device
         this.context = context
 
         device.fetchUuidsWithSdp()
     }
-
-    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler, connectResult:Result?) {
+    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler) {
         Log.d("FlutterMIDICommand","connect bonded")
 
         this.setupStreamHandler = streamHandler
-        this.result = connectResult
 
 //      device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE )
 
