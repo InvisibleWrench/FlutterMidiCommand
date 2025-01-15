@@ -25,7 +25,7 @@ class MidiMessage {
 
   /// Send the message bytes to all connected devices
   void send() {
-    print("send $data");
+    // print("send $data");
     MidiCommand().sendData(data);
   }
 }

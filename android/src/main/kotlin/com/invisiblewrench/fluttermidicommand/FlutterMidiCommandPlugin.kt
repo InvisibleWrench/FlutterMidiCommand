@@ -31,6 +31,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   private lateinit var midiManager:MidiManager
   private lateinit var handler: Handler
 
+  private var isSupported: Boolean = false
+
   private var connectedDevices = mutableMapOf<String, Device>()
 
   lateinit var rxChannel:EventChannel
@@ -123,8 +125,17 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
   fun setup() {
     print("setup")
+
+    isSupported = 
+      context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI) && 
+      context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)
+
     val channel = MethodChannel(messenger, "plugins.invisiblewrench.com/flutter_midi_command")
     channel.setMethodCallHandler(this)
+
+    if (!isSupported) {
+      return
+    }
 
     handler = Handler(context.mainLooper)
     midiManager = context.getSystemService(Context.MIDI_SERVICE) as MidiManager
@@ -146,6 +157,11 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
   override fun onMethodCall(call: MethodCall, result: Result): Unit {
 //    Log.d("FlutterMIDICommand","call method ${call.method}")
+
+    if (!isSupported) {
+      result.error("ERROR", "MIDI not supported", null)
+      return
+    }
 
     when (call.method) {
       "sendData" -> {
@@ -390,6 +406,10 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           grantResults: IntArray): Boolean {
     Log.d("FlutterMIDICommand", "Permissions code: $requestCode grantResults: $grantResults")
 
+    if (!isSupported) {
+      Log.d("FlutterMIDICommand", "MIDI not supported")
+      return false;
+    }
 
     if (requestCode == PERMISSIONS_REQUEST_ACCESS_LOCATION && grantResults?.get(0) == PackageManager.PERMISSION_GRANTED) {
       startScanningLeDevices()

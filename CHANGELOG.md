@@ -1,3 +1,12 @@
+## 0.5.3
+Adds a runtime check to ensure MIDI is available on the android device before starting. See #125 for further details.
+Make plugin work with Flutter 3.27.0 and Android Studio Lady Bug. #127
+Removed package name from AndroidManifest.xml #126
+
+## 0.5.2
+Added Recorder to Example App
+Merge PR #118, Thanks to Donkermand
+
 ## 0.5.1
 Added BLE support on Windows
 
