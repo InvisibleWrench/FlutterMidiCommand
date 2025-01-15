@@ -18,7 +18,7 @@ abstract class Device {
         this.type = type
     }
 
-    abstract fun connectWithStreamHandler(streamHandler: FMCStreamHandler)
+    abstract fun connectWithStreamHandler(streamHandler: FMCStreamHandler, connectResult:Result?)
 
     abstract fun send(data: ByteArray, timestamp: Long?)
 

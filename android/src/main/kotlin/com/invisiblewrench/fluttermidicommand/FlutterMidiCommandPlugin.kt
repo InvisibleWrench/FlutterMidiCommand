@@ -195,8 +195,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
         val errorMsg =  connectToDevice(deviceId, device["type"].toString())
         if (errorMsg != null) {
           result.error("ERROR", errorMsg, null)
-        } else {
-          result.success(null)
         }
       }
       "disconnectDevice" -> {
@@ -604,7 +602,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       Log.d("FlutterMIDICommand", "onDeviceOpened")
       it?.also {
         val device = ConnectedDevice(it, this@FlutterMidiCommandPlugin.setupStreamHandler)
-        device.connectWithStreamHandler(rxStreamHandler)
+        var result = this@FlutterMidiCommandPlugin.ongoingConnections[device.id]
+        device.connectWithStreamHandler(rxStreamHandler, result)
+
         Log.d("FlutterMIDICommand", "Opened device id ${device.id}")
         connectedDevices[device.id] = device
       }

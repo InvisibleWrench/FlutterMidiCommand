@@ -18,7 +18,7 @@ class ConnectedDevice : Device {
         this.setupStreamHandler = setupStreamHandler
     }
 
-    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler) {
+    override fun connectWithStreamHandler(streamHandler: FMCStreamHandler, connectResult:Result?) {
         Log.d("FlutterMIDICommand","connectWithHandler")
 
         this.midiDevice.info?.let {
@@ -26,10 +26,6 @@ class ConnectedDevice : Device {
             Log.d("FlutterMIDICommand","inputPorts ${it.inputPortCount} outputPorts ${it.outputPortCount}")
 
             this.receiver = RXReceiver(streamHandler, this.midiDevice)
-//
-//        it.ports.forEach {
-//          Log.d("FlutterMIDICommand", "${it.name} ${it.type} ${it.portNumber}")
-//        }
 
             var serviceInfo = it.properties.getParcelable<ServiceInfo>("service_info")
             if (serviceInfo?.name == "com.invisiblewrench.fluttermidicommand.VirtualDeviceService") {
@@ -48,38 +44,13 @@ class ConnectedDevice : Device {
             }
         }
 
+
+
         Handler().postDelayed({
             setupStreamHandler?.send("deviceConnected")
+            connectResult.success(null)
         }, 2500)
     }
-
-//    fun openPorts(ports: List<Port>) {
-//      this.midiDevice.info?.let { deviceInfo ->
-//        Log.d("FlutterMIDICommand","inputPorts ${deviceInfo.inputPortCount} outputPorts ${deviceInfo.outputPortCount}")
-//
-//        ports.forEach { port ->
-//          Log.d("FlutterMIDICommand", "Open port ${port.type} ${port.id}")
-//          when (port.type) {
-//            "MidiPortType.IN" -> {
-//              if (deviceInfo.inputPortCount > port.id) {
-//                Log.d("FlutterMIDICommand", "Open input port ${port.id}")
-//                this.inputPort = this.midiDevice.openInputPort(port.id)
-//              }
-//            }
-//            "MidiPortType.OUT" -> {
-//              if (deviceInfo.outputPortCount > port.id) {
-//                Log.d("FlutterMIDICommand", "Open output port ${port.id}")
-//                this.outputPort = this.midiDevice.openOutputPort(port.id)
-//                this.outputPort?.connect(receiver)
-//              }
-//            }
-//            else -> {
-//              Log.d("FlutterMIDICommand", "Unknown MIDI port type ${port.type}. Not opening.")
-//            }
-//          }
-//        }
-//      }
-//    }
 
     override fun send(data: ByteArray, timestamp: Long?) {
 
@@ -91,7 +62,6 @@ class ConnectedDevice : Device {
                 this.receiver?.send(data, 0, data.size, timestamp)
 
         } else {
-//        Log.d("FlutterMIDICommand", "Send to input port ${this.inputPort}")
             this.inputPort?.send(data, 0, data.count(), if (timestamp is Long) timestamp else 0)
         }
     }
