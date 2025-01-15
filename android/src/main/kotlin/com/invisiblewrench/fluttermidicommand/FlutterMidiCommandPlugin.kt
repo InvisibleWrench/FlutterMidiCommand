@@ -19,8 +19,6 @@ import androidx.core.app.ActivityCompat
 import com.welie.blessed.BluetoothCentralManager
 import com.welie.blessed.BluetoothCentralManagerCallback
 import com.welie.blessed.BluetoothPeripheral
-import com.welie.blessed.BluetoothPeripheralCallback
-import com.welie.blessed.GattStatus
 import com.welie.blessed.HciStatus
 import com.welie.blessed.ScanFailure
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -29,6 +27,8 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.*
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.util.UUID
+import java.util.Objects
 
 /** FlutterMidiCommandPlugin */
 class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.RequestPermissionsResultListener {
@@ -58,8 +58,6 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
 
   var bluetoothAdapter: BluetoothAdapter? = null
   var bluetoothScanner: BluetoothLeScanner? = null
-
-  var bluetoothAdapter:BluetoothAdapter? = null
   var central: BluetoothCentralManager? = null
   private val HW_ENABLE_BLUETOOTH = 95452 // arbitrary
   private val PERMISSIONS_REQUEST_ACCESS_LOCATION = 95453 // arbitrary
@@ -109,6 +107,32 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   }
 
   // #endregion
+
+  // This static function is optional and equivalent to onAttachedToEngine. It supports the old
+  // pre-Flutter-1.12 Android projects. You are encouraged to continue supporting
+  // plugin registration via this function while apps migrate to use the new Android APIs
+  // post-flutter-1.12 via https://flutter.dev/go/android-project-migration.
+  //
+  // It is encouraged to share logic between onAttachedToEngine and registerWith to keep
+  // them functionally equivalent. Only one of onAttachedToEngine or registerWith will be called
+  // depending on the user's project. onAttachedToEngine or registerWith must both be defined
+  // in the same class.
+  companion object {
+//    @JvmStatic
+//    fun registerWith(registrar: Registrar) {
+//      var instance = FlutterMidiCommandPlugin()
+//      instance.messenger = registrar.messenger()
+//      instance.context = registrar.activeContext()
+//      instance.activity = registrar.activity()
+//      instance.setup()
+//    }
+
+    var serviceUUID = UUID.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
+    var characteristicUUID = UUID.fromString("7772E5DB-3868-4112-A1A9-F2669D106BF3")
+//
+//
+////    lateinit var rxStreamHandler:FMCStreamHandler
+  }
 
   fun setup() {
     print("setup")
@@ -587,7 +611,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         connectedDevices[id]?.also {
           Log.d("FlutterMIDICommand","remove removed device $it")
           connectedDevices.remove(id)
-          discoveredDevices.removeIf { discoveredDevice -> discoveredDevice.address == id }
+          discoveredDevices.remove(id)
           ongoingConnections.remove(id)
         }
         this@FlutterMidiCommandPlugin.setupStreamHandler.send("deviceLost")
