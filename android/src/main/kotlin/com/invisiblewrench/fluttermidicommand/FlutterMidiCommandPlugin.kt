@@ -1,6 +1,5 @@
 package com.invisiblewrench.fluttermidicommand
 
-//import com.welie.blessed.Transport
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
@@ -77,7 +76,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   }
 
   override fun onAttachedToActivity(p0: ActivityPluginBinding) {
-    print("onAttachedToActivity")
+    Log.d("onAttachedToActivity")
     // TODO: your plugin is now attached to an Activity
     activity = p0.activity
     p0.addRequestPermissionsResultListener(this)
@@ -85,7 +84,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
   }
 
   override fun onDetachedFromActivityForConfigChanges() {
-    print("onDetachedFromActivityForConfigChanges")
+    Log.d("onDetachedFromActivityForConfigChanges")
     // TODO: the Activity your plugin was attached to was
 // destroyed to change configuration.
 // This call will be followed by onReattachedToActivityForConfigChanges().
@@ -96,46 +95,25 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     p0.addRequestPermissionsResultListener(this)
 
 // after a configuration change.
-    print("onReattachedToActivityForConfigChanges")
+    Log.d("onReattachedToActivityForConfigChanges")
   }
 
   override fun onDetachedFromActivity() { // TODO: your plugin is no longer associated with an Activity.
 // Clean up references.
-    print("onDetachedFromActivity")
+    Log.d("onDetachedFromActivity")
     activity = null
     central?.close()
   }
 
   // #endregion
 
-  // This static function is optional and equivalent to onAttachedToEngine. It supports the old
-  // pre-Flutter-1.12 Android projects. You are encouraged to continue supporting
-  // plugin registration via this function while apps migrate to use the new Android APIs
-  // post-flutter-1.12 via https://flutter.dev/go/android-project-migration.
-  //
-  // It is encouraged to share logic between onAttachedToEngine and registerWith to keep
-  // them functionally equivalent. Only one of onAttachedToEngine or registerWith will be called
-  // depending on the user's project. onAttachedToEngine or registerWith must both be defined
-  // in the same class.
   companion object {
-//    @JvmStatic
-//    fun registerWith(registrar: Registrar) {
-//      var instance = FlutterMidiCommandPlugin()
-//      instance.messenger = registrar.messenger()
-//      instance.context = registrar.activeContext()
-//      instance.activity = registrar.activity()
-//      instance.setup()
-//    }
-
     var serviceUUID = UUID.fromString("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
     var characteristicUUID = UUID.fromString("7772E5DB-3868-4112-A1A9-F2669D106BF3")
-//
-//
-////    lateinit var rxStreamHandler:FMCStreamHandler
   }
 
   fun setup() {
-    print("setup")
+    Log.d("setup")
 
     isSupported =
       context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI) &&
@@ -384,7 +362,6 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
     if (type == "BLE") {
       // Connect using BLESSED
       var peripheral = central?.getPeripheral(deviceId)
-      print("peripheral $peripheral")
       if (peripheral != null) {
         var device = BLEDevice(peripheral, this@FlutterMidiCommandPlugin.setupStreamHandler, rxStreamHandler, this@FlutterMidiCommandPlugin.ongoingConnections[deviceId])
         central?.connectPeripheral(peripheral, device.peripheralCallback)
@@ -454,7 +431,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
 
   fun disconnectDevice(deviceId: String) {
-    print("disconnect device $deviceId")
+    Log.d("disconnect device $deviceId")
     connectedDevices[deviceId]?.also {
       it.close()
       connectedDevices.remove(deviceId)
