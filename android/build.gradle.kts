@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    implementation("com.github.weliem:blessed-android:2.5.0")
+    implementation("com.github.weliem:blessed-kotlin:3.0.8")
     implementation("com.jakewharton.timber:timber:5.0.1")
 }
 

@@ -8,3 +8,4 @@ pubspec.lock
 build/
 local.properties
 .idea/
+example/android/app/.cxx

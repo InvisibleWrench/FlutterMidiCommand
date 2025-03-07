@@ -155,7 +155,7 @@ class BLEDevice  : Device {
 
                 // Start to listen for notfications, this might trigger bonding on Pixels
                 Log.d("FlutterMIDICommand", "Enable notify on MIDI characteristic")
-                peripheral.setNotify(serviceUUID, characteristicUUID, true)
+                peripheral.startNotify(serviceUUID, characteristicUUID)
 
                 characteristic = peripheral.getCharacteristic(serviceUUID, characteristicUUID)
             }

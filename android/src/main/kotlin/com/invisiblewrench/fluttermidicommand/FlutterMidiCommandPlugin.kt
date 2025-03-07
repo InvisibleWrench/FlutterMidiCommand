@@ -344,9 +344,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
      handler.postDelayed({
       // Scan for peripherals with a certain service UUIDs
       central?.scanForPeripheralsWithServices(
-        arrayOf<UUID>(
-          serviceUUID
-        )
+        setOf(serviceUUID)
       )
     }, 1100)
     return null
@@ -366,7 +364,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
       var peripheral = central?.getPeripheral(deviceId)
       if (peripheral != null) {
         var device = BLEDevice(peripheral, this@FlutterMidiCommandPlugin.setupStreamHandler, rxStreamHandler, this@FlutterMidiCommandPlugin.ongoingConnections[deviceId])
-        central?.connectPeripheral(peripheral, device.peripheralCallback)
+        central?.connect(peripheral, device.peripheralCallback)
         connectedDevices[device.id] = device
         discoveredDevices.remove(device.id)
       } else {
@@ -381,7 +379,7 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
         if (device != null) {
           midiManager.openBluetoothDevice(device, deviceOpenedListener, handler)
         } else {
-          Log.d(TAG, "not found device ${peripheral.getAddress()}")
+          Log.d(TAG, "not found device ${peripheral.address}")
           return "Device not found"
         }
       } else {
@@ -775,34 +773,34 @@ var discoveredDevices = mutableMapOf<String, Map<String, Any>>()
 
   private val bluetoothCentralManagerCallback: BluetoothCentralManagerCallback =
     object : BluetoothCentralManagerCallback() {
-      override fun onConnectedPeripheral(peripheral: BluetoothPeripheral) {
-        Log.d(TAG, "connected to ${peripheral.getName()}")
-        var id = peripheral.getAddress()
+      override fun onConnected(peripheral: BluetoothPeripheral) {
+        Log.d(TAG, "connected to ${peripheral.name}")
+        var id = peripheral.address
         discoveredDevices.remove(id)
       }
 
       override fun onConnectionFailed(peripheral: BluetoothPeripheral, status: HciStatus) {
-        Log.d(TAG, "connection '${peripheral.getName()}' failed with status ${status.value}")
+        Log.d(TAG, "connection '${peripheral.name}' failed with status ${status.value}")
         setupStreamHandler.send("connectionFailed")
-        ongoingConnections.remove(peripheral.getAddress())
+        ongoingConnections.remove(peripheral.address)
       }
 
-      override fun onDisconnectedPeripheral(peripheral: BluetoothPeripheral, status: HciStatus) {
-        Log.d(TAG, "disconnected '${peripheral.getName()}' with status $status")
-        connectedDevices.remove(peripheral.getAddress())
-        ongoingConnections.remove(peripheral.getAddress())
+      override fun onDisconnected(peripheral: BluetoothPeripheral, status: HciStatus) {
+        Log.d(TAG, "disconnected '${peripheral.name}' with status $status")
+        connectedDevices.remove(peripheral.address)
+        ongoingConnections.remove(peripheral.address)
         setupStreamHandler.send("deviceDisconnected")
       }
 
-      override fun onDiscoveredPeripheral(peripheral: BluetoothPeripheral, scanResult: ScanResult) {
-        Log.d(TAG, "Found peripheral ${peripheral.getName()}")
-        var id = peripheral.getAddress()
+      override fun onDiscovered(peripheral: BluetoothPeripheral, scanResult: ScanResult) {
+        Log.d(TAG, "Found peripheral ${peripheral.name}")
+        var id = peripheral.address
 
         var exists = discoveredDevices.containsKey(id)
 
         discoveredDevices[id] =
           mapOf(
-            "name" to peripheral.getName(),
+            "name" to peripheral.name,
             "id" to id,
             "type" to "BLE",
             "connected" to if (connectedDevices.contains(peripheral.address)) "true" else "false",
