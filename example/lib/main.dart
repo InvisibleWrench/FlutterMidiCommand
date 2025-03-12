@@ -242,7 +242,7 @@ class MyAppState extends State<MyApp> {
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       subtitle: Text(
-                          "ins:${device.inputPorts.length} outs:${device.outputPorts.length}, ${device.id}, ${device.type}"),
+                          "ins:${device.inputPorts.length} outs:${device.outputPorts.length}, ${device.id}, ${device.type}, serviceUUID:${device.serviceUUIDs.first.str}"),
                       leading: Icon(device.connected
                           ? Icons.radio_button_on
                           : Icons.radio_button_off),

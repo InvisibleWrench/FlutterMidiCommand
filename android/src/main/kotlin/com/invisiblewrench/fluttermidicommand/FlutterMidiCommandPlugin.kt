@@ -439,6 +439,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       Log.d("FlutterMIDICommand", "onScanResult: ${result?.device?.address} - ${result?.device?.name}")
       result?.also {
         if (!discoveredDevices.contains(it.device)) {
+          // Get and save serviceUUIDs
+          val serviceUUIDs = result.scanRecord?.serviceUuids?.map { it.uuid.toString() } ?: listOf()
+          it.device.serviceUUIDs = serviceUUIDs
           discoveredDevices.add(it.device)
           setupStreamHandler.send("deviceAppeared")
         }
@@ -551,11 +554,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
       var id = it.address;
       Log.d("FlutterMIDICommand", "add discovered device $ type ${it.type}")
 
-      if (list.contains(id)) {
-        Log.d("FlutterMIDICommand", "device already in list $id")
-      } else {
+      if (!list.contains(id)) {
         Log.d("FlutterMIDICommand", "add native device $id type ${it.type}")
-        list[id] = mapOf(
+        val deviceMap = mutableMapOf(
           "name" to it.name,
           "id" to id,
           "type" to "BLE",
@@ -563,6 +564,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
           "inputs" to listOf(mapOf("id" to 0, "connected" to false)),
           "outputs" to listOf(mapOf("id" to 0, "connected" to false))
         )
+
+        // Only add to device information if serviceUUIDs is not empty
+        if (it.serviceUUIDs.isNotEmpty()) {
+          deviceMap["serviceUUIDs"] = it.serviceUUIDs
+        }
+
+        list[id] = deviceMap
       }
     }
 
