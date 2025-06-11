@@ -26,7 +26,7 @@ class MidiMessage {
   /// Send the message bytes to all connected devices
   void send({String? deviceId, int? timestamp}) {
     // print("send $data");
-    MidiCommand().sendData(data);
+    MidiCommand().sendData(data, deviceId: deviceId, timestamp: timestamp);
   }
 }
 
