@@ -37,6 +37,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   String _bleState = "unknown";
   bool _callbacksRegistered = false;
   bool _isTornDown = false;
+  bool _isScanning = false;
 
   void _registerCallbacks() {
     if (_callbacksRegistered) {
@@ -46,6 +47,9 @@ class UniversalBleMidiTransport implements MidiBleTransport {
 
     UniversalBle.onAvailabilityChange = (state) {
       _bleState = state.name;
+      if (state != AvailabilityState.poweredOn) {
+        _isScanning = false;
+      }
       _bluetoothStateStreamController.add(state.name);
     };
 
@@ -125,11 +129,12 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     await UniversalBle.startScan(
       scanFilter: ScanFilter(withServices: [midiServiceId]),
     );
+    _isScanning = true;
   }
 
   @override
   void stopScanningForBluetoothDevices() {
-    UniversalBle.stopScan();
+    unawaited(_stopScanSafely());
   }
 
   @override
@@ -150,6 +155,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         'BLE MIDI device ${device.id} is not known by this transport.',
       );
     }
+    await _stopScanSafely();
     await bleDevice.connect();
   }
 
@@ -191,7 +197,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     }
     _isTornDown = true;
     _unregisterCallbacks();
-    unawaited(UniversalBle.stopScan());
+    unawaited(_stopScanSafely());
     for (final device in _devices.values) {
       if (device.connectionState != MidiConnectionState.disconnected) {
         unawaited(device.disconnect());
@@ -199,6 +205,21 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     }
     _devices.clear();
     _bleState = "unknown";
+  }
+
+  Future<void> _stopScanSafely() async {
+    if (!_isScanning) {
+      return;
+    }
+
+    try {
+      await UniversalBle.stopScan();
+    } catch (_) {
+      // Some backends report BluetoothNotAvailable if the adapter changes
+      // state while a queued stop-scan request is still in flight.
+    } finally {
+      _isScanning = false;
+    }
   }
 }
 

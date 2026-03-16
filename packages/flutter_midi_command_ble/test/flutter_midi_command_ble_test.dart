@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_midi_command_ble/flutter_midi_command_ble.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_ble/universal_ble.dart';
@@ -17,6 +18,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   final List<String> disconnectCalls = <String>[];
   int startScanCalls = 0;
   int stopScanCalls = 0;
+  bool throwOnStopScan = false;
 
   @override
   Future<AvailabilityState> getBluetoothAvailabilityState() async {
@@ -40,6 +42,12 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   @override
   Future<void> stopScan() async {
     stopScanCalls += 1;
+    if (throwOnStopScan) {
+      throw PlatformException(
+        code: 'BluetoothNotAvailable',
+        message: 'Bluetooth is not available',
+      );
+    }
   }
 
   @override
@@ -187,6 +195,26 @@ void main() {
     expect(device.connected, isTrue);
   });
 
+  test('connectToDevice stops scanning and ignores stop-scan backend errors', () async {
+    fakePlatform.throwOnStopScan = true;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-stop',
+        name: 'BLE Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.startScanningForBluetoothDevices();
+    await transport.connectToDevice(device);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.stopScanCalls, 1);
+    expect(fakePlatform.connectCalls, <String>['ble-stop']);
+    expect(device.connected, isTrue);
+  });
+
   test('connectToDevice surfaces BLE connection failures', () async {
     fakePlatform.failingConnectIds.add('ble-2');
     fakePlatform.emitScanDevice(
@@ -241,5 +269,15 @@ void main() {
     expect(fakePlatform.onConnectionChange, isNotNull);
     expect(fakePlatform.onValueChange, isNotNull);
     expect(fakePlatform.onAvailabilityChange, isNotNull);
+  });
+
+  test('stopScanningForBluetoothDevices ignores backend stop-scan failures', () async {
+    fakePlatform.throwOnStopScan = true;
+
+    await transport.startScanningForBluetoothDevices();
+    transport.stopScanningForBluetoothDevices();
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.stopScanCalls, 1);
   });
 }
