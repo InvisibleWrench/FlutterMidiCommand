@@ -47,8 +47,6 @@ class MidiControlsState extends State<MidiControls> {
   StreamSubscription<MidiDataReceivedEvent>? _rxSubscription;
   final MidiCommand _midiCommand = MidiCommand();
 
-  final MidiRecorder _recorder = MidiRecorder();
-
   @override
   void initState() {
     if (kDebugMode) {
@@ -77,6 +75,8 @@ class MidiControlsState extends State<MidiControls> {
     if (message is ClockMessage || message is SenseMessage) {
       return;
     }
+
+    // print("Received ${message.runtimeType} message: $message");
 
     var nextCcValue = _ccValue;
     var nextPcValue = _pcValue;
@@ -210,36 +210,7 @@ class MidiControlsState extends State<MidiControls> {
           ),
         ),
         const Divider(),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Text("Recorder", style: Theme.of(context).textTheme.titleLarge),
-              Expanded(child: Container()),
-              Switch(
-                  value: _recorder.recording,
-                  onChanged: (newValue) {
-                    setState(() {
-                      if (newValue) {
-                        _recorder.startRecording();
-                      } else {
-                        _recorder.stopRecording();
-                      }
-                    });
-                  }),
-              TextButton(
-                  onPressed: () {
-                    _recorder.exportRecording();
-                  },
-                  child: const Text("Export CSV")),
-              TextButton(
-                  onPressed: () {
-                    _recorder.clearRecording();
-                  },
-                  child: const Text("Clear"))
-            ],
-          ),
-        )
+        const MidiRecorderPanel(),
       ],
     );
   }
