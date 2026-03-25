@@ -16,15 +16,11 @@
   <link rel="stylesheet" href="static-assets/github.css?v1">
   <link rel="stylesheet" href="static-assets/styles.css?v1">
   <link rel="icon" href="static-assets/favicon.png?v1">
-
   
 </head>
 
-
 <body data-base-href="" data-using-base-href="false" class="light-theme">
-
 <div id="overlay-under-drawer"></div>
-
 <header id="title">
   <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
   <ol class="breadcrumbs gt-separated dark hidden-xs">
@@ -34,37 +30,73 @@
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
-  <div class="toggle" id="theme-button" title="Toggle brightness">
-    <label for="theme">
-      <input type="checkbox" id="theme" value="light-theme">
-      <span id="dark-theme-button" class="material-symbols-outlined">
-        dark_mode
-      </span>
-      <span id="light-theme-button" class="material-symbols-outlined">
-        light_mode
-      </span>
-    </label>
-  </div>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
 </header>
 <main>
-
   <div id="dartdoc-main-content" class="main-content">
       
 <section class="desc markdown">
   <h1 id="flutter_midi_command">flutter_midi_command</h1>
 <p>A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices.</p>
-<p>Wraps CoreMIDI/android.media.midi/ALSA in a thin dart/flutter layer.
+<p>Wraps CoreMIDI/android.media.midi/ALSA/win32 in a thin dart/flutter layer.
 Supports</p>
-<ul>
-<li>USB and BLE MIDI connections on Android</li>
-<li>USB, network(session), virtual MIDI devices and BLE MIDI connections on iOS and macOS.</li>
-<li>ALSA Midi on Linux</li>
-<li>Create own virtual MIDI devices on iOS</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Transports</th>
+<th>iOS</th>
+<th>macos</th>
+<th>Android</th>
+<th>Linux</th>
+<th>Windows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>USB</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>BLE</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Virtual</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td>Network Session</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+</tbody>
+</table>
 <h2 id="to-install">To install</h2>
 <ul>
 <li>Make sure your project is created with Kotlin and Swift support.</li>
-<li>Add flutter_midi_command: ^0.4.17 to your pubspec.yaml file.</li>
+<li>Add flutter_midi_command: ^0.5.1 to your pubspec.yaml file.</li>
 <li>In ios/Podfile uncomment and change the platform to 11.0 <code>platform :ios, '11.0'</code></li>
 <li>On iOS, After building, Add a NSBluetoothAlwaysUsageDescription and NSLocalNetworkUsageDescription to info.plist in the generated Xcode project.</li>
 <li>On Linux, make sure ALSA is installed.</li>
@@ -99,14 +131,14 @@ Supports</p>
           <h2>Libraries</h2>
         <dl>
           <dt id="flutter_midi_command">
-  <span class="name"><a href="flutter_midi_command/flutter_midi_command-library.html">flutter_midi_command</a></span> 
+  <span class="name"><a href="flutter_midi_command/">flutter_midi_command</a></span> 
 
 </dt>
 <dd>
 </dd>
 
           <dt id="flutter_midi_command_messages">
-  <span class="name"><a href="flutter_midi_command_messages/flutter_midi_command_messages-library.html">flutter_midi_command_messages</a></span> 
+  <span class="name"><a href="flutter_midi_command_messages/">flutter_midi_command_messages</a></span> 
 
 </dt>
 <dd>
@@ -114,9 +146,7 @@ Supports</p>
 
         </dl>
       </section>
-
   </div> <!-- /.main-content -->
-
   <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
     <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
 <header id="header-search-sidebar" class="hidden-l">
@@ -124,43 +154,33 @@ Supports</p>
     <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
 </header>
-
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="https://github.com/InvisibleWrench/FlutterMidiCommand">flutter_midi_command package</a></li>
 </ol>
 
-
     <h5 class="hidden-xs"><span class="package-name">flutter_midi_command</span> <span class="package-kind">package</span></h5>
     <ol>
       <li class="section-title">Libraries</li>
-      <li><a href="flutter_midi_command/flutter_midi_command-library.html">flutter_midi_command</a></li>
-      <li><a href="flutter_midi_command_messages/flutter_midi_command_messages-library.html">flutter_midi_command_messages</a></li>
+      <li><a href="flutter_midi_command/">flutter_midi_command</a></li>
+      <li><a href="flutter_midi_command_messages/">flutter_midi_command_messages</a></li>
 </ol>
 
   </div>
-
   <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
   </div>
-
 </main>
-
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.4.17
+      0.5.4
   </span>
-
   
 </footer>
-
 
 
 <script src="static-assets/highlight.pack.js?v1"></script>
 <script src="static-assets/docs.dart.js"></script>
 
-
-
 </body>
-
 </html>
 

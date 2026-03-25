@@ -16,40 +16,32 @@
   <link rel="stylesheet" href="../static-assets/github.css?v1">
   <link rel="stylesheet" href="../static-assets/styles.css?v1">
   <link rel="icon" href="../static-assets/favicon.png?v1">
-
   
 </head>
 
-
 <body data-base-href="../" data-using-base-href="false" class="light-theme">
-
 <div id="overlay-under-drawer"></div>
-
 <header id="title">
   <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../index.html">flutter_midi_command</a></li>
-    <li><a href="../flutter_midi_command/flutter_midi_command-library.html">flutter_midi_command.dart</a></li>
+    <li><a href="../flutter_midi_command/">flutter_midi_command.dart</a></li>
     <li class="self-crumb">MidiCommand class</li>
   </ol>
   <div class="self-name">MidiCommand</div>
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
-  <div class="toggle" id="theme-button" title="Toggle brightness">
-    <label for="theme">
-      <input type="checkbox" id="theme" value="light-theme">
-      <span id="dark-theme-button" class="material-symbols-outlined">
-        dark_mode
-      </span>
-      <span id="light-theme-button" class="material-symbols-outlined">
-        light_mode
-      </span>
-    </label>
-  </div>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
 </header>
 <main>
-
 <div
     id="dartdoc-main-content"
     class="main-content"
@@ -67,9 +59,8 @@
     
   <section class="summary offset-anchor" id="constructors">
     <h2>Constructors</h2>
-
     <dl class="constructor-summary-list">
-        <dt id="MidiCommand" class="callable">
+        <dt id="MidiCommand.new" class="callable">
           <span class="name"><a href="../flutter_midi_command/MidiCommand/MidiCommand.html">MidiCommand</a></span><span class="signature">()</span>
         </dt>
         <dd>
@@ -98,7 +89,7 @@
 
         <dt id="devices" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/devices.html">devices</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.1/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span>&gt;</span>?</span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span>&gt;</span>?</span>&gt;</span></span>
   
 
 </dt>
@@ -122,7 +113,7 @@
 
         <dt id="isNetworkSessionEnabled" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/isNetworkSessionEnabled.html">isNetworkSessionEnabled</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a>?</span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a>?</span>&gt;</span></span>
   
 
 </dt>
@@ -134,7 +125,7 @@
 
         <dt id="onBluetoothStateChanged" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onBluetoothStateChanged.html">onBluetoothStateChanged</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/BluetoothState.html">BluetoothState</a></span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/BluetoothState.html">BluetoothState</a></span>&gt;</span></span>
   
 
 </dt>
@@ -146,7 +137,7 @@
 
         <dt id="onMidiDataReceived" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiDataReceived.html">onMidiDataReceived</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.1/flutter_midi_command_platform_interface/MidiPacket-class.html">MidiPacket</a></span>&gt;</span>?</span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiPacket-class.html">MidiPacket</a></span>&gt;</span>?</span>
   
 
 </dt>
@@ -158,7 +149,7 @@
 
         <dt id="onMidiDataSent" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiDataSent.html">onMidiDataSent</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span>&gt;</span></span>
   
 
 </dt>
@@ -170,7 +161,7 @@
 
         <dt id="onMidiSetupChanged" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiSetupChanged.html">onMidiSetupChanged</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>?</span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>?</span>
   
 
 </dt>
@@ -194,6 +185,7 @@
 
     </dl>
   </section>
+
     
   <section
       class="summary offset-anchor"
@@ -201,7 +193,7 @@
     <h2>Methods</h2>
     <dl class="callables">
         <dt id="addVirtualDevice" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/addVirtualDevice.html">addVirtualDevice</a></span><span class="signature">(<wbr><span class="parameter" id="addVirtualDevice-param-name">{<span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">name</span>}</span>)
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/addVirtualDevice.html">addVirtualDevice</a></span><span class="signature">(<wbr>{<span class="parameter" id="addVirtualDevice-param-name"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">name</span></span>})
     <span class="returntype parameter">&#8594; void</span>
   </span>
   
@@ -214,8 +206,8 @@
 </dd>
 
         <dt id="connectToDevice" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/connectToDevice.html">connectToDevice</a></span><span class="signature">(<wbr><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.1/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/connectToDevice.html">connectToDevice</a></span><span class="signature">(<wbr><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -227,7 +219,7 @@
 </dd>
 
         <dt id="disconnectDevice" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/disconnectDevice.html">disconnectDevice</a></span><span class="signature">(<wbr><span class="parameter" id="disconnectDevice-param-device"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.1/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span>)
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/disconnectDevice.html">disconnectDevice</a></span><span class="signature">(<wbr><span class="parameter" id="disconnectDevice-param-device"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span>)
     <span class="returntype parameter">&#8594; void</span>
   </span>
   
@@ -266,7 +258,7 @@
 </dd>
 
         <dt id="removeVirtualDevice" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/removeVirtualDevice.html">removeVirtualDevice</a></span><span class="signature">(<wbr><span class="parameter" id="removeVirtualDevice-param-name">{<span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">name</span>}</span>)
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/removeVirtualDevice.html">removeVirtualDevice</a></span><span class="signature">(<wbr>{<span class="parameter" id="removeVirtualDevice-param-name"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">name</span></span>})
     <span class="returntype parameter">&#8594; void</span>
   </span>
   
@@ -280,7 +272,7 @@ Currently only supported on iOS.
 </dd>
 
         <dt id="sendData" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/sendData.html">sendData</a></span><span class="signature">(<wbr><span class="parameter" id="sendData-param-data"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span> <span class="parameter-name">data</span>, </span><span class="parameter" id="sendData-param-deviceId">{<span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">deviceId</span>, </span><span class="parameter" id="sendData-param-timestamp"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a>?</span> <span class="parameter-name">timestamp</span>}</span>)
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/sendData.html">sendData</a></span><span class="signature">(<wbr><span class="parameter" id="sendData-param-data"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span> <span class="parameter-name">data</span>, {</span><span class="parameter" id="sendData-param-deviceId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">deviceId</span>, </span><span class="parameter" id="sendData-param-timestamp"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a>?</span> <span class="parameter-name">timestamp</span></span>})
     <span class="returntype parameter">&#8594; void</span>
   </span>
   
@@ -307,7 +299,7 @@ Currently only supported on iOS.
 
         <dt id="startBluetoothCentral" class="callable">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/startBluetoothCentral.html">startBluetoothCentral</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -320,7 +312,7 @@ Currently only supported on iOS.
 
         <dt id="startScanningForBluetoothDevices" class="callable">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/startScanningForBluetoothDevices.html">startScanningForBluetoothDevices</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -372,7 +364,7 @@ Currently only supported on iOS.
 
         <dt id="waitUntilBluetoothIsInitialized" class="callable">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/waitUntilBluetoothIsInitialized.html">waitUntilBluetoothIsInitialized</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -410,9 +402,7 @@ Currently only supported on iOS.
     
     
 
-
   </div> <!-- /.main-content -->
-
   <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
     <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
 <header id="header-search-sidebar" class="hidden-l">
@@ -420,40 +410,30 @@ Currently only supported on iOS.
     <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
 </header>
-
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../index.html">flutter_midi_command</a></li>
-    <li><a href="../flutter_midi_command/flutter_midi_command-library.html">flutter_midi_command</a></li>
+    <li><a href="../flutter_midi_command/">flutter_midi_command</a></li>
     <li class="self-crumb">MidiCommand class</li>
 </ol>
-
 
     <h5>flutter_midi_command library</h5>
     <div id="dartdoc-sidebar-left-content"></div>
   </div>
-
   <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
   </div><!--/.sidebar-offcanvas-->
-
 </main>
-
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.4.17
+      0.5.4
   </span>
-
   
 </footer>
-
 
 
 <script src="../static-assets/highlight.pack.js?v1"></script>
 <script src="../static-assets/docs.dart.js"></script>
 
-
-
 </body>
-
 </html>
 
