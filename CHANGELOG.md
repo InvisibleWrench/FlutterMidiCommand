@@ -1,3 +1,9 @@
+## 0.5.4
+MR #137, #138, Added timestamps to messages.
+MR #142, Fix MIDI Listener issue.
+MR #143, Fix Device IDs
+MR #144, Update MIDICommandWindows
+
 ## 0.5.3
 Adds a runtime check to ensure MIDI is available on the android device before starting. See #125 for further details.
 Make plugin work with Flutter 3.27.0 and Android Studio Lady Bug. #127
