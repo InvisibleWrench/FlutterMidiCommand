@@ -12,6 +12,7 @@ abstract class Device {
     lateinit var midiDevice: MidiDevice
     protected var receiver:MidiReceiver? = null
     protected var setupStreamHandler: FMCStreamHandler? = null
+    var serviceUUIDs: List<String> = listOf()
 
     constructor(id: String, type: String) {
         this.id = id

@@ -69,6 +69,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
     
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
     
+
+    // Add a dictionary to store serviceUUIDs
+    private var peripheralServiceUUIDs: [CBPeripheral: [String]] = [:]
+
     public static func register(with registrar: FlutterPluginRegistrar) {
 #if os(macOS)
         let channel = FlutterMethodChannel(name: "plugins.invisiblewrench.com/flutter_midi_command", binaryMessenger: registrar.messenger)
@@ -560,17 +564,28 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         
         for periph:CBPeripheral in discoveredDevices {
             let id = periph.identifier.uuidString
-            devices.append([
-                "name" : periph.name ?? "Unknown",
-                "id" : id,
-                "type" : "BLE",
-                "connected":(connectedDevices.keys.contains(id) ? "true" : "false"),
-                "inputs" : [["id":0, "connected":false] as [String:Any]],
-                "outputs" : [["id":0, "connected":false] as [String:Any]]
-            ])
+            let serviceUUID = periph.discoverServices(nil)
+
+            // 获取存储的serviceUUIDs
+            let serviceUUIDs = peripheralServiceUUIDs[periph] ?? []
+
+            var deviceInfo: [String: Any] = [
+                "name": periph.name ?? "Unknown",
+                "id": id,
+                "type": "BLE",
+                "connected": (connectedDevices.keys.contains(id) ? "true" : "false"),
+                "inputs": [["id":0, "connected":false] as [String:Any]],
+                "outputs": [["id":0, "connected":false] as [String:Any]]
+            ]
+
+            // 只有当serviceUUIDs不为空时才添加到设备信息中
+            if !serviceUUIDs.isEmpty {
+                deviceInfo["serviceUUIDs"] = serviceUUIDs
+            }
+
+            devices.append(deviceInfo)
         }
-        
-        
+
         // ###########
         // CONNECTED BLE DEVICES (which are no longer discoverable)
         // ###########
@@ -898,6 +913,15 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, CBCentralManagerDelegate, 
         print("central didDiscover \(peripheral)")
         if !discoveredDevices.contains(peripheral) {
             discoveredDevices.insert(peripheral)
+
+            // Get serviceUUIDs from advertisementData
+            var serviceUUIDs: [String] = []
+            if let services = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
+                serviceUUIDs = services.map { $0.uuidString }
+            }
+
+            // Store serviceUUIDs in the peripheral's associated data
+            peripheralServiceUUIDs[peripheral] = serviceUUIDs
             updateSetupState(data: "deviceAppeared")
         }
     }
