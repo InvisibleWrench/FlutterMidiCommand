@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+      - codex/restructure-repo-into-mono-repo-with-melon
 
 env:
   FLUTTER_VERSION: '3.38.9'
