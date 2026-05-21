@@ -1,1 +1,1 @@
-library flutter_midi_command_darwin;
+library;

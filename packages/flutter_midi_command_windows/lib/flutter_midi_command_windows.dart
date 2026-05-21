@@ -22,9 +22,7 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
       <String, WindowsMidiDevice>{};
 
   factory FlutterMidiCommandWindows() {
-    if (_instance == null) {
-      _instance = FlutterMidiCommandWindows._();
-    }
+    _instance ??= FlutterMidiCommandWindows._();
     return _instance!;
   }
 

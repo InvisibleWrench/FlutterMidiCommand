@@ -11,11 +11,11 @@ import 'flutter_midi_command_windows.dart';
 const _numberOfBuffers = 4;
 
 class WindowsMidiDevice extends MidiDevice {
-  Map<int, MIDIINCAPS> _ins = {};
-  Map<int, MIDIOUTCAPS> _outs = {};
+  final Map<int, MIDIINCAPS> _ins = {};
+  final Map<int, MIDIOUTCAPS> _outs = {};
 
-  StreamController<MidiPacket> _rxStreamCtrl;
-  StreamController<String> _setupStreamController;
+  final StreamController<MidiPacket> _rxStreamCtrl;
+  final StreamController<String> _setupStreamController;
 
   final hMidiInDevicePtr = malloc<HMIDIIN>();
   final hMidiOutDevicePtr = malloc<IntPtr>();
@@ -24,9 +24,9 @@ class WindowsMidiDevice extends MidiDevice {
 
   final _bufferSize = 8192;
 
-  List<Pointer<MIDIHDR>> _midiInHeaders =
+  final List<Pointer<MIDIHDR>> _midiInHeaders =
       List.generate(_numberOfBuffers, (index) => nullptr);
-  List<Pointer<BYTE>> _midiInBuffers =
+  final List<Pointer<BYTE>> _midiInBuffers =
       List.generate(_numberOfBuffers, (index) => nullptr);
 
   Pointer<MIDIHDR> _midiOutHeader = nullptr;
@@ -103,7 +103,7 @@ class WindowsMidiDevice extends MidiDevice {
 
   bool disconnect() {
     int result;
-    if (_ins.length > 0) {
+    if (_ins.isNotEmpty) {
       result = midiInReset(hMidiInDevicePtr.value);
       if (result != 0) {
         print("RESET ERROR($result): ${midiErrorMessage(result)}");
@@ -133,7 +133,7 @@ class WindowsMidiDevice extends MidiDevice {
       free(hMidiInDevicePtr);
     }
 
-    if (_outs.length > 0) {
+    if (_outs.isNotEmpty) {
       result = midiOutClose(hMidiOutDevicePtr.value);
       if (result != 0) {
         print("OUT CLOSE ERROR($result): ${midiErrorMessage(result)}");

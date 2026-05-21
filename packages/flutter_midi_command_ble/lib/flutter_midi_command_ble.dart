@@ -1,4 +1,4 @@
-library flutter_midi_command_ble;
+library;
 
 import 'dart:async';
 import 'dart:math';
