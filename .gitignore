@@ -10,3 +10,7 @@ local.properties
 .idea/
 *.iml
 packages/flutter_midi_command_darwin/ios/.build/
+/example/.vscode
+/.vscode
+/example/ios/Flutter/ephemeral
+packages/flutter_midi_command_ble/.flutter-plugins-dependencies
