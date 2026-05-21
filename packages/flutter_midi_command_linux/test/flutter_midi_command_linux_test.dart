@@ -30,8 +30,11 @@ void main() {
 
   test('devices refreshes discovery on each call', () async {
     var discoveryCount = 0;
-    final firstDevice = _FakeAlsaMidiDevice(id: 'hw:1,0', name: 'First');
-    final secondDevice = _FakeAlsaMidiDevice(id: 'hw:2,0', name: 'Second');
+    final firstDevice = _FakeLinuxMidiPortDevice(id: 'aseq:1:0', name: 'First');
+    final secondDevice = _FakeLinuxMidiPortDevice(
+      id: 'aseq:2:0',
+      name: 'Second',
+    );
     final plugin = FlutterMidiCommandLinux(
       deviceDiscovery: () {
         discoveryCount += 1;
@@ -42,16 +45,60 @@ void main() {
     final first = await plugin.devices;
     final second = await plugin.devices;
 
-    expect(first.single.id, 'hw:1,0');
-    expect(second.single.id, 'hw:2,0');
+    expect(first.single.id, 'aseq:1:0');
+    expect(second.single.id, 'aseq:2:0');
     expect(discoveryCount, 2);
+  });
+
+  test('per-port discovery exposes separate logical devices', () async {
+    final plugin = FlutterMidiCommandLinux(
+      deviceDiscovery:
+          () => [
+            _FakeLinuxMidiPortDevice(id: 'aseq:20:0', name: 'Interface [1]'),
+            _FakeLinuxMidiPortDevice(id: 'aseq:20:1', name: 'Interface [2]'),
+          ],
+    );
+
+    final devices = await plugin.devices;
+
+    expect(devices.map((device) => device.id), <String>[
+      'aseq:20:0',
+      'aseq:20:1',
+    ]);
+    expect(devices.every((device) => device.inputPorts.length == 1), isTrue);
+    expect(devices.every((device) => device.outputPorts.length == 1), isTrue);
+  });
+
+  test('input-only and output-only ports keep their direction', () async {
+    final plugin = FlutterMidiCommandLinux(
+      deviceDiscovery:
+          () => [
+            _FakeLinuxMidiPortDevice(
+              id: 'aseq:20:0',
+              hasInput: true,
+              hasOutput: false,
+            ),
+            _FakeLinuxMidiPortDevice(
+              id: 'aseq:20:1',
+              hasInput: false,
+              hasOutput: true,
+            ),
+          ],
+    );
+
+    final devices = await plugin.devices;
+
+    expect(devices[0].inputPorts, hasLength(1));
+    expect(devices[0].outputPorts, isEmpty);
+    expect(devices[1].inputPorts, isEmpty);
+    expect(devices[1].outputPorts, hasLength(1));
   });
 
   test(
     'sendData targets deviceId when supplied and broadcasts otherwise',
     () async {
-      final first = _FakeAlsaMidiDevice(id: 'hw:1,0');
-      final second = _FakeAlsaMidiDevice(id: 'hw:2,0');
+      final first = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
+      final second = _FakeLinuxMidiPortDevice(id: 'aseq:2:0');
       final plugin = FlutterMidiCommandLinux(
         deviceDiscovery: () => [first, second],
       );
@@ -62,7 +109,7 @@ void main() {
 
       plugin.sendData(
         Uint8List.fromList([0x90, 0x40, 0x7f]),
-        deviceId: 'hw:2,0',
+        deviceId: 'aseq:2:0',
       );
       expect(first.sentMessages, isEmpty);
       expect(second.sentMessages, [
@@ -83,8 +130,8 @@ void main() {
   test(
     'disconnect uses the stored connected wrapper for matching ids',
     () async {
-      final connectedAlsa = _FakeAlsaMidiDevice(id: 'hw:1,0');
-      final refreshedAlsa = _FakeAlsaMidiDevice(id: 'hw:1,0');
+      final connectedAlsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
+      final refreshedAlsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
       final plugin = FlutterMidiCommandLinux(
         deviceDiscovery: () => [connectedAlsa],
       );
@@ -92,7 +139,7 @@ void main() {
 
       await plugin.connectToDevice(device);
 
-      final refreshedDevice = LinuxMidiDevice.fromAlsaDevice(
+      final refreshedDevice = LinuxMidiDevice.fromPortDevice(
         refreshedAlsa,
         MidiDeviceType.serial,
         StreamController<MidiPacket>.broadcast(),
@@ -107,7 +154,7 @@ void main() {
   );
 
   test('received data is emitted once and stops after disconnect', () async {
-    final alsa = _FakeAlsaMidiDevice(id: 'hw:1,0');
+    final alsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
     final plugin = FlutterMidiCommandLinux(deviceDiscovery: () => [alsa]);
     final device = (await plugin.devices).single;
     final packets = <MidiPacket>[];
@@ -120,7 +167,7 @@ void main() {
     expect(packets, hasLength(1));
     expect(packets.single.data, [0x90, 0x40, 0x7f]);
     expect(packets.single.timestamp, 123);
-    expect(packets.single.device.id, 'hw:1,0');
+    expect(packets.single.device.id, 'aseq:1:0');
 
     plugin.disconnectDevice(device);
     await Future<void>.delayed(Duration.zero);
@@ -132,7 +179,7 @@ void main() {
   });
 
   test('reconnect does not duplicate received data subscriptions', () async {
-    final alsa = _FakeAlsaMidiDevice(id: 'hw:1,0');
+    final alsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
     final plugin = FlutterMidiCommandLinux(deviceDiscovery: () => [alsa]);
     final device = (await plugin.devices).single;
     final packets = <MidiPacket>[];
@@ -154,7 +201,7 @@ void main() {
   test(
     'teardown disconnects devices and closes setup and data streams',
     () async {
-      final alsa = _FakeAlsaMidiDevice(id: 'hw:1,0');
+      final alsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
       final plugin = FlutterMidiCommandLinux(deviceDiscovery: () => [alsa]);
       await plugin.connectToDevice((await plugin.devices).single);
       final setupDone = expectLater(
@@ -173,41 +220,35 @@ void main() {
   );
 }
 
-class _FakeAlsaMidiDevice implements LinuxAlsaMidiDevice {
-  _FakeAlsaMidiDevice({
+class _FakeLinuxMidiPortDevice implements LinuxMidiPortDevice {
+  _FakeLinuxMidiPortDevice({
     required this.id,
     this.name = 'Fake MIDI',
-    List<String>? inputPorts,
-    List<String>? outputPorts,
-  }) : inputPorts = inputPorts ?? ['0'],
-       outputPorts = outputPorts ?? ['0'];
+    this.hasInput = true,
+    this.hasOutput = true,
+  });
 
   @override
   final String id;
 
   @override
-  final int cardId = 1;
-
-  @override
-  final int deviceId = 0;
-
   @override
   final String name;
 
   @override
-  final List<String> inputPorts;
+  final bool hasInput;
 
   @override
-  final List<String> outputPorts;
+  final bool hasOutput;
 
-  final StreamController<LinuxAlsaMidiPacket> _receivedMessages =
-      StreamController<LinuxAlsaMidiPacket>.broadcast();
+  final StreamController<LinuxMidiPacket> _receivedMessages =
+      StreamController<LinuxMidiPacket>.broadcast();
   final List<List<int>> sentMessages = <List<int>>[];
   int connectCount = 0;
   int disconnectCount = 0;
 
   @override
-  Stream<LinuxAlsaMidiPacket> get receivedMessages => _receivedMessages.stream;
+  Stream<LinuxMidiPacket> get receivedMessages => _receivedMessages.stream;
 
   @override
   Future<bool> connect() async {
@@ -226,8 +267,6 @@ class _FakeAlsaMidiDevice implements LinuxAlsaMidiDevice {
   }
 
   void emit(List<int> data, {int timestamp = 0}) {
-    _receivedMessages.add(
-      LinuxAlsaMidiPacket(Uint8List.fromList(data), timestamp),
-    );
+    _receivedMessages.add(LinuxMidiPacket(Uint8List.fromList(data), timestamp));
   }
 }

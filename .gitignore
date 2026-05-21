@@ -14,3 +14,4 @@ packages/flutter_midi_command_darwin/ios/.build/
 /.vscode
 /example/ios/Flutter/ephemeral
 packages/flutter_midi_command_ble/.flutter-plugins-dependencies
+example/android/app/.cxx

@@ -404,101 +404,48 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         // Native
         // ######
         
-        var nativeDevices = Dictionary<MIDIEntityRef, MidiHostDevice>()
-        
+        let deviceCount = MIDIGetNumberOfDevices()
+        for d in 0..<deviceCount {
+            let device = MIDIGetDevice(d)
+            let entityCount = MIDIDeviceGetNumberOfEntities(device)
+
+            for entityIndex in 0..<entityCount {
+                let entity = MIDIDeviceGetEntity(device, entityIndex)
+                let sourceCount = MIDIEntityGetNumberOfSources(entity)
+                let destinationCount = MIDIEntityGetNumberOfDestinations(entity)
+                let logicalPortCount = max(sourceCount, destinationCount)
+
+                if logicalPortCount == 0 {
+                    continue
+                }
+
+                let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
+                let isBluetooth = SwiftFlutterMidiCommandPlugin.isBluetooth(device: entity)
+                let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
+                let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
+                let baseName = entityName == "Error" || entityName.isEmpty ? deviceName : entityName
+                let baseId = "\(device):\(entityIndex)"
+
+                for portIndex in 0..<logicalPortCount {
+                    let deviceId = logicalPortCount == 1 ? baseId : "\(baseId):\(portIndex)"
+                    let displayName = logicalPortCount == 1 ? baseName : "\(baseName) [\(portIndex + 1)]"
+
+                    devices.append(
+                        MidiHostDevice(
+                            id: deviceId,
+                            name: displayName,
+                            type: isNetwork ? .network : (isBluetooth ? .ble : .serial),
+                            connected: connectedDevices.keys.contains(deviceId),
+                            inputs: portIndex < sourceCount ? [MidiPort(id: Int64(portIndex), connected: false, isInput: true) as MidiPort?] : nil,
+                            outputs: portIndex < destinationCount ? [MidiPort(id: Int64(portIndex), connected: false, isInput: false) as MidiPort?] : nil
+                        )
+                    )
+                }
+            }
+        }
+
         let destinationCount = MIDIGetNumberOfDestinations()
-        for d in 0..<destinationCount {
-            let destination = MIDIGetDestination(d)
-            
-            if(isVirtualEndpoint(endpoint: destination)){
-                continue
-            }
-            
-            var entity : MIDIEntityRef = 0
-            var status = MIDIEndpointGetEntity(destination, &entity)
-            if(status != noErr){
-                midiDebugLog("Error \(status) while calling MIDIEndpointGetEntity")
-            }
-            
-            let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
-            let isBluetooth = SwiftFlutterMidiCommandPlugin.isBluetooth(device: entity)
-            
-            var device : MIDIDeviceRef = 0
-            status = MIDIEntityGetDevice(entity, &device)
-            if(status != noErr){
-                midiDebugLog("Error \(status) while calling MIDIEntityGetDevice")
-            }
-            
-            let name = displayName(endpoint: destination)
-            
-            let entityCount = MIDIDeviceGetNumberOfEntities(device)
-            var entityIndex = 0
-            for e in 0..<entityCount {
-                let ent = MIDIDeviceGetEntity(device, e)
-                if (ent == entity) {
-                    entityIndex = e
-                }
-            }
-            let deviceId = "\(device):\(entityIndex)"
-            
-            let entityDestinationCount = MIDIEntityGetNumberOfDestinations(entity)
-            
-            var hostDevice = nativeDevices[entity] ?? MidiHostDevice()
-            hostDevice.name = name
-            hostDevice.id = deviceId
-            hostDevice.type = isNetwork ? .network : (isBluetooth ? .ble : .serial)
-            hostDevice.connected = connectedDevices.keys.contains(deviceId)
-            hostDevice.outputs = createPorts(count: entityDestinationCount, isInput: false)
-            nativeDevices[entity] = hostDevice
-        }
-        
-        
         let sourceCount = MIDIGetNumberOfSources()
-        for s in 0..<sourceCount {
-            let source = MIDIGetSource(s)
-            
-            if(isVirtualEndpoint(endpoint: source)){
-                continue
-            }
-            
-            var entity : MIDIEntityRef = 0
-            var status = MIDIEndpointGetEntity(source, &entity)
-            if(status != noErr){
-                midiDebugLog("Error \(status) while calling MIDIEndpointGetEntity")
-            }
-            let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
-            let isBluetooth = SwiftFlutterMidiCommandPlugin.isBluetooth(device: entity)
-            let name = displayName(endpoint: source)
-            
-            var device : MIDIDeviceRef = 0
-            status = MIDIEntityGetDevice(entity, &device)
-            if(status != noErr){
-                midiDebugLog("Error \(status) while calling MIDIEntityGetDevice")
-            }
-            
-            let entityCount = MIDIDeviceGetNumberOfEntities(device)
-            var entityIndex = 0
-            for e in 0..<entityCount {
-                let ent = MIDIDeviceGetEntity(device, e)
-                if (ent == entity) {
-                    entityIndex = e
-                }
-            }
-            
-            let deviceId = "\(device):\(entityIndex)"
-            
-            let entitySourceCount = MIDIEntityGetNumberOfSources(entity)
-            
-            var hostDevice = nativeDevices[entity] ?? MidiHostDevice()
-            hostDevice.name = name
-            hostDevice.id = deviceId
-            hostDevice.type = isNetwork ? .network : (isBluetooth ? .ble : .serial)
-            hostDevice.connected = connectedDevices.keys.contains(deviceId)
-            hostDevice.inputs = createPorts(count: entitySourceCount, isInput: true)
-            nativeDevices[entity] = hostDevice
-        }
-        
-        devices.append(contentsOf: nativeDevices.values)
         
         // #######
         // VIRTUAL
@@ -977,6 +924,7 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
 class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
     
     var entity : MIDIEntityRef?
+    var selectedPortIndex: Int = 0
     
     override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
         super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
@@ -985,8 +933,11 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         let idParts = id.split(separator: ":")
         
         // Store entity and get device/entity name
-        if let deviceId = MIDIDeviceRef(idParts[0]) {
+        if idParts.count >= 2, let deviceId = MIDIDeviceRef(idParts[0]) {
             if let entityId = Int(idParts[1]) {
+                if idParts.count > 2, let portIndex = Int(idParts[2]) {
+                    selectedPortIndex = portIndex
+                }
                 entity = MIDIDeviceGetEntity(deviceId, entityId)
                 if let e = entity {
                     let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: e)
@@ -1037,10 +988,9 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             
             if let ps = ports {
                 for port in ps {
-                    inSource = MIDIEntityGetSource(e, port.id)
-                    
                     switch port.type {
                     case "MidiPortType.IN":
+                        inSource = MIDIEntityGetSource(e, port.id)
                         let status = MIDIPortConnectSource(inputPort, inSource!, ref)
                         midiDebugLog("port open status \(status)")
                     case "MidiPortType.OUT":
@@ -1053,12 +1003,16 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
                 }
             } else {
                 midiDebugLog("open default ports")
-                inSource = MIDIEntityGetSource(e, 0)
-                let status = MIDIPortConnectSource(inputPort, inSource!, ref)
-                if(status != noErr){
-                    midiDebugLog("Error \(status) while calling MIDIPortConnectSource");
+                if selectedPortIndex < MIDIEntityGetNumberOfSources(e) {
+                    inSource = MIDIEntityGetSource(e, selectedPortIndex)
+                    let status = MIDIPortConnectSource(inputPort, inSource!, ref)
+                    if(status != noErr){
+                        midiDebugLog("Error \(status) while calling MIDIPortConnectSource");
+                    }
                 }
-                outEndpoint = MIDIEntityGetDestination(e, 0)
+                if selectedPortIndex < MIDIEntityGetNumberOfDestinations(e) {
+                    outEndpoint = MIDIEntityGetDestination(e, selectedPortIndex)
+                }
             }
         }
     }

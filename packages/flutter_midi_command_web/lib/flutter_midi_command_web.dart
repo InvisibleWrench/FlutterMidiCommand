@@ -143,7 +143,7 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
     }
 
     final snapshots = grouped.values
-        .map((builder) => builder.build())
+        .expand((builder) => builder.buildLogicalDevices())
         .toList(growable: false);
 
     _deviceSnapshots
@@ -426,12 +426,39 @@ class _WebDeviceSnapshotBuilder {
   final List<_WebInputPortSnapshot> inputs = <_WebInputPortSnapshot>[];
   final List<_WebOutputPortSnapshot> outputs = <_WebOutputPortSnapshot>[];
 
-  _WebDeviceSnapshot build() {
-    return _WebDeviceSnapshot(
-      id: id,
-      name: name,
-      inputs: List<_WebInputPortSnapshot>.unmodifiable(inputs),
-      outputs: List<_WebOutputPortSnapshot>.unmodifiable(outputs),
-    );
+  List<_WebDeviceSnapshot> buildLogicalDevices() {
+    inputs.sort((a, b) => a.portId.compareTo(b.portId));
+    outputs.sort((a, b) => a.portId.compareTo(b.portId));
+
+    final count =
+        inputs.length > outputs.length ? inputs.length : outputs.length;
+    if (count == 0) {
+      return <_WebDeviceSnapshot>[];
+    }
+
+    return List<_WebDeviceSnapshot>.generate(count, (index) {
+      final input = index < inputs.length ? inputs[index] : null;
+      final output = index < outputs.length ? outputs[index] : null;
+      final logicalId =
+          '$id|in:${input?.portId ?? ''}|out:${output?.portId ?? ''}';
+      final logicalName = count == 1 ? name : '$name [${index + 1}]';
+
+      return _WebDeviceSnapshot(
+        id: logicalId,
+        name: logicalName,
+        inputs:
+            input == null
+                ? const <_WebInputPortSnapshot>[]
+                : List<_WebInputPortSnapshot>.unmodifiable(
+                  <_WebInputPortSnapshot>[input],
+                ),
+        outputs:
+            output == null
+                ? const <_WebOutputPortSnapshot>[]
+                : List<_WebOutputPortSnapshot>.unmodifiable(
+                  <_WebOutputPortSnapshot>[output],
+                ),
+      );
+    }, growable: false);
   }
 }

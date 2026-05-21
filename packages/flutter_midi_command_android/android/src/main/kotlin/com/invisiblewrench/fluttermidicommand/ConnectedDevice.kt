@@ -8,11 +8,14 @@ import com.invisiblewrench.fluttermidicommand.pigeon.MidiPacket
 
 class ConnectedDevice(
     device: MidiDevice,
+    private val logicalDeviceId: String,
+    private val inputPortIndex: Int?,
+    private val outputPortIndex: Int?,
     private val onSetupChanged: (String) -> Unit,
     private val onDataReceived: (MidiPacket) -> Unit,
     private val onConnectionChanged: (String, Boolean) -> Unit,
     private val deviceType: MidiDeviceType,
-) : Device(deviceIdForInfo(device.info), device.info.type.toString()) {
+) : Device(logicalDeviceId, device.info.type.toString()) {
     var inputPort: MidiInputPort? = null
     var outputPort: MidiOutputPort? = null
 
@@ -30,12 +33,12 @@ class ConnectedDevice(
                 this.receiver = RXReceiver(_toHostDevice(MidiDeviceType.OWN_VIRTUAL), onDataReceived)
             } else {
                 this.receiver = RXReceiver(_toHostDevice(deviceType), onDataReceived)
-                if (it.inputPortCount > 0) {
-                    this.inputPort = this.midiDevice.openInputPort(0)
+                inputPortIndex?.let { portIndex ->
+                    this.inputPort = this.midiDevice.openInputPort(portIndex)
                 }
             }
-            if (it.outputPortCount > 0) {
-                this.outputPort = this.midiDevice.openOutputPort(0)
+            outputPortIndex?.let { portIndex ->
+                this.outputPort = this.midiDevice.openOutputPort(portIndex)
                 this.outputPort?.connect(this.receiver)
             }
         }
@@ -45,7 +48,7 @@ class ConnectedDevice(
 
     private fun _toHostDevice(type: MidiDeviceType): MidiHostDevice {
         return MidiHostDevice(
-            id = deviceIdForInfo(this.midiDevice.info),
+            id = logicalDeviceId,
             name = this.midiDevice.info.properties.getString(MidiDeviceInfo.PROPERTY_NAME),
             type = type,
             connected = true,

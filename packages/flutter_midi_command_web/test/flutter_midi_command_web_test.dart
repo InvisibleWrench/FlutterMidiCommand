@@ -152,6 +152,59 @@ void main() {
     expect(devices.first.outputPorts.first.id, 11);
   });
 
+  test(
+    'same-name multi-port devices are exposed as separate devices',
+    () async {
+      final backend = _FakeWebMidiBackend(
+        inputs: <WebMidiPortInfo>[
+          _port('2', name: 'Interface', manufacturer: 'Acme'),
+          _port('1', name: 'Interface', manufacturer: 'Acme'),
+        ],
+        outputs: <WebMidiPortInfo>[
+          _port('12', name: 'Interface', manufacturer: 'Acme'),
+          _port('11', name: 'Interface', manufacturer: 'Acme'),
+        ],
+      );
+
+      final plugin = FlutterMidiCommandWeb(backend: backend);
+      final devices = await plugin.devices;
+
+      expect(devices, isNotNull);
+      expect(devices!.length, 2);
+      expect(devices.map((device) => device.name), <String>[
+        'Interface [1]',
+        'Interface [2]',
+      ]);
+      expect(devices.map((device) => device.inputPorts.single.id), <int>[1, 2]);
+      expect(devices.map((device) => device.outputPorts.single.id), <int>[
+        11,
+        12,
+      ]);
+    },
+  );
+
+  test('unbalanced same-name ports remain individually addressable', () async {
+    final backend = _FakeWebMidiBackend(
+      inputs: <WebMidiPortInfo>[
+        _port('1', name: 'Interface', manufacturer: 'Acme'),
+        _port('2', name: 'Interface', manufacturer: 'Acme'),
+      ],
+      outputs: <WebMidiPortInfo>[
+        _port('11', name: 'Interface', manufacturer: 'Acme'),
+      ],
+    );
+
+    final plugin = FlutterMidiCommandWeb(backend: backend);
+    final devices = await plugin.devices;
+
+    expect(devices, isNotNull);
+    expect(devices!.length, 2);
+    expect(devices[0].inputPorts.single.id, 1);
+    expect(devices[0].outputPorts.single.id, 11);
+    expect(devices[1].inputPorts.single.id, 2);
+    expect(devices[1].outputPorts, isEmpty);
+  });
+
   test('state changes are emitted as setup events', () async {
     final backend = _FakeWebMidiBackend(inputs: const [], outputs: const []);
     final plugin = FlutterMidiCommandWeb(backend: backend);
@@ -192,14 +245,17 @@ void main() {
       );
 
       final plugin = FlutterMidiCommandWeb(backend: backend);
-      final device = (await plugin.devices)!.single;
+      final devices = (await plugin.devices)!;
+      final device = devices.singleWhere(
+        (device) =>
+            device.inputPorts.single.id == 1 &&
+            device.outputPorts.single.id == 11,
+      );
 
       final selectedInput = device.inputPorts.firstWhere(
         (port) => port.id == 1,
       );
-      final selectedOutput = device.outputPorts.firstWhere(
-        (port) => port.id == 12,
-      );
+      final selectedOutput = device.outputPorts.single;
 
       await plugin.connectToDevice(
         device,
@@ -208,7 +264,7 @@ void main() {
 
       expect(device.connected, isTrue);
       expect(backend.openedInputs, <String>['1']);
-      expect(backend.openedOutputs, <String>['12']);
+      expect(backend.openedOutputs, <String>['11']);
 
       final packets = <MidiPacket>[];
       final sub = plugin.onMidiDataReceived!.listen(packets.add);
@@ -230,7 +286,7 @@ void main() {
       );
 
       expect(backend.sendCalls.length, 1);
-      expect(backend.sendCalls.first.outputPortId, '12');
+      expect(backend.sendCalls.first.outputPortId, '11');
       expect(backend.sendCalls.first.timestamp, 99);
 
       await sub.cancel();

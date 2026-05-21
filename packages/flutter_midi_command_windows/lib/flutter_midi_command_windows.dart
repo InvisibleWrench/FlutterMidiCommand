@@ -77,15 +77,16 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
       }
 
       final isConnected = _connectedDevices.containsKey(id);
-      devices[id] = WindowsMidiDevice(
-        id,
-        name,
-        _rxStreamController,
-        _setupStreamController,
-        _midiCB.nativeFunction.address,
-      )
-        ..addInput(i, inCaps.ref)
-        ..connected = isConnected;
+      devices[id] =
+          WindowsMidiDevice(
+              id,
+              name,
+              _rxStreamController,
+              _setupStreamController,
+              _midiCB.nativeFunction.address,
+            )
+            ..addInput(i, inCaps.ref)
+            ..connected = isConnected;
     }
 
     free(inCaps);
@@ -110,18 +111,19 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
       }
 
       if (devices.containsKey(id)) {
-        devices[id]! as WindowsMidiDevice..addOutput(i, outCaps.ref);
+        (devices[id]! as WindowsMidiDevice).addOutput(i, outCaps.ref);
       } else {
         final isConnected = _connectedDevices.containsKey(id);
-        devices[id] = WindowsMidiDevice(
-          id,
-          name,
-          _rxStreamController,
-          _setupStreamController,
-          _midiCB.nativeFunction.address,
-        )
-          ..addOutput(i, outCaps.ref)
-          ..connected = isConnected;
+        devices[id] =
+            WindowsMidiDevice(
+                id,
+                name,
+                _rxStreamController,
+                _setupStreamController,
+                _midiCB.nativeFunction.address,
+              )
+              ..addOutput(i, outCaps.ref)
+              ..connected = isConnected;
       }
     }
 
@@ -131,8 +133,10 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
   }
 
   @override
-  Future<void> connectToDevice(MidiDevice device,
-      {List<MidiPort>? ports}) async {
+  Future<void> connectToDevice(
+    MidiDevice device, {
+    List<MidiPort>? ports,
+  }) async {
     if (device is! WindowsMidiDevice) {
       return;
     }
@@ -233,7 +237,7 @@ String midiErrorMessage(int status) {
 }
 
 final NativeCallable<Void Function(IntPtr, Uint32, IntPtr, IntPtr, IntPtr)>
-    _midiCB = NativeCallable<MIDIINPROC>.listener(_onMidiData);
+_midiCB = NativeCallable<MIDIINPROC>.listener(_onMidiData);
 
 const int mHdrDone = 0x00000001;
 const int mHdrPrepared = 0x00000002;
@@ -242,7 +246,12 @@ const int mHdrInQueue = 0x00000004;
 final List<int> partialSysExBuffer = [];
 
 void _onMidiData(
-    int hMidiIn, int wMsg, int dwInstance, int dwParam1, int dwParam2) {
+  int hMidiIn,
+  int wMsg,
+  int dwInstance,
+  int dwParam1,
+  int dwParam2,
+) {
   final dev = FlutterMidiCommandWindows().findMidiDeviceForSource(hMidiIn);
   final midiHdrPointer = Pointer<MIDIHDR>.fromAddress(dwParam1);
   final midiHdr = midiHdrPointer.ref;

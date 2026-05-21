@@ -117,18 +117,23 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
     }
 
     return midiManager.devices
-      .mapNotNull { info ->
+      .flatMap { info ->
         val type = mapDeviceType(info)
+        val baseId = Device.deviceIdForInfo(info)
+        val baseName = info.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-"
+        val logicalPortCount = maxOf(info.inputPortCount, info.outputPortCount, 1)
 
-        val id = Device.deviceIdForInfo(info)
-        MidiHostDevice(
-          id = id,
-          name = info.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "-",
-          type = type,
-          connected = connectedDevices.contains(id),
-          inputs = listOfPorts(info.inputPortCount, isInput = true),
-          outputs = listOfPorts(info.outputPortCount, isInput = false),
-        )
+        (0 until logicalPortCount).map { portIndex ->
+          val id = Device.logicalDeviceId(baseId, portIndex)
+          MidiHostDevice(
+            id = id,
+            name = if (logicalPortCount == 1) baseName else "$baseName [${portIndex + 1}]",
+            type = type,
+            connected = connectedDevices.contains(id),
+            inputs = listOfLogicalPort(info.inputPortCount, portIndex, isInput = true),
+            outputs = listOfLogicalPort(info.outputPortCount, portIndex, isInput = false),
+          )
+        }
       }
   }
 
@@ -143,7 +148,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
       return
     }
 
-    val target = midiManager.devices.firstOrNull { info -> Device.deviceIdForInfo(info) == deviceId }
+    val baseDeviceId = Device.baseDeviceId(deviceId)
+    val portIndex = Device.portIndex(deviceId)
+    val target = midiManager.devices.firstOrNull { info -> Device.deviceIdForInfo(info) == baseDeviceId }
       ?: throw FlutterError("ERROR", "Device not found", null)
 
     midiManager.openDevice(target, { openedDevice: MidiDevice? ->
@@ -155,6 +162,9 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
 
       val connectedDevice = ConnectedDevice(
         openedDevice,
+        deviceId,
+        if (target.inputPortCount > portIndex) portIndex else null,
+        if (target.outputPortCount > portIndex) portIndex else null,
         this::sendSetupUpdate,
         this::sendDataPacket,
         this::sendConnectionStateUpdate,
@@ -223,14 +233,18 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
     // Android has no equivalent CoreMIDI network session.
   }
 
-  private fun listOfPorts(count: Int, isInput: Boolean): List<MidiPort> {
-    return (0 until count).map { index ->
+  private fun listOfLogicalPort(count: Int, portIndex: Int, isInput: Boolean): List<MidiPort> {
+    if (portIndex >= count) {
+      return emptyList()
+    }
+
+    return listOf(
       MidiPort(
-        id = index.toLong(),
+        id = portIndex.toLong(),
         connected = false,
         isInput = isInput,
-      )
-    }
+      ),
+    )
   }
 
   private fun mapDeviceType(info: MidiDeviceInfo): MidiDeviceType {
@@ -276,10 +290,10 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
         return
       }
 
-      val id = Device.deviceIdForInfo(device)
-      connectedDevices[id]?.also {
-        connectedDevices.remove(id)
-        sendConnectionStateUpdate(id, false)
+      val baseId = Device.deviceIdForInfo(device)
+      val removedIds = connectedDevices.keys.filter { Device.baseDeviceId(it) == baseId }
+      removedIds.forEach { id ->
+        connectedDevices.remove(id)?.close()
       }
       sendSetupUpdate("deviceLost")
     }

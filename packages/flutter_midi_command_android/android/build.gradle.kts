@@ -6,7 +6,6 @@ plugins {
 rootProject.allprojects {
     repositories {
         google()
-        jcenter()
         mavenCentral()
     }
 }
@@ -20,16 +19,23 @@ android {
         getByName("test").java.srcDirs("src/test/kotlin")
     }
     defaultConfig {
-        minSdkVersion(21)
+        minSdk = 21
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8.toString()
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     dependencies {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

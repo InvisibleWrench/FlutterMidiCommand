@@ -24,17 +24,25 @@ class WindowsMidiDevice extends MidiDevice {
 
   final _bufferSize = 8192;
 
-  final List<Pointer<MIDIHDR>> _midiInHeaders =
-      List.generate(_numberOfBuffers, (index) => nullptr);
-  final List<Pointer<BYTE>> _midiInBuffers =
-      List.generate(_numberOfBuffers, (index) => nullptr);
+  final List<Pointer<MIDIHDR>> _midiInHeaders = List.generate(
+    _numberOfBuffers,
+    (index) => nullptr,
+  );
+  final List<Pointer<BYTE>> _midiInBuffers = List.generate(
+    _numberOfBuffers,
+    (index) => nullptr,
+  );
 
   Pointer<MIDIHDR> _midiOutHeader = nullptr;
   Pointer<BYTE> _midiOutBuffer = nullptr;
 
-  WindowsMidiDevice(String id, String name, this._rxStreamCtrl,
-      this._setupStreamController, this.callbackAddress)
-      : super(id, name, MidiDeviceType.serial, false);
+  WindowsMidiDevice(
+    String id,
+    String name,
+    this._rxStreamCtrl,
+    this._setupStreamController,
+    this.callbackAddress,
+  ) : super(id, name, MidiDeviceType.serial, false);
 
   /// Connect to the device, ie. open input and output ports
   /// NOTE: Currently only the first input/output port is considered
@@ -45,7 +53,12 @@ class WindowsMidiDevice extends MidiDevice {
     if (mIn != null) {
       var id = mIn.key;
       int result = midiInOpen(
-          hMidiInDevicePtr, id, callbackAddress, 0, CALLBACK_FUNCTION);
+        hMidiInDevicePtr,
+        id,
+        callbackAddress,
+        0,
+        CALLBACK_FUNCTION,
+      );
       if (result != 0) {
         print("OPEN ERROR($result): ${midiErrorMessage(result)}");
         return false;
@@ -60,14 +73,20 @@ class WindowsMidiDevice extends MidiDevice {
           _midiInHeaders[i].ref.dwBytesRecorded = 0;
 
           result = midiInPrepareHeader(
-              hMidiInDevicePtr.value, _midiInHeaders[i], sizeOf<MIDIHDR>());
+            hMidiInDevicePtr.value,
+            _midiInHeaders[i],
+            sizeOf<MIDIHDR>(),
+          );
           if (result != 0) {
             print("HDR PREP ERROR: ${midiErrorMessage(result)}");
             return false;
           }
 
           result = midiInAddBuffer(
-              hMidiInDevicePtr.value, _midiInHeaders[i], sizeOf<MIDIHDR>());
+            hMidiInDevicePtr.value,
+            _midiInHeaders[i],
+            sizeOf<MIDIHDR>(),
+          );
           if (result != 0) {
             print("HDR ADD ERROR: ${midiErrorMessage(result)}");
             return false;
@@ -112,7 +131,10 @@ class WindowsMidiDevice extends MidiDevice {
       for (int i = 0; i < _numberOfBuffers; i++) {
         if (_midiInHeaders[i] != nullptr) {
           midiInUnprepareHeader(
-              hMidiInDevicePtr.value, _midiInHeaders[i], sizeOf<MIDIHDR>());
+            hMidiInDevicePtr.value,
+            _midiInHeaders[i],
+            sizeOf<MIDIHDR>(),
+          );
           free(_midiInHeaders[i]);
         }
         if (_midiInBuffers[i] != nullptr) {
@@ -150,12 +172,12 @@ class WindowsMidiDevice extends MidiDevice {
 
   addInput(int id, MIDIINCAPS input) {
     _ins[id] = input;
-    inputPorts.add(MidiPort(input.wPid, MidiPortType.IN));
+    inputPorts.add(MidiPort(id, MidiPortType.IN));
   }
 
   addOutput(int id, MIDIOUTCAPS output) {
     _outs[id] = output;
-    outputPorts.add(MidiPort(output.wPid, MidiPortType.OUT));
+    outputPorts.add(MidiPort(id, MidiPortType.OUT));
   }
 
   containsMidiIn(int input) => hMidiInDevicePtr.value == input;
@@ -176,6 +198,12 @@ class WindowsMidiDevice extends MidiDevice {
   }
 
   send(Uint8List data) async {
+    if (_outs.isEmpty ||
+        _midiOutBuffer == nullptr ||
+        _midiOutHeader == nullptr) {
+      return;
+    }
+
     // Set data in out buffer
     _midiOutBuffer.asTypedList(data.length).setAll(0, data);
     _midiOutHeader.ref.lpData = _midiOutBuffer as LPSTR;
@@ -184,19 +212,28 @@ class WindowsMidiDevice extends MidiDevice {
     _midiOutHeader.ref.dwFlags = 0;
 
     int result = midiOutPrepareHeader(
-        hMidiOutDevicePtr.value, _midiOutHeader, sizeOf<MIDIHDR>());
+      hMidiOutDevicePtr.value,
+      _midiOutHeader,
+      sizeOf<MIDIHDR>(),
+    );
     if (result != 0) {
       print("HDR OUT PREP ERROR: ${midiErrorMessage(result)}");
     }
 
     result = midiOutLongMsg(
-        hMidiOutDevicePtr.value, _midiOutHeader, sizeOf<MIDIHDR>());
+      hMidiOutDevicePtr.value,
+      _midiOutHeader,
+      sizeOf<MIDIHDR>(),
+    );
     if (result != 0) {
       print("SEND ERROR($result): ${midiErrorMessage(result)}");
     }
 
     result = midiOutUnprepareHeader(
-        hMidiOutDevicePtr.value, _midiOutHeader, sizeOf<MIDIHDR>());
+      hMidiOutDevicePtr.value,
+      _midiOutHeader,
+      sizeOf<MIDIHDR>(),
+    );
     if (result != 0) {
       print("OUT UNPREPARE ERROR($result): ${midiErrorMessage(result)}");
     }
