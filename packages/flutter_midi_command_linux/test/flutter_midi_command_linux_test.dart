@@ -153,6 +153,115 @@ void main() {
     },
   );
 
+  test(
+    'monitor emits setup events only after device snapshot changes',
+    () async {
+      final monitor = StreamController<void>.broadcast();
+      var discovered = <_FakeLinuxMidiPortDevice>[];
+      final plugin = FlutterMidiCommandLinux(
+        deviceDiscovery: () => discovered,
+        deviceMonitor: () => monitor.stream,
+        deviceMonitorDebounce: Duration.zero,
+      );
+      final events = <MidiSetupChange>[];
+      final subscription = plugin.onMidiSetupChanged!.listen(events.add);
+
+      monitor.add(null);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(events, isEmpty);
+
+      discovered = [_FakeLinuxMidiPortDevice(id: 'aseq:1:0')];
+      monitor.add(null);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(events, [MidiSetupChange.deviceAppeared]);
+
+      discovered = [];
+      monitor.add(null);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(events, [
+        MidiSetupChange.deviceAppeared,
+        MidiSetupChange.deviceDisappeared,
+      ]);
+
+      await subscription.cancel();
+      await monitor.close();
+    },
+  );
+
+  test('monitor coalesces multiple hotplug signals into one refresh', () async {
+    final monitor = StreamController<void>.broadcast();
+    var discoveryCount = 0;
+    var discovered = <_FakeLinuxMidiPortDevice>[];
+    final plugin = FlutterMidiCommandLinux(
+      deviceDiscovery: () {
+        discoveryCount += 1;
+        return discovered;
+      },
+      deviceMonitor: () => monitor.stream,
+      deviceMonitorDebounce: Duration.zero,
+    );
+    final events = <MidiSetupChange>[];
+    final subscription = plugin.onMidiSetupChanged!.listen(events.add);
+
+    discovered = [_FakeLinuxMidiPortDevice(id: 'aseq:1:0')];
+    monitor
+      ..add(null)
+      ..add(null)
+      ..add(null);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(events, [MidiSetupChange.deviceAppeared]);
+    expect(discoveryCount, 2);
+
+    await subscription.cancel();
+    await monitor.close();
+  });
+
+  test(
+    'monitor removes disconnected hardware from connected devices',
+    () async {
+      final monitor = StreamController<void>.broadcast();
+      final alsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
+      var discovered = <_FakeLinuxMidiPortDevice>[alsa];
+      final plugin = FlutterMidiCommandLinux(
+        deviceDiscovery: () => discovered,
+        deviceMonitor: () => monitor.stream,
+        deviceMonitorDebounce: Duration.zero,
+      );
+      final setupEvents = <MidiSetupChange>[];
+      final setupSubscription = plugin.onMidiSetupChanged!.listen(
+        setupEvents.add,
+      );
+      final packets = <MidiPacket>[];
+      final dataSubscription = plugin.onMidiDataReceived!.listen(packets.add);
+      final device = (await plugin.devices).single;
+
+      await plugin.connectToDevice(device);
+      discovered = [];
+      monitor.add(null);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      alsa.emit([0x90, 0x40, 0x7f]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(setupEvents, [
+        MidiSetupChange.deviceConnected,
+        MidiSetupChange.deviceDisappeared,
+      ]);
+      expect(alsa.disconnectCount, 1);
+      expect(packets, isEmpty);
+
+      await setupSubscription.cancel();
+      await dataSubscription.cancel();
+      await monitor.close();
+    },
+  );
+
   test('received data is emitted once and stops after disconnect', () async {
     final alsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
     final plugin = FlutterMidiCommandLinux(deviceDiscovery: () => [alsa]);
@@ -202,11 +311,14 @@ void main() {
     'teardown disconnects devices and closes setup and data streams',
     () async {
       final alsa = _FakeLinuxMidiPortDevice(id: 'aseq:1:0');
-      final plugin = FlutterMidiCommandLinux(deviceDiscovery: () => [alsa]);
+      final plugin = FlutterMidiCommandLinux(
+        deviceDiscovery: () => [alsa],
+        deviceMonitor: () => const Stream<void>.empty(),
+      );
       await plugin.connectToDevice((await plugin.devices).single);
       final setupDone = expectLater(
         plugin.onMidiSetupChanged!,
-        emitsInOrder(<Object>['deviceDisconnected', emitsDone]),
+        emitsInOrder(<Object>[MidiSetupChange.deviceDisconnected, emitsDone]),
       );
       final dataDone = expectLater(plugin.onMidiDataReceived!, emitsDone);
 

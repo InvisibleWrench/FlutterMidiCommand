@@ -18,10 +18,12 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
   final WebMidiBackend _backend;
   final StreamController<MidiPacket> _rxStreamController =
       StreamController<MidiPacket>.broadcast();
-  final StreamController<String> _setupStreamController =
-      StreamController<String>.broadcast();
+  final StreamController<MidiSetupChange> _setupStreamController =
+      StreamController<MidiSetupChange>.broadcast();
 
   StreamSubscription<WebMidiStateChange>? _stateChangeSubscription;
+  Timer? _stateChangeTimer;
+  Map<String, _WebDeviceSnapshot>? _stateChangeBaseSnapshots;
   bool _initialized = false;
 
   final Map<String, _WebDeviceSnapshot> _deviceSnapshots =
@@ -45,17 +47,32 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
 
     _stateChangeSubscription?.cancel();
     _stateChangeSubscription = _backend.onStateChanged.listen((event) {
-      switch (event.type) {
-        case WebMidiStateChangeType.connected:
-          _setupStreamController.add('deviceAppeared');
-        case WebMidiStateChangeType.disconnected:
-          _setupStreamController.add('deviceDisappeared');
-        case WebMidiStateChangeType.changed:
-          _setupStreamController.add('deviceStateChanged');
-      }
+      _scheduleStateChangeRefresh();
     });
 
     _initialized = true;
+  }
+
+  void _scheduleStateChangeRefresh() {
+    _stateChangeBaseSnapshots ??= Map<String, _WebDeviceSnapshot>.of(
+      _deviceSnapshots,
+    );
+    _stateChangeTimer?.cancel();
+    _stateChangeTimer = Timer(const Duration(milliseconds: 250), () {
+      _stateChangeTimer = null;
+      final previousSnapshots =
+          _stateChangeBaseSnapshots ??
+          Map<String, _WebDeviceSnapshot>.of(_deviceSnapshots);
+      _stateChangeBaseSnapshots = null;
+      unawaited(_refreshStateChange(previousSnapshots));
+    });
+  }
+
+  Future<void> _refreshStateChange(
+    Map<String, _WebDeviceSnapshot> previousSnapshots,
+  ) async {
+    final nextSnapshots = await _snapshotDevices();
+    _emitSnapshotChanges(previousSnapshots, nextSnapshots);
   }
 
   int _portNumericId(String portId, bool isInput, int fallbackIndex) {
@@ -153,6 +170,43 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
       );
 
     return snapshots;
+  }
+
+  void _emitSnapshotChanges(
+    Map<String, _WebDeviceSnapshot> previousSnapshots,
+    List<_WebDeviceSnapshot> nextSnapshots,
+  ) {
+    final nextSnapshotMap = <String, _WebDeviceSnapshot>{
+      for (final snapshot in nextSnapshots) snapshot.id: snapshot,
+    };
+    final previousIds = previousSnapshots.keys.toSet();
+    final nextIds = nextSnapshotMap.keys.toSet();
+    final disappearedIds = previousIds.difference(nextIds);
+    final appearedIds = nextIds.difference(previousIds);
+    final retainedIds = previousIds.intersection(nextIds);
+    var stateChanged = false;
+
+    for (final id in disappearedIds) {
+      final connectedDevice = _connectedDeviceRefs[id];
+      if (connectedDevice != null) {
+        unawaited(_disconnectDeviceAsync(connectedDevice, emitSetup: false));
+      }
+      _setupStreamController.add(MidiSetupChange.deviceDisappeared);
+    }
+
+    for (final _ in appearedIds) {
+      _setupStreamController.add(MidiSetupChange.deviceAppeared);
+    }
+
+    for (final id in retainedIds) {
+      if (!_snapshotsEqual(previousSnapshots[id], nextSnapshotMap[id])) {
+        stateChanged = true;
+        break;
+      }
+    }
+    if (stateChanged && appearedIds.isEmpty && disappearedIds.isEmpty) {
+      _setupStreamController.add(MidiSetupChange.deviceStateChanged);
+    }
   }
 
   MidiDevice _toMidiDevice(_WebDeviceSnapshot snapshot) {
@@ -289,7 +343,7 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
         .toList(growable: false);
 
     device.connected = true;
-    _setupStreamController.add('deviceConnected');
+    _setupStreamController.add(MidiSetupChange.deviceConnected);
   }
 
   @override
@@ -297,7 +351,10 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
     unawaited(_disconnectDeviceAsync(device));
   }
 
-  Future<void> _disconnectDeviceAsync(MidiDevice device) async {
+  Future<void> _disconnectDeviceAsync(
+    MidiDevice device, {
+    bool emitSetup = true,
+  }) async {
     final inputIds = _connectedInputPortsByDevice.remove(device.id) ?? const [];
     final outputIds =
         _connectedOutputPortsByDevice.remove(device.id) ?? const [];
@@ -312,7 +369,9 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
 
     _connectedDeviceRefs.remove(device.id);
     device.connected = false;
-    _setupStreamController.add('deviceDisconnected');
+    if (emitSetup) {
+      _setupStreamController.add(MidiSetupChange.deviceDisconnected);
+    }
   }
 
   @override
@@ -338,7 +397,10 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
   Stream<MidiPacket>? get onMidiDataReceived => _rxStreamController.stream;
 
   @override
-  Stream<String>? get onMidiSetupChanged => _setupStreamController.stream;
+  Stream<MidiSetupChange>? get onMidiSetupChanged {
+    unawaited(_snapshotDevices());
+    return _setupStreamController.stream;
+  }
 
   @override
   void addVirtualDevice({String? name}) {
@@ -374,6 +436,9 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
 
     await _stateChangeSubscription?.cancel();
     _stateChangeSubscription = null;
+    _stateChangeTimer?.cancel();
+    _stateChangeTimer = null;
+    _stateChangeBaseSnapshots = null;
     _initialized = false;
     _deviceSnapshots.clear();
     _backend.dispose();
@@ -402,6 +467,50 @@ class _WebOutputPortSnapshot {
   final int id;
   final bool connected;
   final String portId;
+}
+
+bool _snapshotsEqual(_WebDeviceSnapshot? a, _WebDeviceSnapshot? b) {
+  if (a == null || b == null) {
+    return a == b;
+  }
+  return a.id == b.id &&
+      a.name == b.name &&
+      _inputSnapshotsEqual(a.inputs, b.inputs) &&
+      _outputSnapshotsEqual(a.outputs, b.outputs);
+}
+
+bool _inputSnapshotsEqual(
+  List<_WebInputPortSnapshot> a,
+  List<_WebInputPortSnapshot> b,
+) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].id != b[i].id ||
+        a[i].connected != b[i].connected ||
+        a[i].portId != b[i].portId) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _outputSnapshotsEqual(
+  List<_WebOutputPortSnapshot> a,
+  List<_WebOutputPortSnapshot> b,
+) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].id != b[i].id ||
+        a[i].connected != b[i].connected ||
+        a[i].portId != b[i].portId) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class _WebDeviceSnapshot {

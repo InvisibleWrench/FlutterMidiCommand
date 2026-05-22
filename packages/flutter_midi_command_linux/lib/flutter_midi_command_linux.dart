@@ -8,6 +8,13 @@ import 'src/alsa_seq_linux_device.dart';
 /// Test seam for deterministic ALSA discovery without touching real hardware.
 typedef LinuxMidiDeviceDiscovery = List<LinuxMidiPortDevice> Function();
 
+/// Test seam for deterministic ALSA hotplug notifications.
+typedef LinuxMidiDeviceMonitor = Stream<void> Function();
+
+Stream<void> _monitorLinuxMidiDevices() {
+  return AlsaSeqLinuxDevice.deviceChangeEvents;
+}
+
 class LinuxMidiPacket {
   const LinuxMidiPacket(this.data, this.timestamp);
 
@@ -84,8 +91,17 @@ class LinuxMidiDevice extends MidiDevice {
 }
 
 class FlutterMidiCommandLinux extends MidiCommandPlatform {
-  FlutterMidiCommandLinux({LinuxMidiDeviceDiscovery? deviceDiscovery})
-    : _deviceDiscovery = deviceDiscovery ?? _discoverLinuxMidiDevices {
+  FlutterMidiCommandLinux({
+    LinuxMidiDeviceDiscovery? deviceDiscovery,
+    LinuxMidiDeviceMonitor? deviceMonitor,
+    Duration deviceMonitorDebounce = const Duration(milliseconds: 250),
+  }) : _deviceDiscovery = deviceDiscovery ?? _discoverLinuxMidiDevices,
+       _deviceMonitor = deviceMonitor ?? _monitorLinuxMidiDevices,
+       _deviceMonitorDebounce = deviceMonitorDebounce {
+    _setupStreamController = StreamController<MidiSetupChange>.broadcast(
+      onListen: _startDeviceMonitor,
+      onCancel: _stopDeviceMonitorIfIdle,
+    );
     _setupStream = _setupStreamController.stream;
     _rxStream = _rxStreamController.stream;
   }
@@ -93,13 +109,20 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
   final StreamController<MidiPacket> _rxStreamController =
       StreamController<MidiPacket>.broadcast();
   late final Stream<MidiPacket> _rxStream;
-  final StreamController<String> _setupStreamController =
-      StreamController<String>.broadcast();
-  late final Stream<String> _setupStream;
+  late final StreamController<MidiSetupChange> _setupStreamController;
+  late final Stream<MidiSetupChange> _setupStream;
 
   final Map<String, LinuxMidiDevice> _connectedDevices =
       <String, LinuxMidiDevice>{};
   final LinuxMidiDeviceDiscovery _deviceDiscovery;
+  final LinuxMidiDeviceMonitor _deviceMonitor;
+  final Duration _deviceMonitorDebounce;
+  final Map<String, _LinuxMidiDeviceSnapshot> _knownDeviceSnapshots =
+      <String, _LinuxMidiDeviceSnapshot>{};
+  StreamSubscription<void>? _deviceMonitorSubscription;
+  Timer? _deviceMonitorTimer;
+  bool _hasKnownDeviceSnapshot = false;
+  bool _tearingDown = false;
 
   static void registerWith() {
     MidiCommandPlatform.instance = FlutterMidiCommandLinux();
@@ -107,7 +130,10 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
 
   @override
   Future<List<MidiDevice>> get devices async {
-    return _deviceDiscovery()
+    final portDevices = _deviceDiscovery();
+    _rememberDevices(portDevices);
+
+    return portDevices
         .map((portDevice) {
           final connectedDevice = _connectedDevices[portDevice.id];
           if (connectedDevice != null) {
@@ -142,7 +168,7 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
     final success = await device.connect();
     if (success) {
       _connectedDevices[device.id] = device;
-      _addSetupEvent("deviceConnected");
+      _addSetupEvent(MidiSetupChange.deviceConnected);
       return;
     }
 
@@ -158,20 +184,26 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
 
     if (remove) {
       _connectedDevices.remove(device.id);
-      _addSetupEvent("deviceDisconnected");
+      _addSetupEvent(MidiSetupChange.deviceDisconnected);
     }
     unawaited(linuxDevice.disconnect());
   }
 
   @override
   void teardown() {
+    _tearingDown = true;
+    _deviceMonitorTimer?.cancel();
+    _deviceMonitorTimer = null;
+    unawaited(_deviceMonitorSubscription?.cancel());
+    _deviceMonitorSubscription = null;
+
     final connected = _connectedDevices.values.toList(growable: false);
     for (final device in connected) {
       unawaited(device.disconnect());
     }
     _connectedDevices.clear();
     AlsaSeqLinuxDevice.closeSharedContext();
-    _addSetupEvent("deviceDisconnected");
+    _addSetupEvent(MidiSetupChange.deviceDisconnected);
     unawaited(_setupStreamController.close());
     unawaited(_rxStreamController.close());
   }
@@ -192,7 +224,7 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
   Stream<MidiPacket>? get onMidiDataReceived => _rxStream;
 
   @override
-  Stream<String>? get onMidiSetupChanged => _setupStream;
+  Stream<MidiSetupChange>? get onMidiSetupChanged => _setupStream;
 
   @override
   void addVirtualDevice({String? name}) {}
@@ -206,9 +238,151 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
   @override
   void setNetworkSessionEnabled(bool enabled) {}
 
-  void _addSetupEvent(String event) {
+  void _addSetupEvent(MidiSetupChange event) {
     if (!_setupStreamController.isClosed) {
       _setupStreamController.add(event);
     }
   }
+
+  void _startDeviceMonitor() {
+    if (_tearingDown || _deviceMonitorSubscription != null) {
+      return;
+    }
+
+    try {
+      final portDevices = _deviceDiscovery();
+      _rememberDevices(portDevices);
+      _deviceMonitorSubscription = _deviceMonitor().listen((_) {
+        _scheduleDeviceRefresh();
+      });
+    } catch (error, stackTrace) {
+      if (!_setupStreamController.isClosed) {
+        _setupStreamController.addError(error, stackTrace);
+      }
+    }
+  }
+
+  void _stopDeviceMonitorIfIdle() {
+    if (_setupStreamController.hasListener) {
+      return;
+    }
+    _deviceMonitorTimer?.cancel();
+    _deviceMonitorTimer = null;
+    unawaited(_deviceMonitorSubscription?.cancel());
+    _deviceMonitorSubscription = null;
+  }
+
+  void _scheduleDeviceRefresh() {
+    if (_tearingDown) {
+      return;
+    }
+
+    _deviceMonitorTimer?.cancel();
+    _deviceMonitorTimer = Timer(_deviceMonitorDebounce, () {
+      _deviceMonitorTimer = null;
+      _refreshDeviceSnapshot();
+    });
+  }
+
+  void _refreshDeviceSnapshot() {
+    if (_tearingDown) {
+      return;
+    }
+
+    try {
+      _applyDeviceSnapshot(_deviceDiscovery());
+    } catch (error, stackTrace) {
+      if (!_setupStreamController.isClosed) {
+        _setupStreamController.addError(error, stackTrace);
+      }
+    }
+  }
+
+  void _rememberDevices(List<LinuxMidiPortDevice> devices) {
+    _knownDeviceSnapshots
+      ..clear()
+      ..addEntries(
+        devices.map(
+          (device) => MapEntry(device.id, _LinuxMidiDeviceSnapshot(device)),
+        ),
+      );
+    _hasKnownDeviceSnapshot = true;
+  }
+
+  void _applyDeviceSnapshot(List<LinuxMidiPortDevice> devices) {
+    final nextSnapshots = <String, _LinuxMidiDeviceSnapshot>{
+      for (final device in devices) device.id: _LinuxMidiDeviceSnapshot(device),
+    };
+
+    if (!_hasKnownDeviceSnapshot) {
+      _knownDeviceSnapshots
+        ..clear()
+        ..addAll(nextSnapshots);
+      _hasKnownDeviceSnapshot = true;
+      return;
+    }
+
+    final previousIds = _knownDeviceSnapshots.keys.toSet();
+    final nextIds = nextSnapshots.keys.toSet();
+    final disappearedIds = previousIds.difference(nextIds);
+    final appearedIds = nextIds.difference(previousIds);
+    final retainedIds = previousIds.intersection(nextIds);
+    final previousSnapshots = Map<String, _LinuxMidiDeviceSnapshot>.of(
+      _knownDeviceSnapshots,
+    );
+    var stateChanged = false;
+
+    _knownDeviceSnapshots
+      ..clear()
+      ..addAll(nextSnapshots);
+
+    for (final id in disappearedIds) {
+      final disconnectedDevice = _connectedDevices.remove(id);
+      if (disconnectedDevice != null) {
+        unawaited(disconnectedDevice.disconnect());
+      }
+      _addSetupEvent(MidiSetupChange.deviceDisappeared);
+    }
+
+    for (final id in appearedIds) {
+      if (nextSnapshots.containsKey(id)) {
+        _addSetupEvent(MidiSetupChange.deviceAppeared);
+      }
+    }
+
+    for (final id in retainedIds) {
+      if (previousSnapshots[id] != nextSnapshots[id]) {
+        stateChanged = true;
+        break;
+      }
+    }
+    if (stateChanged && disappearedIds.isEmpty && appearedIds.isEmpty) {
+      _addSetupEvent(MidiSetupChange.deviceStateChanged);
+    }
+  }
+}
+
+class _LinuxMidiDeviceSnapshot {
+  _LinuxMidiDeviceSnapshot(LinuxMidiPortDevice device)
+    : id = device.id,
+      name = device.name,
+      hasInput = device.hasInput,
+      hasOutput = device.hasOutput;
+
+  final String id;
+  final String name;
+  final bool hasInput;
+  final bool hasOutput;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _LinuxMidiDeviceSnapshot &&
+        other.id == id &&
+        other.name == name &&
+        other.hasInput == hasInput &&
+        other.hasOutput == hasOutput;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, hasInput, hasOutput);
 }

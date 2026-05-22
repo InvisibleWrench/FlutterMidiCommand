@@ -64,6 +64,10 @@ class AlsaSeqLinuxDevice implements LinuxMidiPortDevice {
     );
   }
 
+  static Stream<void> get deviceChangeEvents {
+    return _AlsaSeqContext.instance.deviceChangeEvents;
+  }
+
   static void closeSharedContext() {
     _AlsaSeqContext.closeInstance();
   }
@@ -144,7 +148,7 @@ class _AlsaSeqContext {
   static _AlsaSeqContext get instance => _shared ??= _AlsaSeqContext._();
 
   static void closeInstance() {
-    _shared?.close();
+    _shared?.close(disposeDeviceChangeController: true);
     _shared = null;
   }
 
@@ -158,6 +162,8 @@ class _AlsaSeqContext {
   Isolate? _rxIsolate;
   ReceivePort? _rxPort;
   ReceivePort? _rxErrorPort;
+  final StreamController<void> _deviceChangeController =
+      StreamController<void>.broadcast();
 
   final Map<String, Set<AlsaSeqLinuxDevice>> _devicesByEndpoint =
       <String, Set<AlsaSeqLinuxDevice>>{};
@@ -168,6 +174,11 @@ class _AlsaSeqContext {
       _seq != nullptr &&
       _localInPort >= 0 &&
       _localOutPort >= 0;
+
+  Stream<void> get deviceChangeEvents {
+    ensureOpen();
+    return _deviceChangeController.stream;
+  }
 
   bool ensureOpen() {
     if (ready) {
@@ -246,7 +257,7 @@ class _AlsaSeqContext {
     }
   }
 
-  void close() {
+  void close({bool disposeDeviceChangeController = false}) {
     _rxPort?.close();
     _rxErrorPort?.close();
     _rxIsolate?.kill(priority: Isolate.immediate);
@@ -280,6 +291,9 @@ class _AlsaSeqContext {
     _localInPort = -1;
     _localOutPort = -1;
     _devicesByEndpoint.clear();
+    if (disposeDeviceChangeController && !_deviceChangeController.isClosed) {
+      unawaited(_deviceChangeController.close());
+    }
   }
 
   List<AlsaSeqLinuxDevice> enumerate({
@@ -549,6 +563,10 @@ class _AlsaSeqContext {
   }
 
   void _handleHotplug(int type, int client, int port) {
+    if (!_deviceChangeController.isClosed && _isDeviceTopologyEvent(type)) {
+      _deviceChangeController.add(null);
+    }
+
     if (type == SndSeqEventType.portExit) {
       final devices = _devicesByEndpoint.remove(_endpointKey(client, port));
       for (final device in devices ?? const <AlsaSeqLinuxDevice>{}) {
@@ -644,6 +662,15 @@ bool _isHotplugEvent(int type) {
       type == SndSeqEventType.clientChange ||
       type == SndSeqEventType.portSubscribed ||
       type == SndSeqEventType.portUnsubscribed;
+}
+
+bool _isDeviceTopologyEvent(int type) {
+  return type == SndSeqEventType.portExit ||
+      type == SndSeqEventType.clientExit ||
+      type == SndSeqEventType.portStart ||
+      type == SndSeqEventType.clientStart ||
+      type == SndSeqEventType.portChange ||
+      type == SndSeqEventType.clientChange;
 }
 
 String _endpointKey(int client, int port) => '$client:$port';

@@ -31,7 +31,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   }
 
   final _rxStreamController = StreamController<MidiPacket>.broadcast();
-  final _setupStreamController = StreamController<String>.broadcast();
+  final _setupStreamController = StreamController<MidiSetupChange>.broadcast();
   final _bluetoothStateStreamController = StreamController<String>.broadcast();
   final Map<String, _BleMidiDevice> _devices = {};
   String _bleState = "unknown";
@@ -58,7 +58,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         name: result.name!,
         rxStream: _rxStreamController,
       );
-      _setupStreamController.add("deviceAppeared");
+      _setupStreamController.add(MidiSetupChange.deviceAppeared);
     };
 
     UniversalBle.onConnectionChange = (deviceId, isConnected, error) {
@@ -68,10 +68,10 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       }
       if (isConnected) {
         device.updateConnectionState(BleConnectionState.connected);
-        _setupStreamController.add("deviceConnected");
+        _setupStreamController.add(MidiSetupChange.deviceConnected);
       } else {
         device.updateConnectionState(BleConnectionState.disconnected);
-        _setupStreamController.add("deviceDisconnected");
+        _setupStreamController.add(MidiSetupChange.deviceDisconnected);
       }
     };
 
@@ -182,7 +182,8 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   Stream<MidiPacket> get onMidiDataReceived => _rxStreamController.stream;
 
   @override
-  Stream<String> get onMidiSetupChanged => _setupStreamController.stream;
+  Stream<MidiSetupChange> get onMidiSetupChanged =>
+      _setupStreamController.stream;
 
   @override
   void teardown() {

@@ -34,6 +34,14 @@ enum MidiDeviceType {
   unknown,
 }
 
+enum MidiSetupChange {
+  deviceAppeared,
+  deviceDisappeared,
+  deviceStateChanged,
+  deviceConnected,
+  deviceDisconnected,
+}
+
 class MidiHostDevice {
   MidiHostDevice({
     this.id,
@@ -153,14 +161,17 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is MidiDeviceType) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    }    else if (value is MidiHostDevice) {
+    }    else if (value is MidiSetupChange) {
       buffer.putUint8(130);
-      writeValue(buffer, value.encode());
-    }    else if (value is MidiPort) {
+      writeValue(buffer, value.index);
+    }    else if (value is MidiHostDevice) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    }    else if (value is MidiPacket) {
+    }    else if (value is MidiPort) {
       buffer.putUint8(132);
+      writeValue(buffer, value.encode());
+    }    else if (value is MidiPacket) {
+      buffer.putUint8(133);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -174,10 +185,13 @@ class _PigeonCodec extends StandardMessageCodec {
         final int? value = readValue(buffer) as int?;
         return value == null ? null : MidiDeviceType.values[value];
       case 130: 
-        return MidiHostDevice.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : MidiSetupChange.values[value];
       case 131: 
-        return MidiPort.decode(readValue(buffer)!);
+        return MidiHostDevice.decode(readValue(buffer)!);
       case 132: 
+        return MidiPort.decode(readValue(buffer)!);
+      case 133: 
         return MidiPacket.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -405,7 +419,7 @@ class MidiHostApi {
 abstract class MidiFlutterApi {
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
-  void onSetupChanged(String setupChange);
+  void onSetupChanged(MidiSetupChange setupChange);
 
   void onDataReceived(MidiPacket packet);
 
@@ -424,9 +438,9 @@ abstract class MidiFlutterApi {
           assert(message != null,
           'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
-          final String? arg_setupChange = (args[0] as String?);
+          final MidiSetupChange? arg_setupChange = (args[0] as MidiSetupChange?);
           assert(arg_setupChange != null,
-              'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null, expected non-null String.');
+              'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null, expected non-null MidiSetupChange.');
           try {
             api.onSetupChanged(arg_setupChange!);
             return wrapResponse(empty: true);

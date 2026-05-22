@@ -5,13 +5,14 @@ import android.media.midi.*
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiDeviceType
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiHostDevice
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiPacket
+import com.invisiblewrench.fluttermidicommand.pigeon.MidiSetupChange
 
 class ConnectedDevice(
     device: MidiDevice,
     private val logicalDeviceId: String,
     private val inputPortIndex: Int?,
     private val outputPortIndex: Int?,
-    private val onSetupChanged: (String) -> Unit,
+    private val onSetupChanged: (MidiSetupChange) -> Unit,
     private val onDataReceived: (MidiPacket) -> Unit,
     private val onConnectionChanged: (String, Boolean) -> Unit,
     private val deviceType: MidiDeviceType,
@@ -42,7 +43,7 @@ class ConnectedDevice(
                 this.outputPort?.connect(this.receiver)
             }
         }
-        onSetupChanged("deviceConnected")
+        onSetupChanged(MidiSetupChange.DEVICE_CONNECTED)
         onConnectionChanged(id, true)
     }
 
@@ -77,7 +78,7 @@ class ConnectedDevice(
         this.receiver = null
         this.midiDevice.close()
 
-        onSetupChanged("deviceDisconnected")
+        onSetupChanged(MidiSetupChange.DEVICE_DISCONNECTED)
         onConnectionChanged(id, false)
     }
 

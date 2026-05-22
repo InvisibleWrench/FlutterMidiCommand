@@ -8,7 +8,7 @@ import 'package:flutter_midi_command/flutter_midi_command.dart';
 
 import 'controller.dart';
 
-void main() => runExampleApp();
+void main() => runExampleApp(enableBle: !kIsWeb);
 
 void runExampleApp({
   bool enableBle = true,
@@ -32,7 +32,7 @@ class MyApp extends StatefulWidget {
 }
 
 class MyAppState extends State<MyApp> {
-  StreamSubscription<String>? _setupSubscription;
+  StreamSubscription<MidiSetupChange>? _setupSubscription;
   StreamSubscription<BluetoothState>? _bluetoothStateSubscription;
   late final MidiCommand _midiCommand;
 
@@ -64,7 +64,8 @@ class MyAppState extends State<MyApp> {
       setState(() {});
     });
 
-    _bluetoothStateSubscription = _midiCommand.onBluetoothStateChanged.listen((data) {
+    _bluetoothStateSubscription =
+        _midiCommand.onBluetoothStateChanged.listen((data) {
       if (kDebugMode) {
         print("bluetooth state change $data");
       }
@@ -116,7 +117,8 @@ class MyAppState extends State<MyApp> {
     }
   }
 
-  Future<void> _informUserAboutBluetoothPermissions(BuildContext context) async {
+  Future<void> _informUserAboutBluetoothPermissions(
+      BuildContext context) async {
     if (_didAskForBluetoothPermissions) {
       return;
     }
@@ -126,8 +128,10 @@ class MyAppState extends State<MyApp> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Please Grant Bluetooth Permissions to discover BLE MIDI Devices.'),
-          content: const Text('In the next dialog we might ask you for bluetooth permissions.\n'
+          title: const Text(
+              'Please Grant Bluetooth Permissions to discover BLE MIDI Devices.'),
+          content: const Text(
+              'In the next dialog we might ask you for bluetooth permissions.\n'
               'Please grant permissions to make bluetooth MIDI possible.'),
           actions: <Widget>[
             TextButton(
@@ -155,7 +159,8 @@ class MyAppState extends State<MyApp> {
           actions: <Widget>[
             _LabeledAppBarSwitch(
               label: 'Network',
-              tooltip: 'Enable iOS Network MIDI session (RTP-MIDI) when available.',
+              tooltip:
+                  'Enable iOS Network MIDI session (RTP-MIDI) when available.',
               value: _iOSNetworkSessionEnabled,
               onChanged: (newValue) {
                 _midiCommand.setNetworkSessionEnabled(newValue);
@@ -175,77 +180,94 @@ class MyAppState extends State<MyApp> {
                 if (newValue) {
                   _midiCommand.addVirtualDevice(name: "Flutter MIDI Command");
                 } else {
-                  _midiCommand.removeVirtualDevice(name: "Flutter MIDI Command");
+                  _midiCommand.removeVirtualDevice(
+                      name: "Flutter MIDI Command");
                 }
               },
             ),
-            Builder(builder: (context) {
-              return Tooltip(
-                message: 'Initialize Bluetooth and scan for BLE MIDI devices.',
-                child: IconButton(
-                    onPressed: () async {
-                      // Ask for bluetooth permissions
-                      await _informUserAboutBluetoothPermissions(context);
+            if (widget.enableBle)
+              Builder(builder: (context) {
+                return Tooltip(
+                  message:
+                      'Initialize Bluetooth and scan for BLE MIDI devices.',
+                  child: IconButton(
+                      onPressed: () async {
+                        // Ask for bluetooth permissions
+                        await _informUserAboutBluetoothPermissions(context);
 
-                      // Start bluetooth
-                      if (kDebugMode) {
-                        print("start bluetooth");
-                      }
-                      await _midiCommand.startBluetooth().catchError((err) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(err),
-                        ));
-                      });
-
-                      if (kDebugMode) {
-                        print("wait for init");
-                      }
-                      await _midiCommand.waitUntilBluetoothIsInitialized().timeout(const Duration(seconds: 5), onTimeout: () {
+                        // Start bluetooth
                         if (kDebugMode) {
-                          print("Failed to initialize Bluetooth");
+                          print("start bluetooth");
                         }
-                      });
+                        await _midiCommand.startBluetooth().catchError((err) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(err.toString()),
+                          ));
+                        });
 
-                      // If bluetooth is powered on, start scanning
-                      if (_midiCommand.bluetoothState == BluetoothState.poweredOn) {
-                        _midiCommand.startScanningForBluetoothDevices().catchError((err) {
+                        if (kDebugMode) {
+                          print("wait for init");
+                        }
+                        await _midiCommand
+                            .waitUntilBluetoothIsInitialized()
+                            .timeout(const Duration(seconds: 5), onTimeout: () {
                           if (kDebugMode) {
-                            print("Error $err");
+                            print("Failed to initialize Bluetooth");
                           }
                         });
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text('Scanning for bluetooth devices ...'),
-                          ));
-                        }
-                      } else {
-                        final messages = {
-                          BluetoothState.unsupported: 'Bluetooth is not supported on this device.',
-                          BluetoothState.poweredOff: 'Please switch on bluetooth and try again.',
-                          BluetoothState.poweredOn: 'Everything is fine.',
-                          BluetoothState.resetting: 'Currently resetting. Try again later.',
-                          BluetoothState.unauthorized:
-                              'This app needs bluetooth permissions. Please open settings, find your app and assign bluetooth access rights and start your app again.',
-                          BluetoothState.unknown: 'Bluetooth is not ready yet. Try again later.',
-                          BluetoothState.other: 'This should never happen. Please inform the developer of your app.',
-                        };
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            backgroundColor: Colors.red,
-                            content: Text(messages[_midiCommand.bluetoothState] ?? 'Unknown bluetooth state: ${_midiCommand.bluetoothState}'),
-                          ));
-                        }
-                      }
 
-                      if (kDebugMode) {
-                        print("done");
-                      }
-                      // If not show a message telling users what to do
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.refresh)),
-              );
-            }),
+                        // If bluetooth is powered on, start scanning
+                        if (_midiCommand.bluetoothState ==
+                            BluetoothState.poweredOn) {
+                          _midiCommand
+                              .startScanningForBluetoothDevices()
+                              .catchError((err) {
+                            if (kDebugMode) {
+                              print("Error $err");
+                            }
+                          });
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(
+                              content:
+                                  Text('Scanning for bluetooth devices ...'),
+                            ));
+                          }
+                        } else {
+                          final messages = {
+                            BluetoothState.unsupported:
+                                'Bluetooth is not supported on this device.',
+                            BluetoothState.poweredOff:
+                                'Please switch on bluetooth and try again.',
+                            BluetoothState.poweredOn: 'Everything is fine.',
+                            BluetoothState.resetting:
+                                'Currently resetting. Try again later.',
+                            BluetoothState.unauthorized:
+                                'This app needs bluetooth permissions. Please open settings, find your app and assign bluetooth access rights and start your app again.',
+                            BluetoothState.unknown:
+                                'Bluetooth is not ready yet. Try again later.',
+                            BluetoothState.other:
+                                'This should never happen. Please inform the developer of your app.',
+                          };
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              backgroundColor: Colors.red,
+                              content: Text(messages[
+                                      _midiCommand.bluetoothState] ??
+                                  'Unknown bluetooth state: ${_midiCommand.bluetoothState}'),
+                            ));
+                          }
+                        }
+
+                        if (kDebugMode) {
+                          print("done");
+                        }
+                        // If not show a message telling users what to do
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.refresh)),
+                );
+              }),
           ],
         ),
         bottomNavigationBar: Container(
@@ -281,7 +303,7 @@ class MyAppState extends State<MyApp> {
                         if (_midiCommand.isTransportEnabled(
                           MidiTransport.ble,
                         )) {
-                            _midiCommand.stopScanningForBluetoothDevices();
+                          _midiCommand.stopScanningForBluetoothDevices();
                         }
                         Navigator.of(context)
                             .push(MaterialPageRoute<void>(
@@ -292,7 +314,10 @@ class MyAppState extends State<MyApp> {
                         });
                       },
                       onTap: () {
-                        if (device.connectionState == MidiConnectionState.connecting || device.connectionState == MidiConnectionState.disconnecting) {
+                        if (device.connectionState ==
+                                MidiConnectionState.connecting ||
+                            device.connectionState ==
+                                MidiConnectionState.disconnecting) {
                           return;
                         }
 
@@ -311,7 +336,9 @@ class MyAppState extends State<MyApp> {
                               print("device connected async");
                             }
                           }).catchError((err) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${(err as PlatformException?)?.message}")));
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(
+                                    "Error: ${(err as PlatformException?)?.message}")));
                           });
                           setState(() {});
                         }

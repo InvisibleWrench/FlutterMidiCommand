@@ -64,6 +64,20 @@ enum class MidiDeviceType(val raw: Int) {
   }
 }
 
+enum class MidiSetupChange(val raw: Int) {
+  DEVICE_APPEARED(0),
+  DEVICE_DISAPPEARED(1),
+  DEVICE_STATE_CHANGED(2),
+  DEVICE_CONNECTED(3),
+  DEVICE_DISCONNECTED(4);
+
+  companion object {
+    fun ofRaw(raw: Int): MidiSetupChange? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /** Generated class from Pigeon that represents data sent in messages. */
 data class MidiHostDevice (
   val id: String? = null,
@@ -153,16 +167,21 @@ private open class MidiApiPigeonCodec : StandardMessageCodec() {
         }
       }
       130.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          MidiHostDevice.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          MidiSetupChange.ofRaw(it.toInt())
         }
       }
       131.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          MidiPort.fromList(it)
+          MidiHostDevice.fromList(it)
         }
       }
       132.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          MidiPort.fromList(it)
+        }
+      }
+      133.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           MidiPacket.fromList(it)
         }
@@ -176,16 +195,20 @@ private open class MidiApiPigeonCodec : StandardMessageCodec() {
         stream.write(129)
         writeValue(stream, value.raw)
       }
-      is MidiHostDevice -> {
+      is MidiSetupChange -> {
         stream.write(130)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is MidiPort -> {
+      is MidiHostDevice -> {
         stream.write(131)
         writeValue(stream, value.toList())
       }
-      is MidiPacket -> {
+      is MidiPort -> {
         stream.write(132)
+        writeValue(stream, value.toList())
+      }
+      is MidiPacket -> {
+        stream.write(133)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -380,7 +403,7 @@ class MidiFlutterApi(private val binaryMessenger: BinaryMessenger, private val m
       MidiApiPigeonCodec()
     }
   }
-  fun onSetupChanged(setupChangeArg: String, callback: (Result<Unit>) -> Unit)
+  fun onSetupChanged(setupChangeArg: MidiSetupChange, callback: (Result<Unit>) -> Unit)
 {
     val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
     val channelName = "dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged$separatedMessageChannelSuffix"

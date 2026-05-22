@@ -65,6 +65,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
     // MIDI
     var midiClient = MIDIClientRef()
     var connectedDevices = Dictionary<String, ConnectedDevice>()
+    var knownDeviceSnapshots = Dictionary<String, String>()
     
     // Internal callback buses used by platform MIDI classes.
     var rxStreamHandler = StreamHandler()
@@ -113,6 +114,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &midiClient) { (notification) in
             self.handleMIDINotification(notification)
         }
+        knownDeviceSnapshots = currentDeviceSnapshots()
         
 #if os(iOS)
         session = MIDINetworkSession.default()
@@ -120,7 +122,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 #endif
     }
     
-    func updateSetupState(data: Any) {
+    func updateSetupState(data: MidiSetupChange) {
         DispatchQueue.main.async {
             self.setupStreamHandler.send(data:data)
         }
@@ -144,7 +146,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
     }
 
     private func forwardSetupPayloadToPigeon(payload: Any) {
-        pigeonFlutterApi?.onSetupChanged(setupChange: String(describing: payload)) { _ in }
+        guard let setupChange = payload as? MidiSetupChange else {
+            return
+        }
+        pigeonFlutterApi?.onSetupChanged(setupChange: setupChange) { _ in }
     }
 
     private func forwardMidiPayloadToPigeon(payload: Any) {
@@ -269,7 +274,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             if let device = device {
                 connectedDevices[device.id] = device
                 (device as ConnectedOwnVirtualDevice).isConnected = true
-                updateSetupState(data: "deviceConnected")
+                updateSetupState(data: .deviceConnected)
                 pigeonFlutterApi?.onDeviceConnectionStateChanged(deviceId: deviceId, connected: true) { _ in }
             }
         } else // if type == "native" || if type == "virtual"
@@ -278,7 +283,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             : ConnectedVirtualDevice(id: deviceId, type: type, streamHandler: rxStreamHandler, client: midiClient, ports:ports)
             midiDebugLog("connected to \(device) \(deviceId)")
             connectedDevices[deviceId] = device
-            updateSetupState(data: "deviceConnected")
+            updateSetupState(data: .deviceConnected)
             pigeonFlutterApi?.onDeviceConnectionStateChanged(deviceId: deviceId, connected: true) { _ in }
         }
     }
@@ -289,12 +294,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         if let device = device {
             if device.deviceType == "own-virtual" {
                 (device as! ConnectedOwnVirtualDevice).isConnected = false
-                updateSetupState(data: "deviceDisconnected")
+                updateSetupState(data: .deviceDisconnected)
                 pigeonFlutterApi?.onDeviceConnectionStateChanged(deviceId: deviceId, connected: false) { _ in }
             }
             else {
                 device.close()
-                updateSetupState(data: "deviceDisconnected")
+                updateSetupState(data: .deviceDisconnected)
                 pigeonFlutterApi?.onDeviceConnectionStateChanged(deviceId: deviceId, connected: false) { _ in }
             }
             connectedDevices.removeValue(forKey: deviceId)
@@ -546,12 +551,67 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
         return devices
     }
+
+    func currentDeviceSnapshots() -> Dictionary<String, String> {
+        var snapshots = Dictionary<String, String>()
+        for device in getDevices() {
+            guard let id = device.id else {
+                continue
+            }
+            let inputIds = (device.inputs ?? []).compactMap { $0?.id }.map { String($0) }.joined(separator: ",")
+            let outputIds = (device.outputs ?? []).compactMap { $0?.id }.map { String($0) }.joined(separator: ",")
+            snapshots[id] = "\(device.name ?? "")|\(device.type?.rawValue ?? 0)|in:\(inputIds)|out:\(outputIds)"
+        }
+        return snapshots
+    }
+
+    func refreshMidiSetupSnapshot() {
+        let previousSnapshots = knownDeviceSnapshots
+        let nextSnapshots = currentDeviceSnapshots()
+        let previousIds = Set(previousSnapshots.keys)
+        let nextIds = Set(nextSnapshots.keys)
+        let disappearedIds = previousIds.subtracting(nextIds)
+        let appearedIds = nextIds.subtracting(previousIds)
+        let retainedIds = previousIds.intersection(nextIds)
+        var stateChanged = false
+
+        knownDeviceSnapshots = nextSnapshots
+
+        for id in disappearedIds {
+            if let connectedDevice = connectedDevices[id] {
+                connectedDevice.close()
+                connectedDevices.removeValue(forKey: id)
+                pigeonFlutterApi?.onDeviceConnectionStateChanged(deviceId: id, connected: false) { _ in }
+            }
+            updateSetupState(data: .deviceDisappeared)
+        }
+
+        for _ in appearedIds {
+            updateSetupState(data: .deviceAppeared)
+        }
+
+        for id in retainedIds {
+            if previousSnapshots[id] != nextSnapshots[id] {
+                stateChanged = true
+                break
+            }
+        }
+
+        if stateChanged && appearedIds.isEmpty && disappearedIds.isEmpty {
+            updateSetupState(data: .deviceStateChanged)
+        }
+    }
     
     
     func handleMIDINotification(_ midiNotification: UnsafePointer<MIDINotification>) {
         let notification = midiNotification.pointee
-        
-        updateSetupState(data: "\(notification.messageID)")
+
+        switch notification.messageID {
+        case .msgSetupChanged, .msgObjectAdded, .msgObjectRemoved, .msgPropertyChanged:
+            refreshMidiSetupSnapshot()
+        default:
+            break
+        }
         
         if !midiDebugLoggingEnabled {
             return
@@ -733,7 +793,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             //                midiDebugLog("destination name \(name)")
             //            }
         }
-        updateSetupState(data: "\(#function) \(notification)")
+        updateSetupState(data: .deviceStateChanged)
     }
     
     @objc func midiNetworkContactsChanged(notification:NSNotification) {
@@ -745,7 +805,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 midiDebugLog("contact \(con)")
             }
         }
-        updateSetupState(data: "\(#function) \(notification)")
+        updateSetupState(data: .deviceStateChanged)
     }
 #endif
 }

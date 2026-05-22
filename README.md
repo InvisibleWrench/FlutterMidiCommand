@@ -149,6 +149,18 @@ class MidiSessionController {
 
 `connectToDevice` completes when the connection is established, throws `StateError` on connection failure, and times out after 10 seconds by default.
 
+### Setup change events
+
+Listen to `onMidiSetupChanged` to refresh your device list when the host MIDI topology changes. Native desktop/mobile transports monitor platform setup notifications and emit `MidiSetupChange` values:
+
+- `MidiSetupChange.deviceAppeared`: a MIDI device or logical port became available.
+- `MidiSetupChange.deviceDisappeared`: a MIDI device or logical port was removed.
+- `MidiSetupChange.deviceStateChanged`: an existing device changed name, port shape, or availability state.
+- `MidiSetupChange.deviceConnected`: this app connected to a device.
+- `MidiSetupChange.deviceDisconnected`: this app disconnected from a device, or a connected device was removed.
+
+Android, iOS/macOS, Linux, Windows, and Web use platform notifications to wake a fresh device snapshot and emit setup events only after a real MIDI-device change is observed. BLE MIDI is scan-driven: `MidiSetupChange.deviceAppeared` is emitted for scan results, and connection loss is emitted as `MidiSetupChange.deviceDisconnected`.
+
 See `example/` for a complete app with UI and transport toggles.
 
 ## Message parser

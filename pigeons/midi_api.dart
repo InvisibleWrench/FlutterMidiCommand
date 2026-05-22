@@ -26,6 +26,14 @@ class MidiHostDevice {
 
 enum MidiDeviceType { serial, ble, virtualDevice, ownVirtual, network, unknown }
 
+enum MidiSetupChange {
+  deviceAppeared,
+  deviceDisappeared,
+  deviceStateChanged,
+  deviceConnected,
+  deviceDisconnected,
+}
+
 class MidiPort {
   int? id;
   bool? connected;
@@ -53,7 +61,7 @@ abstract class MidiHostApi {
 
 @FlutterApi()
 abstract class MidiFlutterApi {
-  void onSetupChanged(String setupChange);
+  void onSetupChanged(MidiSetupChange setupChange);
   void onDataReceived(MidiPacket packet);
   void onDeviceConnectionStateChanged(String deviceId, bool connected);
 }

@@ -259,13 +259,13 @@ void main() {
   test('Flutter callbacks forward setup and midi streams', () async {
     final host = _FakeHostApi();
     final platform = MethodChannelMidiCommand(hostApi: host);
-    final setupEvents = <String>[];
+    final setupEvents = <MidiSetupChange>[];
     final packets = <MidiPacket>[];
 
     final setupSub = platform.onMidiSetupChanged!.listen(setupEvents.add);
     final packetSub = platform.onMidiDataReceived!.listen(packets.add);
 
-    platform.onSetupChanged('deviceFound');
+    platform.onSetupChanged(pigeon.MidiSetupChange.deviceAppeared);
     platform.onDataReceived(
       pigeon.MidiPacket(
         device: pigeon.MidiHostDevice(
@@ -283,7 +283,7 @@ void main() {
     await setupSub.cancel();
     await packetSub.cancel();
 
-    expect(setupEvents, <String>['deviceFound']);
+    expect(setupEvents, <MidiSetupChange>[MidiSetupChange.deviceAppeared]);
     expect(packets.length, 1);
     expect(packets.first.data, Uint8List.fromList(<int>[0xF8]));
     expect(packets.first.timestamp, 7);

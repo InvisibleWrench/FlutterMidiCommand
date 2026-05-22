@@ -13,6 +13,7 @@ class BrowserWebMidiBackend implements WebMidiBackend {
       StreamController<WebMidiStateChange>.broadcast();
   final Map<String, web.MIDIInput> _inputsById = <String, web.MIDIInput>{};
   final Map<String, web.MIDIOutput> _outputsById = <String, web.MIDIOutput>{};
+  final Map<String, String> _portStatesById = <String, String>{};
   bool _initialized = false;
 
   @override
@@ -74,15 +75,25 @@ class BrowserWebMidiBackend implements WebMidiBackend {
     _outputsById
       ..clear()
       ..addEntries(outputs.map((port) => MapEntry(port.id, port)));
+    _portStatesById
+      ..clear()
+      ..addEntries(inputs.map((port) => MapEntry(port.id, port.state)))
+      ..addEntries(outputs.map((port) => MapEntry(port.id, port.state)));
   }
 
   void _bindStateChanges(web.MIDIAccess access) {
     access.onstatechange =
         ((web.Event event) {
           final midiEvent = event as web.MIDIConnectionEvent;
+          final portId = midiEvent.port?.id;
+          final state = midiEvent.port?.state;
+          final previousState = portId == null ? null : _portStatesById[portId];
           _refreshPortCache();
 
-          final state = midiEvent.port?.state;
+          if (portId != null && state != null && previousState == state) {
+            return;
+          }
+
           final type = switch (state) {
             'connected' => WebMidiStateChangeType.connected,
             'disconnected' => WebMidiStateChangeType.disconnected,
@@ -154,6 +165,7 @@ class BrowserWebMidiBackend implements WebMidiBackend {
     WebMidiMessageCallback onMessage,
   ) async {
     await initialize();
+    _refreshPortCache();
     final input = _requireInput(portId);
 
     await input.open().toDart;
@@ -168,7 +180,11 @@ class BrowserWebMidiBackend implements WebMidiBackend {
   @override
   Future<void> closeInput(String portId) async {
     await initialize();
-    final input = _requireInput(portId);
+    _refreshPortCache();
+    final input = _inputsById[portId];
+    if (input == null) {
+      return;
+    }
 
     input.onmidimessage = null;
     await input.close().toDart;
@@ -177,6 +193,7 @@ class BrowserWebMidiBackend implements WebMidiBackend {
   @override
   Future<void> openOutput(String portId) async {
     await initialize();
+    _refreshPortCache();
     final output = _requireOutput(portId);
     await output.open().toDart;
   }
@@ -184,7 +201,11 @@ class BrowserWebMidiBackend implements WebMidiBackend {
   @override
   Future<void> closeOutput(String portId) async {
     await initialize();
-    final output = _requireOutput(portId);
+    _refreshPortCache();
+    final output = _outputsById[portId];
+    if (output == null) {
+      return;
+    }
     await output.close().toDart;
   }
 
@@ -210,5 +231,6 @@ class BrowserWebMidiBackend implements WebMidiBackend {
     _initialized = false;
     _inputsById.clear();
     _outputsById.clear();
+    _portStatesById.clear();
   }
 }

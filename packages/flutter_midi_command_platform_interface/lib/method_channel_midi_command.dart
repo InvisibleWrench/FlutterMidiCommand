@@ -31,8 +31,8 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
   final MidiFlutterApiSetUp _flutterApiSetUp;
   final StreamController<MidiPacket> _rxStreamController =
       StreamController<MidiPacket>.broadcast();
-  final StreamController<String> _setupStreamController =
-      StreamController<String>.broadcast();
+  final StreamController<MidiSetupChange> _setupStreamController =
+      StreamController<MidiSetupChange>.broadcast();
   final Map<String, MidiDevice> _deviceCache = <String, MidiDevice>{};
 
   void _registerFlutterApi() {
@@ -249,13 +249,14 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
 
   /// Stream firing events whenever a change in the MIDI setup occurs.
   ///
-  /// For example, when a new BLE devices is discovered.
+  /// Emits [MidiSetupChange] values for device topology and connection changes.
   @override
-  Stream<String>? get onMidiSetupChanged => _setupStreamController.stream;
+  Stream<MidiSetupChange>? get onMidiSetupChanged =>
+      _setupStreamController.stream;
 
   @override
-  void onSetupChanged(String setupChange) {
-    _setupStreamController.add(setupChange);
+  void onSetupChanged(pigeon.MidiSetupChange setupChange) {
+    _setupStreamController.add(_fromPigeonSetupChange(setupChange));
   }
 
   @override
@@ -277,7 +278,7 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
       final cached = _deviceCache[deviceId];
       cached?.connected = false;
       _deviceCache.remove(deviceId);
-      _setupStreamController.add('deviceDisconnected');
+      _setupStreamController.add(MidiSetupChange.deviceDisconnected);
       return;
     }
 
@@ -286,7 +287,7 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
         MidiDevice(deviceId, deviceId, MidiDeviceType.unknown, true);
     cached.connected = true;
     _deviceCache[deviceId] = cached;
-    _setupStreamController.add('deviceConnected');
+    _setupStreamController.add(MidiSetupChange.deviceConnected);
   }
 
   /// Creates a virtual MIDI source
@@ -318,5 +319,20 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
   @override
   void setNetworkSessionEnabled(bool enabled) {
     unawaited(_hostApi.setNetworkSessionEnabled(enabled));
+  }
+}
+
+MidiSetupChange _fromPigeonSetupChange(pigeon.MidiSetupChange setupChange) {
+  switch (setupChange) {
+    case pigeon.MidiSetupChange.deviceAppeared:
+      return MidiSetupChange.deviceAppeared;
+    case pigeon.MidiSetupChange.deviceDisappeared:
+      return MidiSetupChange.deviceDisappeared;
+    case pigeon.MidiSetupChange.deviceStateChanged:
+      return MidiSetupChange.deviceStateChanged;
+    case pigeon.MidiSetupChange.deviceConnected:
+      return MidiSetupChange.deviceConnected;
+    case pigeon.MidiSetupChange.deviceDisconnected:
+      return MidiSetupChange.deviceDisconnected;
   }
 }

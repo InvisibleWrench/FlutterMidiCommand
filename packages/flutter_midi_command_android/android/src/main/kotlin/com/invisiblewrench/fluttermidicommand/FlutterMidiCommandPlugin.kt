@@ -17,6 +17,7 @@ import com.invisiblewrench.fluttermidicommand.pigeon.MidiHostApi
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiHostDevice
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiPacket
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiPort
+import com.invisiblewrench.fluttermidicommand.pigeon.MidiSetupChange
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -81,7 +82,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
     activity = null
   }
 
-  private fun sendSetupUpdate(update: String) {
+  private fun sendSetupUpdate(update: MidiSetupChange) {
     handler.post {
       flutterApi.onSetupChanged(update) { result ->
         result.exceptionOrNull()?.let {
@@ -155,7 +156,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
 
     midiManager.openDevice(target, { openedDevice: MidiDevice? ->
       if (openedDevice == null) {
-        sendSetupUpdate("connectionFailed")
+        sendSetupUpdate(MidiSetupChange.DEVICE_DISCONNECTED)
         sendConnectionStateUpdate(deviceId, false)
         return@openDevice
       }
@@ -280,7 +281,7 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
     override fun onDeviceAdded(device: MidiDeviceInfo?) {
       super.onDeviceAdded(device)
       if (device != null) {
-        sendSetupUpdate("deviceFound")
+        sendSetupUpdate(MidiSetupChange.DEVICE_APPEARED)
       }
     }
 
@@ -295,13 +296,13 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MidiHostApi {
       removedIds.forEach { id ->
         connectedDevices.remove(id)?.close()
       }
-      sendSetupUpdate("deviceLost")
+      sendSetupUpdate(MidiSetupChange.DEVICE_DISAPPEARED)
     }
 
     override fun onDeviceStatusChanged(status: MidiDeviceStatus?) {
       super.onDeviceStatusChanged(status)
       if (status != null) {
-        sendSetupUpdate(status.toString())
+        sendSetupUpdate(MidiSetupChange.DEVICE_STATE_CHANGED)
       }
     }
   }

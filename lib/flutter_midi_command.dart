@@ -6,16 +6,31 @@ import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_midi_command/src/midi_transports.dart';
 
-export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart' show MidiDevice, MidiDeviceTypeWire, MidiPacket, MidiPort;
-export 'package:flutter_midi_command_platform_interface/midi_device.dart' show MidiConnectionState, MidiDeviceType;
+export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
+    show MidiDevice, MidiDeviceTypeWire, MidiPacket, MidiPort, MidiSetupChange;
+export 'package:flutter_midi_command_platform_interface/midi_device.dart'
+    show MidiConnectionState, MidiDeviceType;
 export 'src/midi_transports.dart';
 
-enum BluetoothState { poweredOn, poweredOff, resetting, unauthorized, unknown, unsupported, other }
+enum BluetoothState {
+  poweredOn,
+  poweredOff,
+  resetting,
+  unauthorized,
+  unknown,
+  unsupported,
+  other,
+}
 
 enum _MidiDeviceRoute { platform, bleTransport }
 
 class MidiDataReceivedEvent {
-  const MidiDataReceivedEvent({required this.message, required this.device, required this.transport, required this.timestamp});
+  const MidiDataReceivedEvent({
+    required this.message,
+    required this.device,
+    required this.transport,
+    required this.timestamp,
+  });
 
   final MidiMessage message;
   final MidiDevice device;
@@ -24,7 +39,12 @@ class MidiDataReceivedEvent {
 }
 
 class MidiCommand {
-  static const Set<MidiTransport> supportedTransports = {MidiTransport.native, MidiTransport.ble, MidiTransport.network, MidiTransport.virtual};
+  static const Set<MidiTransport> supportedTransports = {
+    MidiTransport.native,
+    MidiTransport.ble,
+    MidiTransport.network,
+    MidiTransport.virtual,
+  };
 
   factory MidiCommand({MidiBleTransport? bleTransport}) {
     if (_instance == null) {
@@ -35,18 +55,27 @@ class MidiCommand {
     return _instance!;
   }
 
-  MidiCommand._({MidiBleTransport? bleTransport}) : _bleTransport = bleTransport;
+  MidiCommand._({MidiBleTransport? bleTransport})
+    : _bleTransport = bleTransport;
 
   MidiTransportPolicy _transportPolicy = const MidiTransportPolicy();
   MidiBleTransport? _bleTransport;
-  final Expando<_MidiDeviceRoute> _deviceRouteByInstance = Expando<_MidiDeviceRoute>('midi_device_route');
-  final Map<String, _MidiDeviceRoute> _deviceRouteById = <String, _MidiDeviceRoute>{};
-  final Map<String, MidiMessageParser> _messageParsersBySource = <String, MidiMessageParser>{};
-  Expando<MidiMessageParser> _messageParsersByAnonymousDevice = Expando<MidiMessageParser>('midi_message_parser');
+  final Expando<_MidiDeviceRoute> _deviceRouteByInstance =
+      Expando<_MidiDeviceRoute>('midi_device_route');
+  final Map<String, _MidiDeviceRoute> _deviceRouteById =
+      <String, _MidiDeviceRoute>{};
+  final Map<String, MidiMessageParser> _messageParsersBySource =
+      <String, MidiMessageParser>{};
+  Expando<MidiMessageParser> _messageParsersByAnonymousDevice =
+      Expando<MidiMessageParser>('midi_message_parser');
 
-  Set<MidiTransport> get enabledTransports => _transportPolicy.resolveEnabledTransports(supportedTransports);
+  Set<MidiTransport> get enabledTransports =>
+      _transportPolicy.resolveEnabledTransports(supportedTransports);
 
-  MidiCapabilities get capabilities => MidiCapabilities(supportedTransports: supportedTransports, enabledTransports: enabledTransports);
+  MidiCapabilities get capabilities => MidiCapabilities(
+    supportedTransports: supportedTransports,
+    enabledTransports: enabledTransports,
+  );
 
   void configureTransportPolicy(MidiTransportPolicy policy) {
     _transportPolicy = policy;
@@ -69,11 +98,14 @@ class MidiCommand {
     _resetMessageParsers();
   }
 
-  bool isTransportEnabled(MidiTransport transport) => enabledTransports.contains(transport);
+  bool isTransportEnabled(MidiTransport transport) =>
+      enabledTransports.contains(transport);
 
   void _requireTransport(MidiTransport transport, String operation) {
     if (!isTransportEnabled(transport)) {
-      throw StateError('$operation requires transport $transport, but it is disabled by policy.');
+      throw StateError(
+        '$operation requires transport $transport, but it is disabled by policy.',
+      );
     }
   }
 
@@ -116,7 +148,8 @@ class MidiCommand {
     __platform = null;
   }
 
-  final StreamController<Uint8List> _txStreamCtrl = StreamController<Uint8List>.broadcast();
+  final StreamController<Uint8List> _txStreamCtrl =
+      StreamController<Uint8List>.broadcast();
 
   final _bluetoothStateStream = StreamController<BluetoothState>.broadcast();
 
@@ -126,14 +159,18 @@ class MidiCommand {
   BluetoothState _bluetoothState = BluetoothState.unknown;
   StreamSubscription? _onBluetoothStateChangedStreamSubscription;
   _listenToBluetoothState() async {
-    _onBluetoothStateChangedStreamSubscription = _bleTransport?.onBluetoothStateChanged.listen((s) {
-      _bluetoothState = BluetoothState.values.byName(s);
-      _bluetoothStateStream.add(_bluetoothState);
-    });
+    _onBluetoothStateChangedStreamSubscription = _bleTransport
+        ?.onBluetoothStateChanged
+        .listen((s) {
+          _bluetoothState = BluetoothState.values.byName(s);
+          _bluetoothStateStream.add(_bluetoothState);
+        });
 
     scheduleMicrotask(() async {
       if (_bluetoothState == BluetoothState.unknown) {
-        _bluetoothState = BluetoothState.values.byName(await _bleTransport!.bluetoothState());
+        _bluetoothState = BluetoothState.values.byName(
+          await _bleTransport!.bluetoothState(),
+        );
         _bluetoothStateStream.add(_bluetoothState);
       }
     });
@@ -171,7 +208,8 @@ class MidiCommand {
   }
 
   /// Stream firing events whenever the bluetooth state changes
-  Stream<BluetoothState> get onBluetoothStateChanged => _bluetoothStateStream.stream.distinct();
+  Stream<BluetoothState> get onBluetoothStateChanged =>
+      _bluetoothStateStream.stream.distinct();
 
   /// Returns the current Bluetooth state
   BluetoothState get bluetoothState => _bluetoothState;
@@ -240,7 +278,10 @@ class MidiCommand {
   }
 
   /// Connects to the device
-  Future<void> connectToDevice(MidiDevice device, {Duration? awaitConnectionTimeout = const Duration(seconds: 10)}) async {
+  Future<void> connectToDevice(
+    MidiDevice device, {
+    Duration? awaitConnectionTimeout = const Duration(seconds: 10),
+  }) async {
     if (!device.connected) {
       device.setConnectionState(MidiConnectionState.connecting);
     }
@@ -314,7 +355,9 @@ class MidiCommand {
         _txStreamCtrl.add(data);
         return;
       }
-      if (route == _MidiDeviceRoute.bleTransport && _bleTransport != null && isTransportEnabled(MidiTransport.ble)) {
+      if (route == _MidiDeviceRoute.bleTransport &&
+          _bleTransport != null &&
+          isTransportEnabled(MidiTransport.ble)) {
         _bleTransport!.sendData(data, deviceId: deviceId, timestamp: timestamp);
         _txStreamCtrl.add(data);
         return;
@@ -335,10 +378,20 @@ class MidiCommand {
   Stream<MidiDataReceivedEvent>? get onMidiDataReceived {
     final streams = <Stream<MidiDataReceivedEvent>>[];
     if (_platform.onMidiDataReceived != null) {
-      streams.add(_mapPacketsToTypedEvents(_platform.onMidiDataReceived!, fallbackTransport: MidiTransport.native));
+      streams.add(
+        _mapPacketsToTypedEvents(
+          _platform.onMidiDataReceived!,
+          fallbackTransport: MidiTransport.native,
+        ),
+      );
     }
     if (_bleTransport != null && isTransportEnabled(MidiTransport.ble)) {
-      streams.add(_mapPacketsToTypedEvents(_bleTransport!.onMidiDataReceived, fallbackTransport: MidiTransport.ble));
+      streams.add(
+        _mapPacketsToTypedEvents(
+          _bleTransport!.onMidiDataReceived,
+          fallbackTransport: MidiTransport.ble,
+        ),
+      );
     }
     if (streams.isEmpty) {
       return null;
@@ -369,11 +422,9 @@ class MidiCommand {
     return StreamGroup.merge(streams).asBroadcastStream();
   }
 
-  /// Stream firing events whenever a change in the MIDI setup occurs
-  ///
-  /// For example, when a new BLE devices is discovered
-  Stream<String>? get onMidiSetupChanged {
-    final streams = <Stream<String>>[];
+  /// Stream firing events whenever a change in the MIDI setup occurs.
+  Stream<MidiSetupChange>? get onMidiSetupChanged {
+    final streams = <Stream<MidiSetupChange>>[];
     if (_platform.onMidiSetupChanged != null) {
       streams.add(_platform.onMidiSetupChanged!);
     }
@@ -435,7 +486,8 @@ class MidiCommand {
     }
 
     final completer = Completer<void>();
-    var wasConnecting = device.connectionState == MidiConnectionState.connecting;
+    var wasConnecting =
+        device.connectionState == MidiConnectionState.connecting;
     late StreamSubscription<MidiConnectionState> sub;
 
     void completeSuccess() {
@@ -446,7 +498,9 @@ class MidiCommand {
 
     void completeFailure() {
       if (!completer.isCompleted) {
-        completer.completeError(StateError('Failed to connect to MIDI device ${device.id}.'));
+        completer.completeError(
+          StateError('Failed to connect to MIDI device ${device.id}.'),
+        );
       }
     }
 
@@ -466,7 +520,8 @@ class MidiCommand {
 
     if (device.connected) {
       completeSuccess();
-    } else if (device.connectionState == MidiConnectionState.disconnected && wasConnecting) {
+    } else if (device.connectionState == MidiConnectionState.disconnected &&
+        wasConnecting) {
       completeFailure();
     }
 
@@ -498,21 +553,37 @@ class MidiCommand {
     return _MidiDeviceRoute.platform;
   }
 
-  Stream<MidiDataReceivedEvent> _mapPacketsToTypedEvents(Stream<MidiPacket> packets, {required MidiTransport fallbackTransport}) {
+  Stream<MidiDataReceivedEvent> _mapPacketsToTypedEvents(
+    Stream<MidiPacket> packets, {
+    required MidiTransport fallbackTransport,
+  }) {
     return packets.asyncExpand((packet) {
-      final transport = _transportForPacket(packet, fallbackTransport: fallbackTransport);
+      final transport = _transportForPacket(
+        packet,
+        fallbackTransport: fallbackTransport,
+      );
       final parser = _parserForPacket(packet, transport);
       final parsedMessages = parser.parse(packet.data, flushPendingNrpn: false);
       if (parsedMessages.isEmpty) {
         return const Stream<MidiDataReceivedEvent>.empty();
       }
       return Stream<MidiDataReceivedEvent>.fromIterable(
-        parsedMessages.map((message) => MidiDataReceivedEvent(message: message, device: packet.device, transport: transport, timestamp: packet.timestamp)),
+        parsedMessages.map(
+          (message) => MidiDataReceivedEvent(
+            message: message,
+            device: packet.device,
+            transport: transport,
+            timestamp: packet.timestamp,
+          ),
+        ),
       );
     });
   }
 
-  MidiMessageParser _parserForPacket(MidiPacket packet, MidiTransport transport) {
+  MidiMessageParser _parserForPacket(
+    MidiPacket packet,
+    MidiTransport transport,
+  ) {
     if (packet.device.id.isNotEmpty) {
       final key = '${transport.name}:${packet.device.id}';
       return _messageParsersBySource.putIfAbsent(key, MidiMessageParser.new);
@@ -528,7 +599,10 @@ class MidiCommand {
     return parser;
   }
 
-  MidiTransport _transportForPacket(MidiPacket packet, {required MidiTransport fallbackTransport}) {
+  MidiTransport _transportForPacket(
+    MidiPacket packet, {
+    required MidiTransport fallbackTransport,
+  }) {
     switch (packet.device.type) {
       case MidiDeviceType.ble:
         return MidiTransport.ble;
@@ -549,6 +623,8 @@ class MidiCommand {
       parser.reset();
     }
     _messageParsersBySource.clear();
-    _messageParsersByAnonymousDevice = Expando<MidiMessageParser>('midi_message_parser');
+    _messageParsersByAnonymousDevice = Expando<MidiMessageParser>(
+      'midi_message_parser',
+    );
   }
 }

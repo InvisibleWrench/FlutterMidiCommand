@@ -15,7 +15,7 @@ class WindowsMidiDevice extends MidiDevice {
   final Map<int, MIDIOUTCAPS> _outs = {};
 
   final StreamController<MidiPacket> _rxStreamCtrl;
-  final StreamController<String> _setupStreamController;
+  final StreamController<MidiSetupChange> _setupStreamController;
 
   final hMidiInDevicePtr = malloc<HMIDIIN>();
   final hMidiOutDevicePtr = malloc<IntPtr>();
@@ -116,7 +116,7 @@ class WindowsMidiDevice extends MidiDevice {
       _midiOutHeader = malloc<MIDIHDR>();
     }
     connected = true;
-    _setupStreamController.add("deviceConnected");
+    _setupStreamController.add(MidiSetupChange.deviceConnected);
     return true;
   }
 

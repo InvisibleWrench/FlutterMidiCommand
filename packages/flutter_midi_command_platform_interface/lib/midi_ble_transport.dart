@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_midi_command_platform_interface/midi_device.dart';
 import 'package:flutter_midi_command_platform_interface/midi_packet.dart';
 import 'package:flutter_midi_command_platform_interface/midi_port.dart';
+import 'package:flutter_midi_command_platform_interface/midi_setup_change.dart';
 
 /// BLE transport contract consumed by `MidiCommand`.
 ///
@@ -21,6 +22,6 @@ abstract class MidiBleTransport {
   void disconnectDevice(MidiDevice device);
   void sendData(Uint8List data, {int? timestamp, String? deviceId});
   Stream<MidiPacket> get onMidiDataReceived;
-  Stream<String> get onMidiSetupChanged;
+  Stream<MidiSetupChange> get onMidiSetupChanged;
   void teardown();
 }

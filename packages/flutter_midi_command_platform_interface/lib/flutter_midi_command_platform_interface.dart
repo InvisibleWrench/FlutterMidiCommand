@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_midi_command_platform_interface/midi_device.dart';
 import 'package:flutter_midi_command_platform_interface/midi_packet.dart';
 import 'package:flutter_midi_command_platform_interface/midi_port.dart';
+import 'package:flutter_midi_command_platform_interface/midi_setup_change.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'method_channel_midi_command.dart';
 
@@ -11,6 +12,7 @@ export 'package:flutter_midi_command_platform_interface/midi_device.dart';
 export 'package:flutter_midi_command_platform_interface/midi_ble_transport.dart';
 export 'package:flutter_midi_command_platform_interface/midi_packet.dart';
 export 'package:flutter_midi_command_platform_interface/midi_port.dart';
+export 'package:flutter_midi_command_platform_interface/midi_setup_change.dart';
 
 abstract class MidiCommandPlatform extends PlatformInterface {
   /// Constructs a MidiCommandPlatform.
@@ -67,8 +69,9 @@ abstract class MidiCommandPlatform extends PlatformInterface {
 
   /// Stream firing events whenever a change in the MIDI setup occurs.
   ///
-  /// For example, when a new BLE devices is discovered.
-  Stream<String>? get onMidiSetupChanged {
+  /// Platform implementations should start monitoring when this stream is
+  /// listened to where passive setup monitoring is supported.
+  Stream<MidiSetupChange>? get onMidiSetupChanged {
     throw UnimplementedError(
       'get onMidiSetupChanged has not been implemented.',
     );

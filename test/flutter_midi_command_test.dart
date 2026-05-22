@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _FakePlatform extends MidiCommandPlatform {
   final _rx = StreamController<MidiPacket>.broadcast();
-  final _setup = StreamController<String>.broadcast();
+  final _setup = StreamController<MidiSetupChange>.broadcast();
   final sent = <Uint8List>[];
   final connected = <String>[];
   final disconnected = <String>[];
@@ -50,20 +50,20 @@ class _FakePlatform extends MidiCommandPlatform {
   Stream<MidiPacket>? get onMidiDataReceived => _rx.stream;
 
   @override
-  Stream<String>? get onMidiSetupChanged => _setup.stream;
+  Stream<MidiSetupChange>? get onMidiSetupChanged => _setup.stream;
 
   void emitPacket(MidiPacket packet) {
     _rx.add(packet);
   }
 
-  void emitSetup(String value) {
+  void emitSetup(MidiSetupChange value) {
     _setup.add(value);
   }
 }
 
 class _FakeBleTransport implements MidiBleTransport {
   final _rx = StreamController<MidiPacket>.broadcast();
-  final _setup = StreamController<String>.broadcast();
+  final _setup = StreamController<MidiSetupChange>.broadcast();
   final _state = StreamController<String>.broadcast();
 
   final sent = <Uint8List>[];
@@ -126,7 +126,7 @@ class _FakeBleTransport implements MidiBleTransport {
   Stream<MidiPacket> get onMidiDataReceived => _rx.stream;
 
   @override
-  Stream<String> get onMidiSetupChanged => _setup.stream;
+  Stream<MidiSetupChange> get onMidiSetupChanged => _setup.stream;
 
   @override
   void teardown() {
@@ -137,7 +137,7 @@ class _FakeBleTransport implements MidiBleTransport {
     _rx.add(packet);
   }
 
-  void emitSetup(String value) {
+  void emitSetup(MidiSetupChange value) {
     _setup.add(value);
   }
 }
@@ -340,16 +340,22 @@ void main() {
     MidiCommand.setPlatformOverride(platform);
     final midi = MidiCommand(bleTransport: ble);
 
-    final received = <String>[];
+    final received = <MidiSetupChange>[];
     final sub = midi.onMidiSetupChanged!.listen(received.add);
 
-    platform.emitSetup('platform');
-    ble.emitSetup('ble');
+    platform.emitSetup(MidiSetupChange.deviceAppeared);
+    ble.emitSetup(MidiSetupChange.deviceConnected);
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
     await sub.cancel();
 
-    expect(received, containsAll(<String>['platform', 'ble']));
+    expect(
+      received,
+      containsAll(<MidiSetupChange>[
+        MidiSetupChange.deviceAppeared,
+        MidiSetupChange.deviceConnected,
+      ]),
+    );
   });
 
   test('startBluetooth is idempotent', () async {

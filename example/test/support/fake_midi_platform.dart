@@ -15,8 +15,8 @@ class FakeMidiPlatform extends MidiCommandPlatform {
   final List<String> disconnectedDeviceIds = <String>[];
   final StreamController<MidiPacket> _rxStreamController =
       StreamController<MidiPacket>.broadcast();
-  final StreamController<String> _setupStreamController =
-      StreamController<String>.broadcast();
+  final StreamController<MidiSetupChange> _setupStreamController =
+      StreamController<MidiSetupChange>.broadcast();
   var _isClosed = false;
 
   @override
@@ -55,7 +55,8 @@ class FakeMidiPlatform extends MidiCommandPlatform {
   Stream<MidiPacket>? get onMidiDataReceived => _rxStreamController.stream;
 
   @override
-  Stream<String>? get onMidiSetupChanged => _setupStreamController.stream;
+  Stream<MidiSetupChange>? get onMidiSetupChanged =>
+      _setupStreamController.stream;
 
   @override
   void addVirtualDevice({String? name}) {}

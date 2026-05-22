@@ -77,6 +77,14 @@ enum MidiDeviceType: Int {
   case unknown = 5
 }
 
+enum MidiSetupChange: Int {
+  case deviceAppeared = 0
+  case deviceDisappeared = 1
+  case deviceStateChanged = 2
+  case deviceConnected = 3
+  case deviceDisconnected = 4
+}
+
 /// Generated class from Pigeon that represents data sent in messages.
 struct MidiHostDevice {
   var id: String? = nil
@@ -183,10 +191,16 @@ private class MidiApiPigeonCodecReader: FlutterStandardReader {
       }
       return nil
     case 130:
-      return MidiHostDevice.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return MidiSetupChange(rawValue: enumResultAsInt)
+      }
+      return nil
     case 131:
-      return MidiPort.fromList(self.readValue() as! [Any?])
+      return MidiHostDevice.fromList(self.readValue() as! [Any?])
     case 132:
+      return MidiPort.fromList(self.readValue() as! [Any?])
+    case 133:
       return MidiPacket.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -199,14 +213,17 @@ private class MidiApiPigeonCodecWriter: FlutterStandardWriter {
     if let value = value as? MidiDeviceType {
       super.writeByte(129)
       super.writeValue(value.rawValue)
-    } else if let value = value as? MidiHostDevice {
+    } else if let value = value as? MidiSetupChange {
       super.writeByte(130)
-      super.writeValue(value.toList())
-    } else if let value = value as? MidiPort {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? MidiHostDevice {
       super.writeByte(131)
       super.writeValue(value.toList())
-    } else if let value = value as? MidiPacket {
+    } else if let value = value as? MidiPort {
       super.writeByte(132)
+      super.writeValue(value.toList())
+    } else if let value = value as? MidiPacket {
+      super.writeByte(133)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -381,7 +398,7 @@ class MidiHostApiSetup {
 }
 /// Generated protocol from Pigeon that represents Flutter messages that can be called from Swift.
 protocol MidiFlutterApiProtocol {
-  func onSetupChanged(setupChange setupChangeArg: String, completion: @escaping (Result<Void, PigeonError>) -> Void)
+  func onSetupChanged(setupChange setupChangeArg: MidiSetupChange, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onDataReceived(packet packetArg: MidiPacket, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onDeviceConnectionStateChanged(deviceId deviceIdArg: String, connected connectedArg: Bool, completion: @escaping (Result<Void, PigeonError>) -> Void)
 }
@@ -395,7 +412,7 @@ class MidiFlutterApi: MidiFlutterApiProtocol {
   var codec: MidiApiPigeonCodec {
     return MidiApiPigeonCodec.shared
   }
-  func onSetupChanged(setupChange setupChangeArg: String, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+  func onSetupChanged(setupChange setupChangeArg: MidiSetupChange, completion: @escaping (Result<Void, PigeonError>) -> Void) {
     let channelName: String = "dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([setupChangeArg] as [Any?]) { response in
