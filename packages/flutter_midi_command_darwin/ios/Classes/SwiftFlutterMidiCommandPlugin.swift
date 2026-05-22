@@ -363,6 +363,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         return false
     }
 
+    static func isOffline(object: MIDIObjectRef) -> Bool {
+        var offline: Int32 = 0
+        MIDIObjectGetIntegerProperty(object, kMIDIPropertyOffline, &offline)
+        return offline != 0
+    }
+
     private static func containsBluetoothMarker(in value: Any?) -> Bool {
         guard let value else {
             return false
@@ -412,6 +418,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         let deviceCount = MIDIGetNumberOfDevices()
         for d in 0..<deviceCount {
             let device = MIDIGetDevice(d)
+
+            if SwiftFlutterMidiCommandPlugin.isOffline(object: device) {
+                continue
+            }
+
             let entityCount = MIDIDeviceGetNumberOfEntities(device)
 
             for entityIndex in 0..<entityCount {
