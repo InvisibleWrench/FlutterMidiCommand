@@ -301,9 +301,16 @@ class MyAppState extends State<MyApp> {
                       trailing: Icon(_deviceIconForType(device.type)),
                       onLongPress: () {
                         if (_midiCommand.isTransportEnabled(
-                          MidiTransport.ble,
-                        )) {
-                          _midiCommand.stopScanningForBluetoothDevices();
+                              MidiTransport.ble,
+                            ) &&
+                            _midiCommand.bluetoothState ==
+                                BluetoothState.poweredOn) {
+                          try {
+                            _midiCommand.stopScanningForBluetoothDevices();
+                          } catch (_) {
+                            // Ignore BLE shutdown issues when opening the
+                            // controller page for non-BLE workflows.
+                          }
                         }
                         Navigator.of(context)
                             .push(MaterialPageRoute<void>(

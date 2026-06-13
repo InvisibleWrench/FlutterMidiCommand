@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'package:device_manager/device_event.dart';
-import 'package:device_manager/device_manager.dart';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
+import 'package:flutter_midi_command_windows/src/windows_device_discovery.dart';
 import 'package:flutter_midi_command_windows/windows_midi_device.dart';
 import 'package:win32/win32.dart';
 
@@ -69,20 +69,7 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
   bool _tearingDown = false;
 
   Stream<void> _defaultDeviceMonitor() {
-    final controller = StreamController<void>.broadcast();
-    Timer(const Duration(seconds: 3), () {
-      DeviceManager().addListener(() {
-        final event = DeviceManager().lastEvent;
-        if (event == null) {
-          return;
-        }
-        if (event.eventType == EventType.add ||
-            event.eventType == EventType.remove) {
-          controller.add(null);
-        }
-      });
-    });
-    return controller.stream;
+    return _WindowsDeviceNotificationMonitor.instance.stream;
   }
 
   static void registerWith() {
@@ -98,81 +85,47 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
   }
 
   List<MidiDevice> _discoverWindowsMidiDevices() {
-    final devices = <String, MidiDevice>{};
+    final inputs = <WindowsMidiEndpointDescriptor>[];
 
     final inCaps = malloc<MIDIINCAPS>();
     var nMidiDeviceNum = midiInGetNumDevs();
-    final deviceInputs = <String, int>{};
 
     for (var i = 0; i < nMidiDeviceNum; ++i) {
-      midiInGetDevCaps(i, inCaps, sizeOf<MIDIINCAPS>());
-      final name = inCaps.ref.szPname;
-      var id = name;
-
-      if (!deviceInputs.containsKey(name)) {
-        deviceInputs[name] = 0;
-      } else {
-        deviceInputs[name] = deviceInputs[name]! + 1;
+      final result = midiInGetDevCaps(i, inCaps, sizeOf<MIDIINCAPS>());
+      if (result != MMSYSERR_NOERROR) {
+        continue;
       }
-
-      if (deviceInputs[name]! > 0) {
-        id = "$id (${deviceInputs[name]})";
-      }
-
-      final isConnected = _connectedDevices.containsKey(id);
-      devices[id] =
-          WindowsMidiDevice(
-              id,
-              name,
-              _rxStreamController,
-              _setupStreamController,
-              _midiCB.nativeFunction.address,
-            )
-            ..addInput(i, inCaps.ref)
-            ..connected = isConnected;
+      inputs.add(
+        WindowsMidiEndpointDescriptor(id: i, name: inCaps.ref.szPname),
+      );
     }
 
     free(inCaps);
 
+    final outputs = <WindowsMidiEndpointDescriptor>[];
     final outCaps = malloc<MIDIOUTCAPS>();
     nMidiDeviceNum = midiOutGetNumDevs();
-    final deviceOutputs = <String, int>{};
 
     for (var i = 0; i < nMidiDeviceNum; ++i) {
-      midiOutGetDevCaps(i, outCaps, sizeOf<MIDIOUTCAPS>());
-      final name = outCaps.ref.szPname;
-      var id = name;
-
-      if (!deviceOutputs.containsKey(name)) {
-        deviceOutputs[name] = 0;
-      } else {
-        deviceOutputs[name] = deviceOutputs[name]! + 1;
+      final result = midiOutGetDevCaps(i, outCaps, sizeOf<MIDIOUTCAPS>());
+      if (result != MMSYSERR_NOERROR) {
+        continue;
       }
-
-      if (deviceOutputs[name]! > 0) {
-        id = "$id (${deviceOutputs[name]})";
-      }
-
-      if (devices.containsKey(id)) {
-        (devices[id]! as WindowsMidiDevice).addOutput(i, outCaps.ref);
-      } else {
-        final isConnected = _connectedDevices.containsKey(id);
-        devices[id] =
-            WindowsMidiDevice(
-                id,
-                name,
-                _rxStreamController,
-                _setupStreamController,
-                _midiCB.nativeFunction.address,
-              )
-              ..addOutput(i, outCaps.ref)
-              ..connected = isConnected;
-      }
+      outputs.add(
+        WindowsMidiEndpointDescriptor(id: i, name: outCaps.ref.szPname),
+      );
     }
 
     free(outCaps);
 
-    return devices.values.toList();
+    return buildWindowsMidiDevices(
+      inputs: inputs,
+      outputs: outputs,
+      rxStreamController: _rxStreamController,
+      setupStreamController: _setupStreamController,
+      callbackAddress: _midiCB.nativeFunction.address,
+      connectedDeviceIds: _connectedDevices.keys.toSet(),
+    );
   }
 
   @override
@@ -364,6 +317,45 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
   }
 }
 
+class _WindowsDeviceNotificationMonitor {
+  _WindowsDeviceNotificationMonitor._() {
+    _streamController = StreamController<void>.broadcast(
+      onListen: _ensureInitialized,
+    );
+  }
+
+  static final _WindowsDeviceNotificationMonitor instance =
+      _WindowsDeviceNotificationMonitor._();
+  static const MethodChannel _channel = MethodChannel(
+    'flutter_midi_command_windows/device_notifications',
+  );
+
+  late final StreamController<void> _streamController;
+  bool _initialized = false;
+
+  Stream<void> get stream => _streamController.stream;
+
+  void _ensureInitialized() {
+    if (_initialized) {
+      return;
+    }
+    _initialized = true;
+    _channel.setMethodCallHandler(_handleMethodCall);
+  }
+
+  Future<Object?> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'deviceAdded':
+      case 'deviceRemoved':
+        if (!_streamController.isClosed) {
+          _streamController.add(null);
+        }
+        break;
+    }
+    return null;
+  }
+}
+
 class _WindowsMidiDeviceSnapshot {
   _WindowsMidiDeviceSnapshot(MidiDevice device)
     : id = device.id,
@@ -448,8 +440,6 @@ void _onMidiData(
   int dwParam2,
 ) {
   final dev = FlutterMidiCommandWindows().findMidiDeviceForSource(hMidiIn);
-  final midiHdrPointer = Pointer<MIDIHDR>.fromAddress(dwParam1);
-  final midiHdr = midiHdrPointer.ref;
 
   switch (wMsg) {
     case MM_MIM_OPEN:
@@ -459,10 +449,12 @@ void _onMidiData(
       dev?.connected = false;
       break;
     case MM_MIM_DATA:
-      final data = Uint32List.fromList([dwParam1]).buffer.asUint8List();
+      final data = _shortMidiMessageBytes(dwParam1);
       dev?.handleData(data, dwParam2);
       break;
     case MM_MIM_LONGDATA:
+      final midiHdrPointer = Pointer<MIDIHDR>.fromAddress(dwParam1);
+      final midiHdr = midiHdrPointer.ref;
       if ((midiHdr.dwFlags & mHdrDone) != 0) {
         final dataPointer = midiHdr.lpData.cast<Uint8>();
         final messageData = dataPointer.asTypedList(midiHdr.dwBytesRecorded);
@@ -495,5 +487,53 @@ void _onMidiData(
     case MM_MIM_LONGERROR:
       print("Long error");
       break;
+  }
+}
+
+Uint8List _shortMidiMessageBytes(int packedMessage) {
+  final status = packedMessage & 0xFF;
+  final data1 = (packedMessage >> 8) & 0xFF;
+  final data2 = (packedMessage >> 16) & 0xFF;
+  final length = _shortMidiMessageLength(status);
+
+  switch (length) {
+    case 1:
+      return Uint8List.fromList([status]);
+    case 2:
+      return Uint8List.fromList([status, data1]);
+    case 3:
+      return Uint8List.fromList([status, data1, data2]);
+    default:
+      return Uint8List(0);
+  }
+}
+
+int _shortMidiMessageLength(int status) {
+  if (status >= 0xF8) {
+    return 1;
+  }
+
+  switch (status & 0xF0) {
+    case 0x80:
+    case 0x90:
+    case 0xA0:
+    case 0xB0:
+    case 0xE0:
+      return 3;
+    case 0xC0:
+    case 0xD0:
+      return 2;
+  }
+
+  switch (status) {
+    case 0xF1:
+    case 0xF3:
+      return 2;
+    case 0xF2:
+      return 3;
+    case 0xF6:
+      return 1;
+    default:
+      return 1;
   }
 }

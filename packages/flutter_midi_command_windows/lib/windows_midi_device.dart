@@ -11,8 +11,8 @@ import 'flutter_midi_command_windows.dart';
 const _numberOfBuffers = 4;
 
 class WindowsMidiDevice extends MidiDevice {
-  final Map<int, MIDIINCAPS> _ins = {};
-  final Map<int, MIDIOUTCAPS> _outs = {};
+  final Set<int> _ins = <int>{};
+  final Set<int> _outs = <int>{};
 
   final StreamController<MidiPacket> _rxStreamCtrl;
   final StreamController<MidiSetupChange> _setupStreamController;
@@ -49,9 +49,9 @@ class WindowsMidiDevice extends MidiDevice {
   bool connect() {
     // Open input
 
-    var mIn = _ins.entries.firstOrNull;
+    var mIn = _ins.firstOrNull;
     if (mIn != null) {
-      var id = mIn.key;
+      var id = mIn;
       int result = midiInOpen(
         hMidiInDevicePtr,
         id,
@@ -102,9 +102,9 @@ class WindowsMidiDevice extends MidiDevice {
     }
 
     // Open output
-    var mOut = _outs.entries.firstOrNull;
+    var mOut = _outs.firstOrNull;
     if (mOut != null) {
-      var id = mOut.key;
+      var id = mOut;
 
       int result = midiOutOpen(hMidiOutDevicePtr, id, 0, 0, CALLBACK_NULL);
       if (result != 0) {
@@ -170,13 +170,13 @@ class WindowsMidiDevice extends MidiDevice {
     return true;
   }
 
-  addInput(int id, MIDIINCAPS input) {
-    _ins[id] = input;
+  void addInput(int id) {
+    _ins.add(id);
     inputPorts.add(MidiPort(id, MidiPortType.IN));
   }
 
-  addOutput(int id, MIDIOUTCAPS output) {
-    _outs[id] = output;
+  void addOutput(int id) {
+    _outs.add(id);
     outputPorts.add(MidiPort(id, MidiPortType.OUT));
   }
 

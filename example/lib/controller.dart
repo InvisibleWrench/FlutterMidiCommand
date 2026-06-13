@@ -76,8 +76,6 @@ class MidiControlsState extends State<MidiControls> {
       return;
     }
 
-    // print("Received ${message.runtimeType} message: $message");
-
     var nextCcValue = _ccValue;
     var nextPcValue = _pcValue;
     var nextPitchValue = _pitchValue;

@@ -7,11 +7,14 @@
 #include "generated_plugin_registrant.h"
 
 #include <device_manager/device_manager_plugin.h>
+#include <flutter_midi_command_windows/flutter_midi_command_windows_plugin.h>
 #include <universal_ble/universal_ble_plugin_c_api.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   DeviceManagerPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("DeviceManagerPlugin"));
+  FlutterMidiCommandWindowsPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FlutterMidiCommandWindowsPlugin"));
   UniversalBlePluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("UniversalBlePluginCApi"));
 }

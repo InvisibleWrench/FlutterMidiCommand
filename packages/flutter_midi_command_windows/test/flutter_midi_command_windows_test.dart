@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
+import 'package:flutter_midi_command_windows/src/windows_device_discovery.dart';
 import 'package:flutter_midi_command_windows/flutter_midi_command_windows.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win32/win32.dart';
@@ -65,6 +66,71 @@ void main() {
 
     await subscription.cancel();
     await monitor.close();
+  });
+
+  test('buildWindowsMidiDevices pairs balanced multi-port endpoints', () {
+    final rxStreamController = StreamController<MidiPacket>.broadcast();
+    final setupStreamController = StreamController<MidiSetupChange>.broadcast();
+
+    final devices = buildWindowsMidiDevices(
+      inputs: const <WindowsMidiEndpointDescriptor>[
+        WindowsMidiEndpointDescriptor(id: 0, name: 'Controller'),
+        WindowsMidiEndpointDescriptor(id: 1, name: 'MIDIIN2 (Controller)'),
+        WindowsMidiEndpointDescriptor(id: 2, name: 'MIDIIN3 (Controller)'),
+      ],
+      outputs: const <WindowsMidiEndpointDescriptor>[
+        WindowsMidiEndpointDescriptor(id: 10, name: 'Controller'),
+        WindowsMidiEndpointDescriptor(id: 11, name: 'MIDIOUT2 (Controller)'),
+        WindowsMidiEndpointDescriptor(id: 12, name: 'MIDIOUT3 (Controller)'),
+      ],
+      rxStreamController: rxStreamController,
+      setupStreamController: setupStreamController,
+      callbackAddress: 0,
+    );
+
+    expect(devices, hasLength(3));
+    expect(devices.map((device) => device.name), <String>[
+      'Controller',
+      'Controller (1)',
+      'Controller (2)',
+    ]);
+    expect(
+      devices.every(
+        (device) =>
+            device.inputPorts.length == 1 && device.outputPorts.length == 1,
+      ),
+      isTrue,
+    );
+
+    rxStreamController.close();
+    setupStreamController.close();
+  });
+
+  test('buildWindowsMidiDevices keeps unmatched extra endpoints unpaired', () {
+    final rxStreamController = StreamController<MidiPacket>.broadcast();
+    final setupStreamController = StreamController<MidiSetupChange>.broadcast();
+
+    final devices = buildWindowsMidiDevices(
+      inputs: const <WindowsMidiEndpointDescriptor>[
+        WindowsMidiEndpointDescriptor(id: 0, name: 'Controller'),
+        WindowsMidiEndpointDescriptor(id: 1, name: 'MIDIIN2 (Controller)'),
+      ],
+      outputs: const <WindowsMidiEndpointDescriptor>[
+        WindowsMidiEndpointDescriptor(id: 10, name: 'Controller'),
+      ],
+      rxStreamController: rxStreamController,
+      setupStreamController: setupStreamController,
+      callbackAddress: 0,
+    );
+
+    expect(devices, hasLength(2));
+    expect(devices[0].inputPorts, hasLength(1));
+    expect(devices[0].outputPorts, hasLength(1));
+    expect(devices[1].inputPorts, hasLength(1));
+    expect(devices[1].outputPorts, isEmpty);
+
+    rxStreamController.close();
+    setupStreamController.close();
   });
 }
 
