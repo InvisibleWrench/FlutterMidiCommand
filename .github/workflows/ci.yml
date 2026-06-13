@@ -34,6 +34,7 @@ jobs:
       - run: dart pub global activate melos
       - run: melos bootstrap
       - run: melos run analyze
+      - run: melos run analyze:example
       - run: melos run test
       - run: melos run test:web:chrome
 

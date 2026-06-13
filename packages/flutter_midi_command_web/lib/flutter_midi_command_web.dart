@@ -104,6 +104,26 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
     return fallback;
   }
 
+  String _normalizedDeviceKeyForPort(
+    WebMidiPortInfo port, {
+    required String fallback,
+  }) {
+    final name =
+        normalizeWebMidiEndpointName(
+          port.name ?? fallback,
+        ).trim().toLowerCase();
+
+    if (name.isNotEmpty) {
+      return name;
+    }
+
+    if (port.id.isNotEmpty) {
+      return port.id;
+    }
+
+    return fallback;
+  }
+
   String _displayNameForPort(WebMidiPortInfo port, {required String fallback}) {
     final name = port.name?.trim();
     if (name != null && name.isNotEmpty) {
@@ -135,6 +155,7 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
           id: _portNumericId(input.id, true, i),
           connected: input.connected,
           portId: input.id,
+          port: input,
         ),
       );
     }
@@ -155,13 +176,25 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
           id: _portNumericId(output.id, false, i),
           connected: output.connected,
           portId: output.id,
+          port: output,
         ),
       );
     }
 
-    final snapshots = grouped.values
-        .expand((builder) => builder.buildLogicalDevices())
-        .toList(growable: false);
+    final snapshots = buildWebMidiDevices(
+      grouped.values
+          .expand((builder) => builder.inputs)
+          .toList(growable: false),
+      grouped.values
+          .expand((builder) => builder.outputs)
+          .toList(growable: false),
+      normalizedGroupKeyForInput:
+          (input) =>
+              _normalizedDeviceKeyForPort(input.port, fallback: input.portId),
+      normalizedGroupKeyForOutput:
+          (output) =>
+              _normalizedDeviceKeyForPort(output.port, fallback: output.portId),
+    );
 
     _deviceSnapshots
       ..clear()
@@ -450,11 +483,13 @@ class _WebInputPortSnapshot {
     required this.id,
     required this.connected,
     required this.portId,
+    required this.port,
   });
 
   final int id;
   final bool connected;
   final String portId;
+  final WebMidiPortInfo port;
 }
 
 class _WebOutputPortSnapshot {
@@ -462,11 +497,13 @@ class _WebOutputPortSnapshot {
     required this.id,
     required this.connected,
     required this.portId,
+    required this.port,
   });
 
   final int id;
   final bool connected;
   final String portId;
+  final WebMidiPortInfo port;
 }
 
 bool _snapshotsEqual(_WebDeviceSnapshot? a, _WebDeviceSnapshot? b) {
@@ -534,27 +571,51 @@ class _WebDeviceSnapshotBuilder {
   final String name;
   final List<_WebInputPortSnapshot> inputs = <_WebInputPortSnapshot>[];
   final List<_WebOutputPortSnapshot> outputs = <_WebOutputPortSnapshot>[];
+}
 
-  List<_WebDeviceSnapshot> buildLogicalDevices() {
-    inputs.sort((a, b) => a.portId.compareTo(b.portId));
-    outputs.sort((a, b) => a.portId.compareTo(b.portId));
+List<_WebDeviceSnapshot> buildWebMidiDevices(
+  List<_WebInputPortSnapshot> inputs,
+  List<_WebOutputPortSnapshot> outputs, {
+  required String Function(_WebInputPortSnapshot input)
+  normalizedGroupKeyForInput,
+  required String Function(_WebOutputPortSnapshot output)
+  normalizedGroupKeyForOutput,
+}) {
+  final devices = <_WebDeviceSnapshot>[];
+  final allocatedNames = <String, int>{};
+  final pairedInputIds = <String>{};
+  final pairedOutputIds = <String>{};
 
-    final count =
-        inputs.length > outputs.length ? inputs.length : outputs.length;
-    if (count == 0) {
-      return <_WebDeviceSnapshot>[];
+  void addDevice({
+    required String baseName,
+    _WebInputPortSnapshot? input,
+    _WebOutputPortSnapshot? output,
+  }) {
+    final trimmedBaseName = baseName.trim();
+    final resolvedName =
+        trimmedBaseName.isEmpty
+            ? 'MIDI Device'
+            : normalizeWebMidiEndpointName(trimmedBaseName);
+    final allocatedCount = allocatedNames[resolvedName] ?? 0;
+    allocatedNames[resolvedName] = allocatedCount + 1;
+    final deviceLabel =
+        allocatedCount == 0
+            ? resolvedName
+            : '$resolvedName [${allocatedCount + 1}]';
+    final logicalId =
+        '${resolvedName.toLowerCase()}|in:${input?.portId ?? ''}|out:${output?.portId ?? ''}';
+
+    if (input != null) {
+      pairedInputIds.add(input.portId);
+    }
+    if (output != null) {
+      pairedOutputIds.add(output.portId);
     }
 
-    return List<_WebDeviceSnapshot>.generate(count, (index) {
-      final input = index < inputs.length ? inputs[index] : null;
-      final output = index < outputs.length ? outputs[index] : null;
-      final logicalId =
-          '$id|in:${input?.portId ?? ''}|out:${output?.portId ?? ''}';
-      final logicalName = count == 1 ? name : '$name [${index + 1}]';
-
-      return _WebDeviceSnapshot(
+    devices.add(
+      _WebDeviceSnapshot(
         id: logicalId,
-        name: logicalName,
+        name: deviceLabel,
         inputs:
             input == null
                 ? const <_WebInputPortSnapshot>[]
@@ -567,7 +628,158 @@ class _WebDeviceSnapshotBuilder {
                 : List<_WebOutputPortSnapshot>.unmodifiable(
                   <_WebOutputPortSnapshot>[output],
                 ),
-      );
-    }, growable: false);
+      ),
+    );
   }
+
+  final inputsByName = _groupEndpointsByKey(inputs, (input) => input.port.name);
+  final outputsByName = _groupEndpointsByKey(
+    outputs,
+    (output) => output.port.name,
+  );
+  final orderedExactNames = _orderedSharedKeys(
+    inputs.map((input) => input.port.name),
+    outputs.map((output) => output.port.name),
+  );
+
+  for (final name in orderedExactNames) {
+    if (name == null) {
+      continue;
+    }
+    final inputEndpoints = List<_WebInputPortSnapshot>.of(
+      inputsByName[name] ?? const <_WebInputPortSnapshot>[],
+    )..sort((a, b) => a.portId.compareTo(b.portId));
+    final outputEndpoints = List<_WebOutputPortSnapshot>.of(
+      outputsByName[name] ?? const <_WebOutputPortSnapshot>[],
+    )..sort((a, b) => a.portId.compareTo(b.portId));
+    final pairCount =
+        inputEndpoints.length < outputEndpoints.length
+            ? inputEndpoints.length
+            : outputEndpoints.length;
+
+    for (var index = 0; index < pairCount; index++) {
+      addDevice(
+        baseName: name,
+        input: inputEndpoints[index],
+        output: outputEndpoints[index],
+      );
+    }
+  }
+
+  final remainingInputs = inputs
+      .where((input) => !pairedInputIds.contains(input.portId))
+      .toList(growable: false);
+  final remainingOutputs = outputs
+      .where((output) => !pairedOutputIds.contains(output.portId))
+      .toList(growable: false);
+  final inputsByGroup = _groupEndpointsByKey(
+    remainingInputs,
+    normalizedGroupKeyForInput,
+  );
+  final outputsByGroup = _groupEndpointsByKey(
+    remainingOutputs,
+    normalizedGroupKeyForOutput,
+  );
+  final orderedNormalizedGroups = _orderedSharedKeys(
+    remainingInputs.map(normalizedGroupKeyForInput),
+    remainingOutputs.map(normalizedGroupKeyForOutput),
+  );
+
+  for (final groupKey in orderedNormalizedGroups) {
+    final inputEndpoints = List<_WebInputPortSnapshot>.of(
+      inputsByGroup[groupKey] ?? const <_WebInputPortSnapshot>[],
+    )..sort((a, b) => a.portId.compareTo(b.portId));
+    final outputEndpoints = List<_WebOutputPortSnapshot>.of(
+      outputsByGroup[groupKey] ?? const <_WebOutputPortSnapshot>[],
+    )..sort((a, b) => a.portId.compareTo(b.portId));
+    if (inputEndpoints.isEmpty ||
+        outputEndpoints.isEmpty ||
+        inputEndpoints.length != outputEndpoints.length) {
+      continue;
+    }
+
+    for (var index = 0; index < inputEndpoints.length; index++) {
+      addDevice(
+        baseName: inputEndpoints[index].port.name ?? 'MIDI Device',
+        input: inputEndpoints[index],
+        output: outputEndpoints[index],
+      );
+    }
+  }
+
+  for (final input in inputs) {
+    if (!pairedInputIds.contains(input.portId)) {
+      addDevice(baseName: input.port.name ?? 'MIDI Input', input: input);
+    }
+  }
+
+  for (final output in outputs) {
+    if (!pairedOutputIds.contains(output.portId)) {
+      addDevice(baseName: output.port.name ?? 'MIDI Output', output: output);
+    }
+  }
+
+  return devices;
+}
+
+String normalizeWebMidiEndpointName(String name) {
+  var normalized = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  final bracketedDirectionPrefix = RegExp(
+    r'^(midi\s*in|midi\s*out|midiin|midiout)\d*\s*\((.+)\)$',
+    caseSensitive: false,
+  );
+  final bracketedMatch = bracketedDirectionPrefix.firstMatch(normalized);
+  if (bracketedMatch != null) {
+    normalized = bracketedMatch.group(2)!;
+  }
+
+  normalized = normalized.replaceFirst(
+    RegExp(
+      r'^(midi\s*in|midi\s*out|midiin|midiout)\d*\s*[:\-]?\s*',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  normalized = normalized.replaceFirst(
+    RegExp(r'^(input|output)\s*[:\-]?\s*', caseSensitive: false),
+    '',
+  );
+  normalized = normalized.replaceFirst(
+    RegExp(r'\s+\((input|output)\)$', caseSensitive: false),
+    '',
+  );
+  normalized = normalized.trim();
+  return normalized.isEmpty ? name.trim() : normalized;
+}
+
+Map<K, List<T>> _groupEndpointsByKey<T, K>(
+  List<T> endpoints,
+  K Function(T endpoint) keySelector,
+) {
+  final grouped = <K, List<T>>{};
+  for (final endpoint in endpoints) {
+    grouped.putIfAbsent(keySelector(endpoint), () => <T>[]).add(endpoint);
+  }
+  return grouped;
+}
+
+List<T> _orderedSharedKeys<T>(Iterable<T> first, Iterable<T> second) {
+  final firstKeys = first.toSet();
+  final secondKeys = second.toSet();
+  final orderedKeys = <T>[];
+  final seenKeys = <T>{};
+
+  for (final key in first) {
+    if (secondKeys.contains(key) && seenKeys.add(key)) {
+      orderedKeys.add(key);
+    }
+  }
+  for (final key in second) {
+    if (firstKeys.contains(key) && seenKeys.add(key)) {
+      orderedKeys.add(key);
+    }
+  }
+
+  return orderedKeys;
 }

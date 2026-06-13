@@ -194,7 +194,38 @@ void main() {
       expect(devices, isNotNull);
       expect(devices!.length, 2);
       expect(devices.map((device) => device.name), <String>[
-        'Interface [1]',
+        'Interface',
+        'Interface [2]',
+      ]);
+      expect(devices.map((device) => device.inputPorts.single.id), <int>[1, 2]);
+      expect(devices.map((device) => device.outputPorts.single.id), <int>[
+        11,
+        12,
+      ]);
+    },
+  );
+
+  test(
+    'normalized multi-port names are paired into full-duplex devices',
+    () async {
+      final backend = _FakeWebMidiBackend(
+        inputs: <WebMidiPortInfo>[
+          _port('1', name: 'MIDIIN2 (Interface)', manufacturer: 'Acme'),
+          _port('2', name: 'MIDIIN3 (Interface)', manufacturer: 'Acme'),
+        ],
+        outputs: <WebMidiPortInfo>[
+          _port('11', name: 'MIDIOUT2 (Interface)', manufacturer: ''),
+          _port('12', name: 'MIDIOUT3 (Interface)', manufacturer: ''),
+        ],
+      );
+
+      final plugin = FlutterMidiCommandWeb(backend: backend);
+      final devices = await plugin.devices;
+
+      expect(devices, isNotNull);
+      expect(devices!.length, 2);
+      expect(devices.map((device) => device.name), <String>[
+        'Interface',
         'Interface [2]',
       ]);
       expect(devices.map((device) => device.inputPorts.single.id), <int>[1, 2]);
@@ -225,6 +256,36 @@ void main() {
     expect(devices[0].outputPorts.single.id, 11);
     expect(devices[1].inputPorts.single.id, 2);
     expect(devices[1].outputPorts, isEmpty);
+  });
+
+  test('unbalanced normalized names remain split when counts differ', () async {
+    final backend = _FakeWebMidiBackend(
+      inputs: <WebMidiPortInfo>[
+        _port('1', name: 'MIDIIN2 (Interface)', manufacturer: 'Acme'),
+        _port('2', name: 'MIDIIN3 (Interface)', manufacturer: 'Acme'),
+      ],
+      outputs: <WebMidiPortInfo>[
+        _port('11', name: 'MIDIOUT2 (Interface)', manufacturer: ''),
+      ],
+    );
+
+    final plugin = FlutterMidiCommandWeb(backend: backend);
+    final devices = await plugin.devices;
+
+    expect(devices, isNotNull);
+    expect(devices!.length, 3);
+    expect(
+      devices
+          .where((device) => device.outputPorts.isNotEmpty)
+          .map((device) => device.outputPorts.single.id),
+      <int>[11],
+    );
+    expect(
+      devices
+          .where((device) => device.inputPorts.isNotEmpty)
+          .map((device) => device.inputPorts.single.id),
+      <int>[1, 2],
+    );
   });
 
   test('state changes are emitted as setup events', () async {

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command_example/main.dart' as app;
 import 'package:flutter_test/flutter_test.dart';
