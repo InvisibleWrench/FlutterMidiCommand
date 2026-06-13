@@ -13,7 +13,7 @@ topics:
   - music-tech
 
 environment:
-  sdk: ">=3.7.0 <4.0.0"
+  sdk: ">=3.11.4 <4.0.0"
   flutter: ">=3.24.0"
 
 dependencies:
