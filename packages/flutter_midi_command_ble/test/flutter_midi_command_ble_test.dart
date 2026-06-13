@@ -43,7 +43,14 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   }
 
   @override
-  Future<void> connect(String deviceId, {Duration? connectionTimeout}) async {
+  Future<bool> isScanning() async => false;
+
+  @override
+  Future<void> connect(
+    String deviceId, {
+    Duration? connectionTimeout,
+    bool autoConnect = false,
+  }) async {
     connectCalls.add(deviceId);
     await Future<void>.delayed(const Duration(milliseconds: 1));
     if (failingConnectIds.contains(deviceId)) {
@@ -63,7 +70,10 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   }
 
   @override
-  Future<List<BleService>> discoverServices(String deviceId) async {
+  Future<List<BleService>> discoverServices(
+    String deviceId,
+    bool withDescriptors,
+  ) async {
     return servicesByDevice[deviceId] ?? <BleService>[];
   }
 
@@ -98,6 +108,17 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   Future<int> requestMtu(String deviceId, int expectedMtu) async {
     return expectedMtu;
   }
+
+  @override
+  Future<int> readRssi(String deviceId) async {
+    return 0;
+  }
+
+  @override
+  Future<void> requestConnectionPriority(
+    String deviceId,
+    BleConnectionPriority priority,
+  ) async {}
 
   @override
   Future<bool> isPaired(String deviceId) async {
@@ -169,7 +190,7 @@ void main() {
       BleService(midiServiceId, <BleCharacteristic>[
         BleCharacteristic(midiCharacteristicId, <CharacteristicProperty>[
           CharacteristicProperty.notify,
-        ]),
+        ], const <BleDescriptor>[]),
       ]),
     ];
 
@@ -223,21 +244,21 @@ void main() {
   });
 
   test('teardown unregisters callbacks and can be reactivated', () async {
-    expect(fakePlatform.onScanResult, isNotNull);
+    expect(fakePlatform.onScanResultUpdate, isNotNull);
     expect(fakePlatform.onConnectionChange, isNotNull);
     expect(fakePlatform.onValueChange, isNotNull);
     expect(fakePlatform.onAvailabilityChange, isNotNull);
 
     transport.teardown();
 
-    expect(fakePlatform.onScanResult, isNull);
+    expect(fakePlatform.onScanResultUpdate, isNull);
     expect(fakePlatform.onConnectionChange, isNull);
     expect(fakePlatform.onValueChange, isNull);
     expect(fakePlatform.onAvailabilityChange, isNull);
 
     await transport.startBluetooth();
 
-    expect(fakePlatform.onScanResult, isNotNull);
+    expect(fakePlatform.onScanResultUpdate, isNotNull);
     expect(fakePlatform.onConnectionChange, isNotNull);
     expect(fakePlatform.onValueChange, isNotNull);
     expect(fakePlatform.onAvailabilityChange, isNotNull);

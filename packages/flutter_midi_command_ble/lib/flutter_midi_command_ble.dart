@@ -75,7 +75,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       }
     };
 
-    UniversalBle.onValueChange = (deviceId, characteristicId, data) {
+    UniversalBle.onValueChange = (deviceId, characteristicId, data, _) {
       _devices[deviceId]?.handleData(data);
     };
 
