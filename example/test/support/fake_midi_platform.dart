@@ -4,23 +4,37 @@ import 'dart:typed_data';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 
 class FakeMidiPlatform extends MidiCommandPlatform {
-  final MidiDevice device = MidiDevice(
-    'serial-1',
-    'Test Serial Device',
-    MidiDeviceType.serial,
-    false,
-  );
+  FakeMidiPlatform({bool? networkEnabled})
+      : networkEnabled = networkEnabled ?? false {
+    devicesList = <MidiDevice>[
+      MidiDevice(
+        'serial-1',
+        'Test Serial Device',
+        MidiDeviceType.serial,
+        false,
+      ),
+    ];
+  }
 
+  late List<MidiDevice> devicesList;
   final List<String> connectedDeviceIds = <String>[];
   final List<String> disconnectedDeviceIds = <String>[];
+  final List<String?> addedVirtualDeviceNames = <String?>[];
+  final List<String?> removedVirtualDeviceNames = <String?>[];
+  final List<bool> networkEnabledChanges = <bool>[];
   final StreamController<MidiPacket> _rxStreamController =
       StreamController<MidiPacket>.broadcast();
   final StreamController<MidiSetupChange> _setupStreamController =
       StreamController<MidiSetupChange>.broadcast();
+  bool networkEnabled;
+  int devicesCallCount = 0;
   var _isClosed = false;
 
   @override
-  Future<List<MidiDevice>?> get devices async => <MidiDevice>[device];
+  Future<List<MidiDevice>?> get devices async {
+    devicesCallCount += 1;
+    return devicesList;
+  }
 
   @override
   Future<void> connectToDevice(
@@ -39,7 +53,9 @@ class FakeMidiPlatform extends MidiCommandPlatform {
 
   @override
   void teardown() {
-    device.setConnectionState(MidiConnectionState.disconnected);
+    for (final device in devicesList) {
+      device.setConnectionState(MidiConnectionState.disconnected);
+    }
     if (_isClosed) {
       return;
     }
@@ -59,14 +75,25 @@ class FakeMidiPlatform extends MidiCommandPlatform {
       _setupStreamController.stream;
 
   @override
-  void addVirtualDevice({String? name}) {}
+  void addVirtualDevice({String? name}) {
+    addedVirtualDeviceNames.add(name);
+  }
 
   @override
-  void removeVirtualDevice({String? name}) {}
+  void removeVirtualDevice({String? name}) {
+    removedVirtualDeviceNames.add(name);
+  }
 
   @override
-  Future<bool?> get isNetworkSessionEnabled async => false;
+  Future<bool?> get isNetworkSessionEnabled async => networkEnabled;
 
   @override
-  void setNetworkSessionEnabled(bool enabled) {}
+  void setNetworkSessionEnabled(bool enabled) {
+    networkEnabled = enabled;
+    networkEnabledChanges.add(enabled);
+  }
+
+  void emitSetupChange(MidiSetupChange change) {
+    _setupStreamController.add(change);
+  }
 }

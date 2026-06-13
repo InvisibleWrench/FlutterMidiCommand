@@ -2,6 +2,9 @@
 
 * Major release aligned with the federated monorepo architecture.
 * Updated to the 1.x platform interface and typed host models.
+* Replaced third-party USB change monitoring with native Windows device notifications.
+* Improved multi-port enumeration so balanced WinMM endpoint groups surface as full-duplex devices.
+* Fixed short-message handling in the WinMM input callback path.
 
 ## 0.3.0
 

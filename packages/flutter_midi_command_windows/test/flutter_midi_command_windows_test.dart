@@ -132,6 +132,47 @@ void main() {
     rxStreamController.close();
     setupStreamController.close();
   });
+
+  test('normalizeWindowsMidiEndpointName strips WinMM direction prefixes', () {
+    expect(
+      normalizeWindowsMidiEndpointName('MIDIIN2 (Controller)'),
+      'Controller',
+    );
+    expect(
+      normalizeWindowsMidiEndpointName('MIDIOUT3 (Controller)'),
+      'Controller',
+    );
+    expect(
+      normalizeWindowsMidiEndpointName('Output: Controller'),
+      'Controller',
+    );
+  });
+
+  test('buildWindowsMidiDevices preserves connected state by generated id', () {
+    final rxStreamController = StreamController<MidiPacket>.broadcast();
+    final setupStreamController = StreamController<MidiSetupChange>.broadcast();
+
+    final devices = buildWindowsMidiDevices(
+      inputs: const <WindowsMidiEndpointDescriptor>[
+        WindowsMidiEndpointDescriptor(id: 0, name: 'Controller'),
+        WindowsMidiEndpointDescriptor(id: 1, name: 'MIDIIN2 (Controller)'),
+      ],
+      outputs: const <WindowsMidiEndpointDescriptor>[
+        WindowsMidiEndpointDescriptor(id: 10, name: 'Controller'),
+        WindowsMidiEndpointDescriptor(id: 11, name: 'MIDIOUT2 (Controller)'),
+      ],
+      rxStreamController: rxStreamController,
+      setupStreamController: setupStreamController,
+      callbackAddress: 0,
+      connectedDeviceIds: const <String>{'Controller (1)'},
+    );
+
+    expect(devices[0].connected, isFalse);
+    expect(devices[1].connected, isTrue);
+
+    rxStreamController.close();
+    setupStreamController.close();
+  });
 }
 
 MidiDevice _device(String id, {String name = 'Keys'}) {

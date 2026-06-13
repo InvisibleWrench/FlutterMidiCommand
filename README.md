@@ -161,7 +161,13 @@ Listen to `onMidiSetupChanged` to refresh your device list when the host MIDI to
 
 Android, iOS/macOS, Linux, Windows, and Web use platform notifications to wake a fresh device snapshot and emit setup events only after a real MIDI-device change is observed. BLE MIDI is scan-driven: `MidiSetupChange.deviceAppeared` is emitted for scan results, and connection loss is emitted as `MidiSetupChange.deviceDisconnected`.
 
-See `example/` for a complete app with UI and transport toggles.
+On Windows, native device monitoring now keeps USB MIDI hot-plug changes in sync with `devices`, and multi-port WinMM endpoints are paired into full-duplex devices when matching input/output port sets can be inferred consistently.
+
+See `example/` for a complete app with:
+
+- independent transport toggles for RTP, BLE, and Virtual MIDI
+- a manual `Refresh Devices` action for the current device snapshot
+- a separate `Scan BLE` action so Bluetooth discovery does not double as general device refresh
 
 ## Message parser
 

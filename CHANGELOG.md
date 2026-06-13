@@ -8,6 +8,8 @@
 - Added transport capabilities/policies and stronger async connection semantics (`connectToDevice` completes on connection).
 - Added a typed MIDI parser/generator API (`MidiMessageParser` and `MidiMessage.parse`) with support for running status, realtime interleaving, SysEx, and NRPN/RPN message flows.
 - Expanded test coverage across shared logic, platform interface, BLE transport, and web backend.
+- Updated the example app with separate transport toggles plus distinct `Refresh Devices` and `Scan BLE` controls.
+- Improved Windows MIDI enumeration with hot-plug device updates and better multi-port full-duplex pairing.
 
 ## 0.5.3
 Adds a runtime check to ensure MIDI is available on the android device before starting. See #125 for further details.
