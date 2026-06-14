@@ -22,6 +22,9 @@ class FakeMidiPlatform extends MidiCommandPlatform {
   final List<String?> addedVirtualDeviceNames = <String?>[];
   final List<String?> removedVirtualDeviceNames = <String?>[];
   final List<bool> networkEnabledChanges = <bool>[];
+  final List<Uint8List> sentMessages = <Uint8List>[];
+  final List<String?> sentDeviceIds = <String?>[];
+  final List<int?> sentTimestamps = <int?>[];
   final StreamController<MidiPacket> _rxStreamController =
       StreamController<MidiPacket>.broadcast();
   final StreamController<MidiSetupChange> _setupStreamController =
@@ -65,7 +68,11 @@ class FakeMidiPlatform extends MidiCommandPlatform {
   }
 
   @override
-  void sendData(Uint8List data, {int? timestamp, String? deviceId}) {}
+  void sendData(Uint8List data, {int? timestamp, String? deviceId}) {
+    sentMessages.add(Uint8List.fromList(data));
+    sentDeviceIds.add(deviceId);
+    sentTimestamps.add(timestamp);
+  }
 
   @override
   Stream<MidiPacket>? get onMidiDataReceived => _rxStreamController.stream;
@@ -95,5 +102,17 @@ class FakeMidiPlatform extends MidiCommandPlatform {
 
   void emitSetupChange(MidiSetupChange change) {
     _setupStreamController.add(change);
+  }
+
+  void emitPacket(
+    String deviceId,
+    List<int> data, {
+    int timestamp = 0,
+  }) {
+    final device =
+        devicesList.firstWhere((candidate) => candidate.id == deviceId);
+    _rxStreamController.add(
+      MidiPacket(Uint8List.fromList(data), timestamp, device),
+    );
   }
 }

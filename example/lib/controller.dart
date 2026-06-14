@@ -42,9 +42,11 @@ class MidiControlsState extends State<MidiControls> {
   var _pitchValue = 0.0;
   var _nrpnValue = 0;
   var _nrpnCtrl = 0;
+  final List<_RawMidiEvent> _rawEvents = <_RawMidiEvent>[];
 
   // StreamSubscription<String> _setupSubscription;
   StreamSubscription<MidiDataReceivedEvent>? _rxSubscription;
+  StreamSubscription<MidiPacket>? _rawPacketSubscription;
   final MidiCommand _midiCommand = MidiCommand();
 
   @override
@@ -55,6 +57,9 @@ class MidiControlsState extends State<MidiControls> {
     _rxSubscription = _midiCommand.onMidiDataReceived?.listen(
       _handleMessageEvent,
     );
+    _rawPacketSubscription = _midiCommand.onMidiPacketReceived?.listen(
+      _handleRawPacket,
+    );
 
     super.initState();
   }
@@ -63,6 +68,7 @@ class MidiControlsState extends State<MidiControls> {
   void dispose() {
     // _setupSubscription?.cancel();
     _rxSubscription?.cancel();
+    _rawPacketSubscription?.cancel();
     super.dispose();
   }
 
@@ -146,6 +152,52 @@ class MidiControlsState extends State<MidiControls> {
     });
   }
 
+  void _handleRawPacket(MidiPacket packet) {
+    if (packet.device.id != widget.device.id) {
+      return;
+    }
+    _appendRawEvent(
+      _RawMidiEvent(
+        direction: 'RX',
+        timestamp: packet.timestamp,
+        data: Uint8List.fromList(packet.data),
+      ),
+    );
+  }
+
+  void _appendRawEvent(_RawMidiEvent event) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _rawEvents.insert(0, event);
+      if (_rawEvents.length > 20) {
+        _rawEvents.removeRange(20, _rawEvents.length);
+      }
+    });
+  }
+
+  void _sendMidiMessage(MidiMessage message) {
+    final data = message.generateData();
+    _appendRawEvent(
+      _RawMidiEvent(
+        direction: 'TX',
+        timestamp: null,
+        data: Uint8List.fromList(data),
+      ),
+    );
+    _midiCommand.sendData(
+      data,
+      deviceId: widget.device.id,
+    );
+  }
+
+  String _formatRawBytes(Uint8List data) {
+    return data
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0').toUpperCase())
+        .join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -182,17 +234,21 @@ class MidiControlsState extends State<MidiControls> {
           child: VirtualPiano(
             noteRange: const RangeValues(48, 76),
             onNotePressed: (note, vel) {
-              NoteOnMessage(
-                channel: _channel,
-                note: note,
-                velocity: 100,
-              ).send(deviceId: widget.device.id);
+              _sendMidiMessage(
+                NoteOnMessage(
+                  channel: _channel,
+                  note: note,
+                  velocity: 100,
+                ),
+              );
             },
             onNoteReleased: (note) {
-              NoteOffMessage(
-                channel: _channel,
-                note: note,
-              ).send(deviceId: widget.device.id);
+              _sendMidiMessage(
+                NoteOffMessage(
+                  channel: _channel,
+                  note: note,
+                ),
+              );
             },
           ),
         ),
@@ -206,6 +262,35 @@ class MidiControlsState extends State<MidiControls> {
               child: Text('Send $e bytes'),
             ),
           ),
+        ),
+        const Divider(),
+        ExpansionTile(
+          title: const Text('Raw MIDI Monitor'),
+          subtitle: Text(
+            _rawEvents.isEmpty
+                ? 'No packets captured yet.'
+                : '${_rawEvents.length} recent packets',
+          ),
+          children: [
+            if (_rawEvents.isEmpty)
+              const ListTile(
+                dense: true,
+                title: Text('Interact with the device to see raw packets.'),
+              ),
+            for (final event in _rawEvents)
+              ListTile(
+                dense: true,
+                title: Text(
+                  _formatRawBytes(event.data),
+                  style: const TextStyle(fontFamily: 'monospace'),
+                ),
+                subtitle: Text(
+                  event.timestamp == null
+                      ? event.direction
+                      : '${event.direction} @ ${event.timestamp}',
+                ),
+              ),
+          ],
         ),
         const Divider(),
         const MidiRecorderPanel(),
@@ -229,8 +314,8 @@ class MidiControlsState extends State<MidiControls> {
     setState(() {
       _pcValue = newValue;
     });
-    PCMessage(channel: _channel, program: _pcValue).send(
-      deviceId: widget.device.id,
+    _sendMidiMessage(
+      PCMessage(channel: _channel, program: _pcValue),
     );
   }
 
@@ -238,22 +323,26 @@ class MidiControlsState extends State<MidiControls> {
     setState(() {
       _ccValue = newValue;
     });
-    CCMessage(
-      channel: _channel,
-      controller: _controller,
-      value: _ccValue,
-    ).send(deviceId: widget.device.id);
+    _sendMidiMessage(
+      CCMessage(
+        channel: _channel,
+        controller: _controller,
+        value: _ccValue,
+      ),
+    );
   }
 
   _onNRPNValueChanged(int newValue) {
     setState(() {
       _nrpnValue = newValue;
     });
-    NRPN4Message(
-      channel: _channel,
-      parameter: _nrpnCtrl,
-      value: _nrpnValue,
-    ).send(deviceId: widget.device.id);
+    _sendMidiMessage(
+      NRPN4Message(
+        channel: _channel,
+        parameter: _nrpnCtrl,
+        value: _nrpnValue,
+      ),
+    );
   }
 
   _onNRPNCtrlChanged(int newValue) {
@@ -266,8 +355,8 @@ class MidiControlsState extends State<MidiControls> {
     setState(() {
       _pitchValue = newValue;
     });
-    PitchBendMessage(channel: _channel, bend: _pitchValue).send(
-      deviceId: widget.device.id,
+    _sendMidiMessage(
+      PitchBendMessage(channel: _channel, bend: _pitchValue),
     );
   }
 
@@ -281,8 +370,20 @@ class MidiControlsState extends State<MidiControls> {
       data[i + 1] = i % 0x80;
     }
     data[length - 1] = 0xF7;
-    SysExMessage(rawData: data).send(deviceId: widget.device.id);
+    _sendMidiMessage(SysExMessage(rawData: data));
   }
+}
+
+class _RawMidiEvent {
+  const _RawMidiEvent({
+    required this.direction,
+    required this.timestamp,
+    required this.data,
+  });
+
+  final String direction;
+  final int? timestamp;
+  final Uint8List data;
 }
 
 class SteppedSelector extends StatelessWidget {

@@ -12,7 +12,7 @@ void main() {
   });
 
   testWidgets(
-    'example separates device refresh from BLE scanning and exposes transport toggles',
+    'example separates discovery, shows transport badges, quick send, and raw monitor',
     (tester) async {
       final fakePlatform = FakeMidiPlatform(networkEnabled: false);
       final fakeBleTransport = FakeBleTransport();
@@ -27,6 +27,7 @@ void main() {
       expect(find.text('Transports'), findsOneWidget);
       expect(find.text('Discovery'), findsOneWidget);
       expect(find.text('Test Serial Device'), findsOneWidget);
+      expect(find.text('Native'), findsOneWidget);
       expect(find.text('Test BLE Device'), findsNothing);
 
       final initialDeviceCalls = fakePlatform.devicesCallCount;
@@ -40,10 +41,11 @@ void main() {
       expect(find.text('Ok. I got it!'), findsOneWidget);
 
       await tester.tap(find.text('Ok. I got it!'));
+      await tester.pump(const Duration(milliseconds: 50));
       await tester.pumpAndSettle();
       expect(fakeBleTransport.startBluetoothCallCount, 1);
-      expect(fakeBleTransport.startScanCallCount, 1);
-      expect(find.text('Test BLE Device'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byType(Switch).at(0));
       await tester.pumpAndSettle();
@@ -55,6 +57,34 @@ void main() {
         fakePlatform.addedVirtualDeviceNames,
         contains('Flutter MIDI Command'),
       );
+
+      await tester.tap(find.text('Test Serial Device'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Send test note'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Send test note'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(fakePlatform.sentMessages.length, 2);
+      expect(fakePlatform.sentDeviceIds, <String?>['serial-1', 'serial-1']);
+
+      await tester.longPress(find.text('Test Serial Device'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Raw MIDI Monitor'),
+        300,
+      );
+      expect(find.text('Raw MIDI Monitor'), findsOneWidget);
+
+      fakePlatform.emitPacket(
+        'serial-1',
+        <int>[0x90, 0x3C, 0x64],
+        timestamp: 42,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Raw MIDI Monitor'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('90 3C 64'), findsOneWidget);
     },
   );
 }

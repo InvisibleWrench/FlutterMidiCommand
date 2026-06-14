@@ -319,6 +319,44 @@ class MyAppState extends State<MyApp> {
     }
   }
 
+  String _transportLabelForType(MidiDeviceType type) {
+    switch (type) {
+      case MidiDeviceType.serial:
+        return 'Native';
+      case MidiDeviceType.network:
+        return 'Network';
+      case MidiDeviceType.ble:
+        return 'BLE';
+      case MidiDeviceType.virtual:
+        return 'Virtual';
+      case MidiDeviceType.ownVirtual:
+        return 'Own Virtual';
+      case MidiDeviceType.unknown:
+        return 'Unknown';
+    }
+  }
+
+  Future<void> _sendTestNote(
+    BuildContext context,
+    MidiDevice device,
+  ) async {
+    final noteOn = Uint8List.fromList(<int>[0x90, 60, 100]);
+    final noteOff = Uint8List.fromList(<int>[0x80, 60, 0]);
+
+    try {
+      _midiCommand.sendData(noteOn, deviceId: device.id);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      _midiCommand.sendData(noteOff, deviceId: device.id);
+    } catch (err) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to send test note: $err')),
+      );
+    }
+  }
+
   IconData _connectionIconForState(MidiConnectionState state) {
     switch (state) {
       case MidiConnectionState.connected:
@@ -532,12 +570,42 @@ class MyAppState extends State<MyApp> {
             device.name,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          subtitle: Text(
-              "ins:${device.inputPorts.length} outs:${device.outputPorts.length}, ${device.id}, ${device.type.wireValue}, ${device.connectionState.name}"),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Chip(
+                    avatar: Icon(
+                      _deviceIconForType(device.type),
+                      size: 16,
+                    ),
+                    label: Text(_transportLabelForType(device.type)),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "ins:${device.inputPorts.length} outs:${device.outputPorts.length}, ${device.id}, ${device.connectionState.name}",
+              ),
+            ],
+          ),
           leading: Icon(
             _connectionIconForState(device.connectionState),
           ),
-          trailing: Icon(_deviceIconForType(device.type)),
+          trailing: device.connected
+              ? IconButton(
+                  icon: const Icon(Icons.music_note),
+                  tooltip: 'Send test note',
+                  onPressed: () {
+                    unawaited(_sendTestNote(context, device));
+                  },
+                )
+              : null,
           onLongPress: () {
             if (_midiCommand.isTransportEnabled(
                   MidiTransport.ble,

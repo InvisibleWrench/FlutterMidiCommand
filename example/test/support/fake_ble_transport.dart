@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 
 class FakeBleTransport implements MidiBleTransport {
@@ -31,7 +30,9 @@ class FakeBleTransport implements MidiBleTransport {
   Future<void> startBluetooth() async {
     bluetoothStarted = true;
     startBluetoothCallCount += 1;
-    _bluetoothStateController.add('poweredOn');
+    scheduleMicrotask(() {
+      _bluetoothStateController.add('poweredOn');
+    });
   }
 
   @override

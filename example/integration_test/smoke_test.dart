@@ -26,11 +26,17 @@ void main() {
       expect(find.text('Transports'), findsOneWidget);
       expect(find.text('Discovery'), findsOneWidget);
       expect(find.text('Test Serial Device'), findsOneWidget);
+      expect(find.text('Native'), findsOneWidget);
 
       await tester.tap(find.text('Test Serial Device'));
       await tester.pumpAndSettle(const Duration(milliseconds: 200));
       expect(fakePlatform.connectedDeviceIds, contains('serial-1'));
       expect(device.connectionState, MidiConnectionState.connected);
+      expect(find.byTooltip('Send test note'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Send test note'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(fakePlatform.sentMessages.length, 2);
 
       await tester.tap(find.text('Test Serial Device'));
       await tester.pumpAndSettle(const Duration(milliseconds: 200));
@@ -42,8 +48,13 @@ void main() {
 
       await tester.longPress(find.text('Test Serial Device'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Raw MIDI Monitor'),
+        300,
+      );
       expect(find.text('CC'), findsOneWidget);
       expect(find.text('Pitch Bend'), findsOneWidget);
+      expect(find.text('Raw MIDI Monitor'), findsOneWidget);
     },
   );
 }

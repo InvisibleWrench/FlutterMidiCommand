@@ -3,7 +3,6 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  device_manager
   flutter_midi_command_windows
   universal_ble
 )
