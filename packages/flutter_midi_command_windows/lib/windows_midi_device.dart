@@ -19,6 +19,9 @@ class WindowsMidiDevice extends MidiDevice {
 
   final hMidiInDevicePtr = malloc<HMIDIIN>();
   final hMidiOutDevicePtr = malloc<IntPtr>();
+  int _midiInHandle = 0;
+  int _midiOutHandle = 0;
+  bool _disconnecting = false;
 
   int callbackAddress;
 
@@ -47,6 +50,8 @@ class WindowsMidiDevice extends MidiDevice {
   /// Connect to the device, ie. open input and output ports
   /// NOTE: Currently only the first input/output port is considered
   bool connect() {
+    _disconnecting = false;
+
     // Open input
 
     var mIn = _ins.firstOrNull;
@@ -63,6 +68,8 @@ class WindowsMidiDevice extends MidiDevice {
         print("OPEN ERROR($result): ${midiErrorMessage(result)}");
         return false;
       } else {
+        _midiInHandle = hMidiInDevicePtr.value;
+
         // Setup buffer
         for (int i = 0; i < _numberOfBuffers; i++) {
           _midiInBuffers[i] = malloc<BYTE>(_bufferSize);
@@ -111,6 +118,7 @@ class WindowsMidiDevice extends MidiDevice {
         print("OUT OPEN ERROR: result");
         return false;
       }
+      _midiOutHandle = hMidiOutDevicePtr.value;
 
       _midiOutBuffer = malloc<BYTE>(_bufferSize);
       _midiOutHeader = malloc<MIDIHDR>();
@@ -121,9 +129,19 @@ class WindowsMidiDevice extends MidiDevice {
   }
 
   bool disconnect() {
+    if (_disconnecting) {
+      return true;
+    }
+
+    _disconnecting = true;
     int result;
-    if (_ins.isNotEmpty) {
-      result = midiInReset(hMidiInDevicePtr.value);
+    if (_midiInHandle != 0) {
+      result = midiInStop(_midiInHandle);
+      if (result != 0) {
+        print("STOP ERROR($result): ${midiErrorMessage(result)}");
+      }
+
+      result = midiInReset(_midiInHandle);
       if (result != 0) {
         print("RESET ERROR($result): ${midiErrorMessage(result)}");
       }
@@ -131,44 +149,55 @@ class WindowsMidiDevice extends MidiDevice {
       for (int i = 0; i < _numberOfBuffers; i++) {
         if (_midiInHeaders[i] != nullptr) {
           midiInUnprepareHeader(
-            hMidiInDevicePtr.value,
+            _midiInHandle,
             _midiInHeaders[i],
             sizeOf<MIDIHDR>(),
           );
           free(_midiInHeaders[i]);
+          _midiInHeaders[i] = nullptr;
         }
         if (_midiInBuffers[i] != nullptr) {
           free(_midiInBuffers[i]);
+          _midiInBuffers[i] = nullptr;
         }
       }
 
-      result = midiInStop(hMidiInDevicePtr.value);
-      if (result != 0) {
-        print("STOP ERROR($result): ${midiErrorMessage(result)}");
-      }
-
-      result = midiInClose(hMidiInDevicePtr.value);
+      result = midiInClose(_midiInHandle);
       if (result != 0) {
         print("CLOSE ERROR($result): ${midiErrorMessage(result)}");
       }
-
-      free(hMidiInDevicePtr);
+      _midiInHandle = 0;
+      hMidiInDevicePtr.value = 0;
     }
 
-    if (_outs.isNotEmpty) {
-      result = midiOutClose(hMidiOutDevicePtr.value);
+    if (_midiOutHandle != 0) {
+      result = midiOutReset(_midiOutHandle);
+      if (result != 0) {
+        print("OUT RESET ERROR($result): ${midiErrorMessage(result)}");
+      }
+
+      result = midiOutClose(_midiOutHandle);
       if (result != 0) {
         print("OUT CLOSE ERROR($result): ${midiErrorMessage(result)}");
       }
-      free(hMidiOutDevicePtr);
+      _midiOutHandle = 0;
+      hMidiOutDevicePtr.value = 0;
     }
 
-    free(_midiOutBuffer);
-    free(_midiOutHeader);
+    if (_midiOutBuffer != nullptr) {
+      free(_midiOutBuffer);
+      _midiOutBuffer = nullptr;
+    }
+    if (_midiOutHeader != nullptr) {
+      free(_midiOutHeader);
+      _midiOutHeader = nullptr;
+    }
 
     connected = false;
     return true;
   }
+
+  bool get isDisconnecting => _disconnecting;
 
   void addInput(int id) {
     _ins.add(id);
@@ -180,10 +209,13 @@ class WindowsMidiDevice extends MidiDevice {
     outputPorts.add(MidiPort(id, MidiPortType.OUT));
   }
 
-  containsMidiIn(int input) => hMidiInDevicePtr.value == input;
+  containsMidiIn(int input) => _midiInHandle != 0 && _midiInHandle == input;
 
   _resetHeader(Pointer<MIDIHDR> midiHdrPointer) {
-    midiInAddBuffer(hMidiInDevicePtr.value, midiHdrPointer, sizeOf<MIDIHDR>());
+    if (_disconnecting || _midiInHandle == 0) {
+      return;
+    }
+    midiInAddBuffer(_midiInHandle, midiHdrPointer, sizeOf<MIDIHDR>());
   }
 
   handleData(Uint8List data, int timestamp) {
@@ -199,6 +231,8 @@ class WindowsMidiDevice extends MidiDevice {
 
   send(Uint8List data) async {
     if (_outs.isEmpty ||
+        _disconnecting ||
+        _midiOutHandle == 0 ||
         _midiOutBuffer == nullptr ||
         _midiOutHeader == nullptr) {
       return;
@@ -212,7 +246,7 @@ class WindowsMidiDevice extends MidiDevice {
     _midiOutHeader.ref.dwFlags = 0;
 
     int result = midiOutPrepareHeader(
-      hMidiOutDevicePtr.value,
+      _midiOutHandle,
       _midiOutHeader,
       sizeOf<MIDIHDR>(),
     );
@@ -220,17 +254,13 @@ class WindowsMidiDevice extends MidiDevice {
       print("HDR OUT PREP ERROR: ${midiErrorMessage(result)}");
     }
 
-    result = midiOutLongMsg(
-      hMidiOutDevicePtr.value,
-      _midiOutHeader,
-      sizeOf<MIDIHDR>(),
-    );
+    result = midiOutLongMsg(_midiOutHandle, _midiOutHeader, sizeOf<MIDIHDR>());
     if (result != 0) {
       print("SEND ERROR($result): ${midiErrorMessage(result)}");
     }
 
     result = midiOutUnprepareHeader(
-      hMidiOutDevicePtr.value,
+      _midiOutHandle,
       _midiOutHeader,
       sizeOf<MIDIHDR>(),
     );

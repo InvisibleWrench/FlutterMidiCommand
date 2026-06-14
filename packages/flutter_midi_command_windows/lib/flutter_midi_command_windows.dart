@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:typed_data';
-
 import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
@@ -154,12 +152,15 @@ class FlutterMidiCommandWindows extends MidiCommandPlatform {
       return;
     }
 
+    _connectedDevices.remove(device.id);
     final result = windowsDevice.disconnect();
-    if (result) {
-      if (remove) {
-        _connectedDevices.remove(device.id);
-        _setupStreamController.add(MidiSetupChange.deviceDisconnected);
-      }
+    if (!result) {
+      _connectedDevices[device.id] = windowsDevice;
+      return;
+    }
+
+    if (remove) {
+      _setupStreamController.add(MidiSetupChange.deviceDisconnected);
     }
   }
 
@@ -440,19 +441,27 @@ void _onMidiData(
   int dwParam2,
 ) {
   final dev = FlutterMidiCommandWindows().findMidiDeviceForSource(hMidiIn);
+  final activeDevice = dev != null && !dev.isDisconnecting ? dev : null;
 
   switch (wMsg) {
     case MM_MIM_OPEN:
-      dev?.connected = true;
+      activeDevice?.connected = true;
       break;
     case MM_MIM_CLOSE:
-      dev?.connected = false;
+      activeDevice?.connected = false;
       break;
     case MM_MIM_DATA:
+      if (activeDevice == null) {
+        break;
+      }
       final data = _shortMidiMessageBytes(dwParam1);
-      dev?.handleData(data, dwParam2);
+      activeDevice.handleData(data, dwParam2);
       break;
     case MM_MIM_LONGDATA:
+      if (activeDevice == null || dwParam1 == 0) {
+        partialSysExBuffer.clear();
+        break;
+      }
       final midiHdrPointer = Pointer<MIDIHDR>.fromAddress(dwParam1);
       final midiHdr = midiHdrPointer.ref;
       if ((midiHdr.dwFlags & mHdrDone) != 0) {
@@ -466,7 +475,7 @@ void _onMidiData(
         partialSysExBuffer.addAll(messageData);
 
         if (partialSysExBuffer.isNotEmpty && partialSysExBuffer.last == 0xF7) {
-          dev?.handleSysexData(messageData, midiHdrPointer);
+          activeDevice.handleSysexData(messageData, midiHdrPointer);
           partialSysExBuffer.clear();
         }
       } else {
