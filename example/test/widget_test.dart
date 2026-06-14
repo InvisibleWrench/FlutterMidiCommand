@@ -69,6 +69,7 @@ void main() {
 
       await tester.longPress(find.text('Test Serial Device'));
       await tester.pumpAndSettle();
+      expect(find.text('Test Serial Device'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Raw MIDI Monitor'),
         300,
