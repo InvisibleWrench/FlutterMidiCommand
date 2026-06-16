@@ -14,6 +14,9 @@ dependencies:
   flutter_midi_command_platform_interface: ^0.4.1
   flutter_midi_command_linux: ^0.3.0
   flutter_midi_command_windows: ^0.3.0
+  flutter_web_plugins:
+    sdk: flutter
+  web: ^1.1.0
     
 dev_dependencies:
   flutter_test:
@@ -41,3 +44,6 @@ flutter:
         default_package: flutter_midi_command_linux
       windows:
         default_package: flutter_midi_command_windows
+      web:
+        pluginClass: FlutterMidiCommandWeb
+        fileName: flutter_midi_command_web.dart
