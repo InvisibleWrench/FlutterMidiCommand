@@ -151,6 +151,9 @@ class MyAppState extends State<MyApp> {
                     await _midiCommand
                         .startBluetoothCentral()
                         .catchError((err) {
+                          if (kDebugMode) {
+                            print("BLE Central Error $err");
+                          }
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(err),
                       ));
