@@ -1,6 +1,6 @@
 
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:csv/csv.dart';
@@ -26,37 +26,41 @@ class MidiRecorder {
   StreamSubscription<MidiPacket>? _midiSub;
 
   void startRecording() {
+    print("Starting recording");
     _recording = true;
     _midiSub = MidiCommand().onMidiDataReceived?.listen((packet) {
+      print("Recording packet: ${packet.data.length} bytes");
       _messages.add(packet);
     });
   }
 
   void stopRecording() {
+    print("Stopping recording");
     _recording = false;
     _midiSub?.cancel();
   }
 
 
   void exportRecording() async {
-    var rows = _messages.map((e) => [e.timestamp, ...e.data.map((e) => e.toString())]).toList();
+    print("Writing ${_messages.length} messages to CSV file");
+    List<List<String>> rows = _messages.map<List<String>>((e) => [e.timestamp.toString(), ...e.data.map<String>((e) => e.toString())]).toList();
 
-    var csv = const ListToCsvConverter().convert(rows);
+    var data = csv.encode(rows);
+    Uint8List bytes = Uint8List.fromList(data.codeUnits);
 
-    String? outputFile = await FilePicker.platform.saveFile(
+    String? outputFile = await FilePicker.saveFile(
       dialogTitle: 'Please select an output file:',
       fileName: 'midi_recording.csv',
       type: FileType.custom,
       allowedExtensions: ['csv'],
+      bytes: bytes,
     );
 
     if (outputFile == null) {
-      // User canceled the picker
+      print("The user canceled the picker");
     } else {
-      await File(outputFile).writeAsString(csv);
+      print("Recorded ${bytes.length} bytes exported to $outputFile");
     }
-
-    print("recording exported");
   }
 
   void clearRecording() {
