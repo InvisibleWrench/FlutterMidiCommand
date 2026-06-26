@@ -10,7 +10,7 @@ import 'controller.dart';
 void main() => runApp(const MyApp());
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   MyAppState createState() => MyAppState();
@@ -55,7 +55,7 @@ class MyAppState extends State<MyApp> {
     super.dispose();
   }
 
-  _updateNetworkSessionState() async {
+  void _updateNetworkSessionState() async {
     var nse = await _midiCommand.isNetworkSessionEnabled;
     if (nse != null) {
       setState(() {

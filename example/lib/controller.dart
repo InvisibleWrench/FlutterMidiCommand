@@ -10,7 +10,7 @@ import 'package:flutter_virtual_piano/flutter_virtual_piano.dart';
 class ControllerPage extends StatelessWidget {
   final MidiDevice device;
 
-  const ControllerPage(this.device, {Key? key}) : super(key: key);
+  const ControllerPage(this.device, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +26,7 @@ class ControllerPage extends StatelessWidget {
 class MidiControls extends StatefulWidget {
   final MidiDevice device;
 
-  const MidiControls(this.device, {Key? key}) : super(key: key);
+  const MidiControls(this.device, {super.key});
 
   @override
   MidiControlsState createState() {
@@ -200,46 +200,46 @@ class MidiControlsState extends State<MidiControls> {
     );
   }
 
-  _onChannelChanged(int newValue) {
+  void _onChannelChanged(int newValue) {
     setState(() {
       _channel = newValue - 1;
     });
   }
 
-  _onControllerChanged(int newValue) {
+  void _onControllerChanged(int newValue) {
     setState(() {
       _controller = newValue;
     });
   }
 
-  _onProgramChanged(int newValue) {
+  void _onProgramChanged(int newValue) {
     setState(() {
       _pcValue = newValue;
     });
     PCMessage(channel: _channel, program: _pcValue).send();
   }
 
-  _onValueChanged(int newValue) {
+  void _onValueChanged(int newValue) {
     setState(() {
       _ccValue = newValue;
     });
     CCMessage(channel: _channel, controller: _controller, value: _ccValue).send();
   }
 
-  _onNRPNValueChanged(int newValue) {
+  void _onNRPNValueChanged(int newValue) {
     setState(() {
       _nrpnValue = newValue;
     });
     NRPN4Message(channel: _channel, parameter: _nrpnCtrl, value: _nrpnValue).send();
   }
 
-  _onNRPNCtrlChanged(int newValue) {
+  void _onNRPNCtrlChanged(int newValue) {
     setState(() {
       _nrpnCtrl = newValue;
     });
   }
 
-  _onPitchChanged(double newValue) {
+  void _onPitchChanged(double newValue) {
     setState(() {
       _pitchValue = newValue;
     });
@@ -265,7 +265,7 @@ class SteppedSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  const SteppedSelector(this.label, this.value, this.minValue, this.maxValue, this.callback, {Key? key}) : super(key: key);
+  const SteppedSelector(this.label, this.value, this.minValue, this.maxValue, this.callback, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +300,7 @@ class SlidingSelector extends StatelessWidget {
   final int value;
   final Function(int) callback;
 
-  const SlidingSelector(this.label, this.value, this.minValue, this.maxValue, this.callback, {Key? key}) : super(key: key);
+  const SlidingSelector(this.label, this.value, this.minValue, this.maxValue, this.callback, {super.key});
 
   @override
   Widget build(BuildContext context) {

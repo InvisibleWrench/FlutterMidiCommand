@@ -25,20 +25,20 @@ class MidiRecorder {
 
   StreamSubscription<MidiPacket>? _midiSub;
 
-  startRecording() {
+  void startRecording() {
     _recording = true;
     _midiSub = MidiCommand().onMidiDataReceived?.listen((packet) {
       _messages.add(packet);
     });
   }
 
-  stopRecording() {
+  void stopRecording() {
     _recording = false;
     _midiSub?.cancel();
   }
 
 
-  exportRecording() async {
+  void exportRecording() async {
     var rows = _messages.map((e) => [e.timestamp, ...e.data.map((e) => e.toString())]).toList();
 
     var csv = const ListToCsvConverter().convert(rows);
@@ -59,7 +59,7 @@ class MidiRecorder {
     print("recording exported");
   }
 
-  clearRecording() {
+  void clearRecording() {
     _messages.clear();
   }
 }
