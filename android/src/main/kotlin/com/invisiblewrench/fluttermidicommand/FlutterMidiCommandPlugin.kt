@@ -18,6 +18,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.*
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** FlutterMidiCommandPlugin */
 class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.RequestPermissionsResultListener {
@@ -132,7 +133,8 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   }
 
 
-  override fun onMethodCall(call: MethodCall, result: Result): Unit {
+  override fun onMethodCall(call: MethodCall, rawResult: Result): Unit {
+    val result = SafeResult(rawResult)
 //    Log.d("FlutterMIDICommand","call method ${call.method}")
 
     if (!isSupported) {
@@ -654,6 +656,40 @@ class FlutterMidiCommandPlugin : FlutterPlugin, ActivityAware, MethodCallHandler
   }
 
 
+}
+
+class SafeResult(private val result: Result) : Result {
+    private val hasReplied = AtomicBoolean(false)
+
+    override fun success(resultValue: Any?) {
+        if (hasReplied.compareAndSet(false, true)) {
+            try {
+                result.success(resultValue)
+            } catch (e: Exception) {
+                Log.e("SafeResult", "Error sending success reply", e)
+            }
+        }
+    }
+
+    override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+        if (hasReplied.compareAndSet(false, true)) {
+            try {
+                result.error(errorCode, errorMessage, errorDetails)
+            } catch (e: Exception) {
+                Log.e("SafeResult", "Error sending error reply", e)
+            }
+        }
+    }
+
+    override fun notImplemented() {
+        if (hasReplied.compareAndSet(false, true)) {
+            try {
+                result.notImplemented()
+            } catch (e: Exception) {
+                Log.e("SafeResult", "Error sending notImplemented reply", e)
+            }
+        }
+    }
 }
 
 
