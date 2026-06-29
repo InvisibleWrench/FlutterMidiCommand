@@ -1,4 +1,0 @@
-module flutter_midi_command {
-    header "/Users/morten/Work/Flutter/flutter_midi_command/packages/flutter_midi_command_darwin/ios/.build/arm64-apple-macosx/debug/flutter_midi_command.build/flutter_midi_command-Swift.h"
-    requires objc
-}
