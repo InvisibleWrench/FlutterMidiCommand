@@ -146,7 +146,8 @@ class MidiRecorderPanel extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final event = latestMessages[index];
                         final bytes = event.message.data
-                            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                            .map((byte) =>
+                                byte.toRadixString(16).padLeft(2, '0'))
                             .join(' ');
                         return ListTile(
                           dense: true,

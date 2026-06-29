@@ -62,13 +62,13 @@ class _HomeViewState extends State<HomeView> {
         children: [256, 512, 768, 1024]
             .map(
               (e) => Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: () => _sendEmptySysex(e),
-              child: Text('Send $e bytes'),
-            ),
-          ),
-        )
+                padding: const EdgeInsets.all(8.0),
+                child: ElevatedButton(
+                  onPressed: () => _sendEmptySysex(e),
+                  child: Text('Send $e bytes'),
+                ),
+              ),
+            )
             .toList(),
       ),
     );

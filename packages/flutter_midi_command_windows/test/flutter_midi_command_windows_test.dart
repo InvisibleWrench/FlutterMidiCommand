@@ -189,12 +189,12 @@ void main() {
       final subscription = plugin.onMidiSetupChanged!.listen(events.add);
       final device = _FakeWindowsMidiDevice('keys');
 
-    await plugin.connectToDevice(device);
-    plugin.disconnectDevice(device);
-    await Future<void>.delayed(Duration.zero);
+      await plugin.connectToDevice(device);
+      plugin.disconnectDevice(device);
+      await Future<void>.delayed(Duration.zero);
 
-    expect(device.connectCalls, 1);
-    expect(device.disconnectCalls, 1);
+      expect(device.connectCalls, 1);
+      expect(device.disconnectCalls, 1);
       expect(events, <MidiSetupChange>[MidiSetupChange.deviceDisconnected]);
 
       await subscription.cancel();

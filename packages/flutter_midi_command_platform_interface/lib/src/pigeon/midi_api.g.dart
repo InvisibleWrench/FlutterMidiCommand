@@ -15,7 +15,11 @@ PlatformException _createConnectionError(String channelName) {
   );
 }
 
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse({
+  Object? result,
+  PlatformException? error,
+  bool empty = false,
+}) {
   if (empty) {
     return <Object?>[];
   }
@@ -25,14 +29,7 @@ List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty
   return <Object?>[error.code, error.message, error.details];
 }
 
-enum MidiDeviceType {
-  serial,
-  ble,
-  virtualDevice,
-  ownVirtual,
-  network,
-  unknown,
-}
+enum MidiDeviceType { serial, ble, virtualDevice, ownVirtual, network, unknown }
 
 enum MidiSetupChange {
   deviceAppeared,
@@ -65,14 +62,7 @@ class MidiHostDevice {
   List<MidiPort?>? outputs;
 
   Object encode() {
-    return <Object?>[
-      id,
-      name,
-      type,
-      connected,
-      inputs,
-      outputs,
-    ];
+    return <Object?>[id, name, type, connected, inputs, outputs];
   }
 
   static MidiHostDevice decode(Object result) {
@@ -89,11 +79,7 @@ class MidiHostDevice {
 }
 
 class MidiPort {
-  MidiPort({
-    this.id,
-    this.connected,
-    this.isInput,
-  });
+  MidiPort({this.id, this.connected, this.isInput});
 
   int? id;
 
@@ -102,11 +88,7 @@ class MidiPort {
   bool? isInput;
 
   Object encode() {
-    return <Object?>[
-      id,
-      connected,
-      isInput,
-    ];
+    return <Object?>[id, connected, isInput];
   }
 
   static MidiPort decode(Object result) {
@@ -120,11 +102,7 @@ class MidiPort {
 }
 
 class MidiPacket {
-  MidiPacket({
-    this.device,
-    this.data,
-    this.timestamp,
-  });
+  MidiPacket({this.device, this.data, this.timestamp});
 
   MidiHostDevice? device;
 
@@ -133,11 +111,7 @@ class MidiPacket {
   int? timestamp;
 
   Object encode() {
-    return <Object?>[
-      device,
-      data,
-      timestamp,
-    ];
+    return <Object?>[device, data, timestamp];
   }
 
   static MidiPacket decode(Object result) {
@@ -150,7 +124,6 @@ class MidiPacket {
   }
 }
 
-
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -158,19 +131,19 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is MidiDeviceType) {
+    } else if (value is MidiDeviceType) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    }    else if (value is MidiSetupChange) {
+    } else if (value is MidiSetupChange) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
-    }    else if (value is MidiHostDevice) {
+    } else if (value is MidiHostDevice) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    }    else if (value is MidiPort) {
+    } else if (value is MidiPort) {
       buffer.putUint8(132);
       writeValue(buffer, value.encode());
-    }    else if (value is MidiPacket) {
+    } else if (value is MidiPacket) {
       buffer.putUint8(133);
       writeValue(buffer, value.encode());
     } else {
@@ -181,17 +154,17 @@ class _PigeonCodec extends StandardMessageCodec {
   @override
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
-      case 129: 
+      case 129:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : MidiDeviceType.values[value];
-      case 130: 
+      case 130:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : MidiSetupChange.values[value];
-      case 131: 
+      case 131:
         return MidiHostDevice.decode(readValue(buffer)!);
-      case 132: 
+      case 132:
         return MidiPort.decode(readValue(buffer)!);
-      case 133: 
+      case 133:
         return MidiPacket.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -203,9 +176,12 @@ class MidiHostApi {
   /// Constructor for [MidiHostApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  MidiHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  MidiHostApi({
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix =
+           messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -213,12 +189,14 @@ class MidiHostApi {
   final String pigeonVar_messageChannelSuffix;
 
   Future<List<MidiHostDevice>> listDevices() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.listDevices$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.listDevices$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(null) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -240,14 +218,17 @@ class MidiHostApi {
   }
 
   Future<void> connect(MidiHostDevice device, List<MidiPort>? ports) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.connect$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.connect$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_channel.send(<Object?>[device, ports]) as List<Object?>?;
+        await pigeonVar_channel.send(<Object?>[device, ports])
+            as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {
@@ -262,12 +243,14 @@ class MidiHostApi {
   }
 
   Future<void> disconnect(String deviceId) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.disconnect$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.disconnect$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(<Object?>[deviceId]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -284,12 +267,14 @@ class MidiHostApi {
   }
 
   Future<void> teardown() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.teardown$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.teardown$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(null) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -306,12 +291,14 @@ class MidiHostApi {
   }
 
   Future<void> sendData(MidiPacket packet) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.sendData$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.sendData$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(<Object?>[packet]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -328,12 +315,14 @@ class MidiHostApi {
   }
 
   Future<void> addVirtualDevice(String? name) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.addVirtualDevice$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.addVirtualDevice$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(<Object?>[name]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -350,12 +339,14 @@ class MidiHostApi {
   }
 
   Future<void> removeVirtualDevice(String? name) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.removeVirtualDevice$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.removeVirtualDevice$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(<Object?>[name]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -372,12 +363,14 @@ class MidiHostApi {
   }
 
   Future<bool?> isNetworkSessionEnabled() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.isNetworkSessionEnabled$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.isNetworkSessionEnabled$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(null) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -394,12 +387,14 @@ class MidiHostApi {
   }
 
   Future<void> setNetworkSessionEnabled(bool enabled) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.setNetworkSessionEnabled$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiHostApi.setNetworkSessionEnabled$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(<Object?>[enabled]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -425,82 +420,117 @@ abstract class MidiFlutterApi {
 
   void onDeviceConnectionStateChanged(String deviceId, bool connected);
 
-  static void setUp(MidiFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  static void setUp(
+    MidiFlutterApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix =
+        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+      final BasicMessageChannel<Object?>
+      pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
-          assert(message != null,
-          'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null.');
+          assert(
+            message != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null.',
+          );
           final List<Object?> args = (message as List<Object?>?)!;
-          final MidiSetupChange? arg_setupChange = (args[0] as MidiSetupChange?);
-          assert(arg_setupChange != null,
-              'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null, expected non-null MidiSetupChange.');
+          final MidiSetupChange? arg_setupChange =
+              (args[0] as MidiSetupChange?);
+          assert(
+            arg_setupChange != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onSetupChanged was null, expected non-null MidiSetupChange.',
+          );
           try {
             api.onSetupChanged(arg_setupChange!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDataReceived$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+      final BasicMessageChannel<Object?>
+      pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDataReceived$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
-          assert(message != null,
-          'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDataReceived was null.');
+          assert(
+            message != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDataReceived was null.',
+          );
           final List<Object?> args = (message as List<Object?>?)!;
           final MidiPacket? arg_packet = (args[0] as MidiPacket?);
-          assert(arg_packet != null,
-              'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDataReceived was null, expected non-null MidiPacket.');
+          assert(
+            arg_packet != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDataReceived was null, expected non-null MidiPacket.',
+          );
           try {
             api.onDataReceived(arg_packet!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+      final BasicMessageChannel<Object?>
+      pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
-          assert(message != null,
-          'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged was null.');
+          assert(
+            message != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged was null.',
+          );
           final List<Object?> args = (message as List<Object?>?)!;
           final String? arg_deviceId = (args[0] as String?);
-          assert(arg_deviceId != null,
-              'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged was null, expected non-null String.');
+          assert(
+            arg_deviceId != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged was null, expected non-null String.',
+          );
           final bool? arg_connected = (args[1] as bool?);
-          assert(arg_connected != null,
-              'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged was null, expected non-null bool.');
+          assert(
+            arg_connected != null,
+            'Argument for dev.flutter.pigeon.flutter_midi_command_platform_interface.MidiFlutterApi.onDeviceConnectionStateChanged was null, expected non-null bool.',
+          );
           try {
             api.onDeviceConnectionStateChanged(arg_deviceId!, arg_connected!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }

@@ -349,19 +349,17 @@ class _BleMidiDevice extends MidiDevice {
   Future<void> _discoverServices() async {
     _devState = _DeviceState.interrogating;
     final services = await UniversalBle.discoverServices(deviceId);
-    _midiService =
-        services
-            .where((s) => s.uuid.toUpperCase() == midiServiceId)
-            .firstOrNull;
+    _midiService = services
+        .where((s) => s.uuid.toUpperCase() == midiServiceId)
+        .firstOrNull;
     if (_midiService == null) {
       _devState = _DeviceState.irrelevant;
       return;
     }
 
-    _midiCharacteristic =
-        _midiService!.characteristics
-            .where((c) => c.uuid.toUpperCase() == midiCharacteristicId)
-            .firstOrNull;
+    _midiCharacteristic = _midiService!.characteristics
+        .where((c) => c.uuid.toUpperCase() == midiCharacteristicId)
+        .firstOrNull;
     if (_midiCharacteristic == null) {
       _devState = _DeviceState.irrelevant;
       return;
@@ -415,18 +413,16 @@ class _BleMidiDevice extends MidiDevice {
       if (((midiByte & 0x80) == 0x80) &&
           bleHandlerState != _BleHandlerState.timestamp &&
           bleHandlerState != _BleHandlerState.sysexInt) {
-        bleHandlerState =
-            _bleSysExHasFinished
-                ? _BleHandlerState.timestamp
-                : _BleHandlerState.sysexInt;
+        bleHandlerState = _bleSysExHasFinished
+            ? _BleHandlerState.timestamp
+            : _BleHandlerState.sysexInt;
       } else {
         switch (bleHandlerState) {
           case _BleHandlerState.header:
             if (!_bleSysExHasFinished) {
-              bleHandlerState =
-                  (midiByte & 0x80) == 0x80
-                      ? _BleHandlerState.sysexInt
-                      : _BleHandlerState.sysex;
+              bleHandlerState = (midiByte & 0x80) == 0x80
+                  ? _BleHandlerState.sysexInt
+                  : _BleHandlerState.sysex;
             }
             break;
           case _BleHandlerState.timestamp:

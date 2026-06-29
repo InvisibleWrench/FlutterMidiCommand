@@ -5,29 +5,44 @@ void main() {
   group('MidiTransportPolicy', () {
     test('defaults to all supported transports', () {
       const policy = MidiTransportPolicy();
-      final result = policy.resolveEnabledTransports({MidiTransport.native, MidiTransport.ble});
+      final result = policy.resolveEnabledTransports({
+        MidiTransport.native,
+        MidiTransport.ble,
+      });
 
       expect(result, {MidiTransport.native, MidiTransport.ble});
     });
 
     test('can include only selected transports', () {
-      const policy = MidiTransportPolicy(includedTransports: {MidiTransport.native});
+      const policy = MidiTransportPolicy(
+        includedTransports: {MidiTransport.native},
+      );
 
-      final result = policy.resolveEnabledTransports({MidiTransport.native, MidiTransport.ble});
+      final result = policy.resolveEnabledTransports({
+        MidiTransport.native,
+        MidiTransport.ble,
+      });
 
       expect(result, {MidiTransport.native});
     });
 
     test('excluded transports are always removed', () {
-      const policy = MidiTransportPolicy(excludedTransports: {MidiTransport.ble});
+      const policy = MidiTransportPolicy(
+        excludedTransports: {MidiTransport.ble},
+      );
 
-      final result = policy.resolveEnabledTransports({MidiTransport.native, MidiTransport.ble});
+      final result = policy.resolveEnabledTransports({
+        MidiTransport.native,
+        MidiTransport.ble,
+      });
 
       expect(result, {MidiTransport.native});
     });
 
     test('unknown transports are ignored', () {
-      const policy = MidiTransportPolicy(includedTransports: {MidiTransport.native, MidiTransport.network});
+      const policy = MidiTransportPolicy(
+        includedTransports: {MidiTransport.native, MidiTransport.network},
+      );
 
       final result = policy.resolveEnabledTransports({MidiTransport.native});
 
@@ -37,7 +52,10 @@ void main() {
 
   group('MidiCapabilities', () {
     test('tracks supported and enabled transports', () {
-      const capabilities = MidiCapabilities(supportedTransports: {MidiTransport.native, MidiTransport.ble}, enabledTransports: {MidiTransport.native});
+      const capabilities = MidiCapabilities(
+        supportedTransports: {MidiTransport.native, MidiTransport.ble},
+        enabledTransports: {MidiTransport.native},
+      );
 
       expect(capabilities.supports(MidiTransport.native), isTrue);
       expect(capabilities.supports(MidiTransport.virtual), isFalse);
@@ -53,13 +71,21 @@ void main() {
 
       expect(MidiDeviceTypeWire.fromWireValue('native'), MidiDeviceType.serial);
       expect(MidiDeviceTypeWire.fromWireValue('BLE'), MidiDeviceType.ble);
-      expect(MidiDeviceTypeWire.fromWireValue('own-virtual'), MidiDeviceType.ownVirtual);
+      expect(
+        MidiDeviceTypeWire.fromWireValue('own-virtual'),
+        MidiDeviceType.ownVirtual,
+      );
     });
   });
 
   group('MidiConnectionState', () {
     test('updates per-device state stream', () async {
-      final device = MidiDevice('serial-1', 'Serial', MidiDeviceType.serial, false);
+      final device = MidiDevice(
+        'serial-1',
+        'Serial',
+        MidiDeviceType.serial,
+        false,
+      );
       final states = <MidiConnectionState>[];
       final sub = device.onConnectionStateChanged.listen(states.add);
 
@@ -71,7 +97,11 @@ void main() {
       await sub.cancel();
       device.dispose();
 
-      expect(states, <MidiConnectionState>[MidiConnectionState.connected, MidiConnectionState.disconnecting, MidiConnectionState.disconnected]);
+      expect(states, <MidiConnectionState>[
+        MidiConnectionState.connected,
+        MidiConnectionState.disconnecting,
+        MidiConnectionState.disconnected,
+      ]);
     });
   });
 }
