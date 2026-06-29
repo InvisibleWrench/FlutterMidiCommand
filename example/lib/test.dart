@@ -7,7 +7,7 @@ void main() {
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({Key? key}) : super(key: key);
+  const MainApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class MainApp extends StatelessWidget {
 }
 
 class HomeView extends StatefulWidget {
-  const HomeView({Key? key}) : super(key: key);
+  const HomeView({super.key});
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -62,13 +62,13 @@ class _HomeViewState extends State<HomeView> {
         children: [256, 512, 768, 1024]
             .map(
               (e) => Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: () => _sendEmptySysex(e),
-              child: Text('Send $e bytes'),
-            ),
-          ),
-        )
+                padding: const EdgeInsets.all(8.0),
+                child: ElevatedButton(
+                  onPressed: () => _sendEmptySysex(e),
+                  child: Text('Send $e bytes'),
+                ),
+              ),
+            )
             .toList(),
       ),
     );

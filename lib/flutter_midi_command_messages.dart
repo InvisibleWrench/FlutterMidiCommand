@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'flutter_midi_command.dart';
+part 'src/midi_message_parser.dart';
 
 enum MessageType {
   CC,
@@ -13,7 +14,7 @@ enum MessageType {
   Beat,
   PolyAT,
   AT,
-  PitchBend
+  PitchBend,
 }
 
 class MidiMessage {
@@ -23,9 +24,24 @@ class MidiMessage {
   /// Base class for MIDI message types
   MidiMessage();
 
+  /// Generates MIDI bytes for this message without sending.
+  ///
+  /// Subclasses override this to provide typed message encoding.
+  Uint8List generateData() => data;
+
+  /// Parses one or more raw MIDI messages into typed [MidiMessage] objects.
+  static List<MidiMessage> parse(
+    Uint8List bytes, {
+    MidiMessageParser? parser,
+    bool flushPendingNrpn = true,
+  }) {
+    final activeParser = parser ?? MidiMessageParser();
+    return activeParser.parse(bytes, flushPendingNrpn: flushPendingNrpn);
+  }
+
   /// Send the message bytes to all connected devices
   void send({String? deviceId, int? timestamp}) {
-    // print("send $data");
+    data = generateData();
     MidiCommand().sendData(data, deviceId: deviceId, timestamp: timestamp);
   }
 }
@@ -39,12 +55,12 @@ class CCMessage extends MidiMessage {
   CCMessage({this.channel = 0, this.controller = 0, this.value = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(3);
-    data[0] = 0xB0 + channel;
-    data[1] = controller;
-    data[2] = value;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(3);
+    generated[0] = 0xB0 + channel;
+    generated[1] = controller;
+    generated[2] = value;
+    return generated;
   }
 }
 
@@ -56,11 +72,11 @@ class PCMessage extends MidiMessage {
   PCMessage({this.channel = 0, this.program = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(2);
-    data[0] = 0xC0 + channel;
-    data[1] = program;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(2);
+    generated[0] = 0xC0 + channel;
+    generated[1] = program;
+    return generated;
   }
 }
 
@@ -73,12 +89,12 @@ class NoteOnMessage extends MidiMessage {
   NoteOnMessage({this.channel = 0, this.note = 0, this.velocity = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(3);
-    data[0] = 0x90 + channel;
-    data[1] = note;
-    data[2] = velocity;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(3);
+    generated[0] = 0x90 + channel;
+    generated[1] = note;
+    generated[2] = velocity;
+    return generated;
   }
 }
 
@@ -91,33 +107,36 @@ class NoteOffMessage extends MidiMessage {
   NoteOffMessage({this.channel = 0, this.note = 0, this.velocity = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(3);
-    data[0] = 0x80 + channel;
-    data[1] = note;
-    data[2] = velocity;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(3);
+    generated[0] = 0x80 + channel;
+    generated[1] = note;
+    generated[2] = velocity;
+    return generated;
   }
 }
 
 class SysExMessage extends MidiMessage {
   List<int> headerData;
   int value;
+  List<int>? rawData;
 
   /// System Exclusive Message
-  SysExMessage({this.headerData = const [], this.value = 0});
+  SysExMessage({this.headerData = const [], this.value = 0, this.rawData});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List.fromList(headerData);
-    data.insert(0, 0xF0); // Start byte
-    data.addAll(_bytesForValue(value));
-    data.add(0xF7); // End byte
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    if (rawData != null) {
+      return Uint8List.fromList(rawData!);
+    }
+    final generated = Uint8List.fromList(headerData);
+    generated.insert(0, 0xF0); // Start byte
+    generated.addAll(_bytesForValue(value));
+    generated.add(0xF7); // End byte
+    return generated;
   }
 
   Int8List _bytesForValue(int value) {
-    print("bytes for value $value");
     var bytes = Int8List(5);
 
     int absValue = value.abs();
@@ -152,34 +171,34 @@ class NRPN4Message extends MidiMessage {
   NRPN4Message({this.channel = 0, this.parameter = 0, this.value = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    parameter = parameter.clamp(0, 16383);
-    int parameterMSB = parameter ~/ 128;
-    int parameterLSB = parameter & 0x7F;
+  Uint8List generateData() {
+    final clampedParameter = parameter.clamp(0, 16383);
+    final parameterMSB = clampedParameter ~/ 128;
+    final parameterLSB = clampedParameter & 0x7F;
 
-    value = value.clamp(0, 16383);
-    int valueMSB = value ~/ 128;
-    int valueLSB = value & 0x7F;
+    final clampedValue = value.clamp(0, 16383);
+    final valueMSB = clampedValue ~/ 128;
+    final valueLSB = clampedValue & 0x7F;
 
-    data = Uint8List(9);
+    final generated = Uint8List(9);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x63;
-    data[2] = parameterMSB;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x63;
+    generated[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0x62;
-    data[4] = parameterLSB;
+    generated[3] = 0x62;
+    generated[4] = parameterLSB;
 
     // Data Value MSB
-    data[5] = 0x06;
-    data[6] = valueMSB;
+    generated[5] = 0x06;
+    generated[6] = valueMSB;
 
     // Data Value LSB
-    data[7] = 0x26;
-    data[8] = valueLSB;
+    generated[7] = 0x26;
+    generated[8] = valueLSB;
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -192,28 +211,27 @@ class NRPN3Message extends MidiMessage {
   NRPN3Message({this.channel = 0, this.parameter = 0, this.value = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    parameter = parameter.clamp(0, 16383);
-    int parameterMSB = parameter ~/ 128;
-    int parameterLSB = parameter & 0x7F;
+  Uint8List generateData() {
+    final clampedParameter = parameter.clamp(0, 16383);
+    final parameterMSB = clampedParameter ~/ 128;
+    final parameterLSB = clampedParameter & 0x7F;
+    final clampedValue = value & 0x7F;
 
-    value = value & 0x7F;
-
-    data = Uint8List(7);
+    final generated = Uint8List(7);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x63;
-    data[2] = parameterMSB;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x63;
+    generated[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0x62;
-    data[4] = parameterLSB;
+    generated[3] = 0x62;
+    generated[4] = parameterLSB;
 
     // Data Value
-    data[5] = 0x06;
-    data[6] = value;
+    generated[5] = 0x06;
+    generated[6] = clampedValue;
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -234,26 +252,29 @@ class NRPNHexMessage extends MidiMessage {
   });
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(9);
+  Uint8List generateData() {
+    final hasValueLsb = valueLSB >= 0;
+    final generated = Uint8List(hasValueLsb ? 9 : 7);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x63;
-    data[2] = parameterMSB;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x63;
+    generated[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0x62;
-    data[4] = parameterLSB;
+    generated[3] = 0x62;
+    generated[4] = parameterLSB;
 
     // Data Value MSB
-    data[5] = 0x06;
-    data[6] = valueMSB;
+    generated[5] = 0x06;
+    generated[6] = valueMSB;
 
     // Data Value LSB
-    data[7] = 0x26;
-    data[8] = valueLSB;
+    if (hasValueLsb) {
+      generated[7] = 0x26;
+      generated[8] = valueLSB;
+    }
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -265,19 +286,19 @@ class NRPNNullMessage extends MidiMessage {
   NRPNNullMessage({this.channel = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(6);
+  Uint8List generateData() {
+    final generated = Uint8List(6);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x63;
-    data[2] = 0x7F;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x63;
+    generated[2] = 0x7F;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x62;
-    data[5] = 0x7F;
+    generated[3] = 0xB0 + channel;
+    generated[4] = 0x62;
+    generated[5] = 0x7F;
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -300,29 +321,29 @@ class RPNMessage extends MidiMessage {
   RPNMessage({this.channel = 0, this.parameter = 0, this.value = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(12);
+  Uint8List generateData() {
+    final generated = Uint8List(12);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x65;
-    data[2] = parameter >> 7;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x65;
+    generated[2] = parameter >> 7;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x64;
-    data[5] = parameter & 0x7F;
+    generated[3] = 0xB0 + channel;
+    generated[4] = 0x64;
+    generated[5] = parameter & 0x7F;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = value >> 7;
+    generated[6] = 0xB0 + channel;
+    generated[7] = 0x06;
+    generated[8] = value >> 7;
 
     // Data Value LSB
-    data[9] = 0xB0 + channel;
-    data[10] = 0x26;
-    data[11] = value & 0x7F;
+    generated[9] = 0xB0 + channel;
+    generated[10] = 0x26;
+    generated[11] = value & 0x7F;
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -343,32 +364,32 @@ class RPNHexMessage extends MidiMessage {
   });
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    var length = valueLSB > -1 ? 12 : 9;
-    data = Uint8List(length);
+  Uint8List generateData() {
+    final length = valueLSB > -1 ? 12 : 9;
+    final generated = Uint8List(length);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x65;
-    data[2] = parameterMSB;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x65;
+    generated[2] = parameterMSB;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x64;
-    data[5] = parameterLSB;
+    generated[3] = 0xB0 + channel;
+    generated[4] = 0x64;
+    generated[5] = parameterLSB;
 
     // Data Value MSB
-    data[6] = 0xB0 + channel;
-    data[7] = 0x06;
-    data[8] = valueMSB;
+    generated[6] = 0xB0 + channel;
+    generated[7] = 0x06;
+    generated[8] = valueMSB;
 
     // Data Value LSB
     if (valueLSB > -1) {
-      data[9] = 0xB0 + channel;
-      data[10] = 0x26;
-      data[11] = valueLSB;
+      generated[9] = 0xB0 + channel;
+      generated[10] = 0x26;
+      generated[11] = valueLSB;
     }
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -380,19 +401,19 @@ class RPNNullMessage extends MidiMessage {
   RPNNullMessage({this.channel = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(6);
+  Uint8List generateData() {
+    final generated = Uint8List(6);
     // Data Entry MSB
-    data[0] = 0xB0 + channel;
-    data[1] = 0x65;
-    data[2] = 0x7F;
+    generated[0] = 0xB0 + channel;
+    generated[1] = 0x65;
+    generated[2] = 0x7F;
 
     // Data Entry LSB
-    data[3] = 0xB0 + channel;
-    data[4] = 0x64;
-    data[5] = 0x7F;
+    generated[3] = 0xB0 + channel;
+    generated[4] = 0x64;
+    generated[5] = 0x7F;
 
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }
 
@@ -404,18 +425,17 @@ class PitchBendMessage extends MidiMessage {
   PitchBendMessage({this.channel = 0, this.bend = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    double clampedBend = (bend.clamp(-1, 1) + 1) / 2.0;
-    int targetValue = (clampedBend * 0x3FFF).round();
+  Uint8List generateData() {
+    final clampedBend = (bend.clamp(-1.0, 1.0) + 1) / 2.0;
+    final targetValue = (clampedBend * 0x3FFF).round();
+    final bendMSB = targetValue >> 7;
+    final bendLSB = targetValue & 0x7F;
 
-    int bendMSB = targetValue >> 7;
-    int bendLSB = targetValue & 0x7F;
-
-    data = Uint8List(3);
-    data[0] = 0xE0 + channel;
-    data[1] = bendLSB;
-    data[2] = bendMSB;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    final generated = Uint8List(3);
+    generated[0] = 0xE0 + channel;
+    generated[1] = bendLSB;
+    generated[2] = bendMSB;
+    return generated;
   }
 }
 
@@ -428,12 +448,12 @@ class PolyATMessage extends MidiMessage {
   PolyATMessage({this.channel = 0, this.note = 0, this.pressure = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(3);
-    data[0] = 0xA0 + channel;
-    data[1] = note;
-    data[2] = pressure;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(3);
+    generated[0] = 0xA0 + channel;
+    generated[1] = note;
+    generated[2] = pressure;
+    return generated;
   }
 }
 
@@ -445,11 +465,11 @@ class ATMessage extends MidiMessage {
   ATMessage({this.channel = 0, this.pressure = 0});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(2);
-    data[0] = 0xD0 + channel;
-    data[1] = pressure;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(2);
+    generated[0] = 0xD0 + channel;
+    generated[1] = pressure;
+    return generated;
   }
 }
 
@@ -457,10 +477,10 @@ class SenseMessage extends MidiMessage {
   /// Sense Message
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(1);
-    data[0] = 0xFE;
-    super.send(deviceId: deviceId, timestamp: timestamp);
+  Uint8List generateData() {
+    final generated = Uint8List(1);
+    generated[0] = 0xFE;
+    return generated;
   }
 }
 
@@ -473,22 +493,22 @@ class ClockMessage extends MidiMessage {
   ClockMessage({this.type = ClockType.beat});
 
   @override
-  void send({String? deviceId, int? timestamp}) {
-    data = Uint8List(1);
+  Uint8List generateData() {
+    final generated = Uint8List(1);
     switch (type) {
       case ClockType.beat:
-        data[0] = 0xF8;
+        generated[0] = 0xF8;
         break;
       case ClockType.start:
-        data[0] = 0xFA;
+        generated[0] = 0xFA;
         break;
       case ClockType.cont:
-        data[0] = 0xFB;
+        generated[0] = 0xFB;
         break;
       case ClockType.stop:
-        data[0] = 0xFC;
+        generated[0] = 0xFC;
         break;
     }
-    super.send(deviceId: deviceId, timestamp: timestamp);
+    return generated;
   }
 }

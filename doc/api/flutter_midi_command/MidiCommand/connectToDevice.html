@@ -55,8 +55,9 @@
     <section class="multi-line-signature">
       
 <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
-<span class="name ">connectToDevice</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span></li>
-</ol>)
+<span class="name ">connectToDevice</span>(<wbr><ol class="parameter-list"> <li><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="../../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span>, {</span></li>
+<li><span class="parameter" id="connectToDevice-param-awaitConnectionTimeout"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a>?</span> <span class="parameter-name">awaitConnectionTimeout</span> = <span class="default-value">const Duration(seconds: 10)</span>, </span></li>
+</ol>})
 
       
 
@@ -70,8 +71,44 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; connectToDevice(MidiDevice device) async {
-  return _platform.connectToDevice(device);
+  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; connectToDevice(MidiDevice device, {Duration? awaitConnectionTimeout = const Duration(seconds: 10)}) async {
+  if (!device.connected) {
+    device.setConnectionState(MidiConnectionState.connecting);
+  }
+  final connectionEstablished = _awaitConnectedOrFailed(device);
+
+  try {
+    final route = _resolveDeviceRoute(device);
+    if (route == _MidiDeviceRoute.bleTransport) {
+      _requireTransport(MidiTransport.ble, &#39;connectToDevice&#39;);
+      _requireBleTransport(&#39;connectToDevice&#39;);
+      await _bleTransport!.connectToDevice(device);
+    } else {
+      await _platform.connectToDevice(device);
+    }
+  } catch (_) {
+    if (device.connectionState == MidiConnectionState.connecting) {
+      device.setConnectionState(MidiConnectionState.disconnected);
+    }
+    rethrow;
+  }
+
+  if (device.connected) {
+    return;
+  }
+
+  if (awaitConnectionTimeout == null) {
+    await connectionEstablished;
+    return;
+  }
+  try {
+    await connectionEstablished.timeout(awaitConnectionTimeout);
+  } on TimeoutException {
+    if (device.connectionState == MidiConnectionState.connecting) {
+      device.setConnectionState(MidiConnectionState.disconnected);
+    }
+    rethrow;
+  }
 }</code></pre>
 </section>
 
@@ -100,7 +137,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

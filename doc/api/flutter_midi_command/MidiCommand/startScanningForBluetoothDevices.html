@@ -71,7 +71,9 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; startScanningForBluetoothDevices() async {
-  return _platform.startScanningForBluetoothDevices();
+  _requireTransport(MidiTransport.ble, &#39;startScanningForBluetoothDevices&#39;);
+  _requireBleTransport(&#39;startScanningForBluetoothDevices&#39;);
+  return _bleTransport!.startScanningForBluetoothDevices();
 }</code></pre>
 </section>
 
@@ -100,7 +102,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

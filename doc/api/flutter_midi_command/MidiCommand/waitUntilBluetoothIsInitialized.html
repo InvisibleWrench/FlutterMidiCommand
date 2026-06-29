@@ -71,9 +71,8 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; waitUntilBluetoothIsInitialized() async {
+  _requireTransport(MidiTransport.ble, &#39;waitUntilBluetoothIsInitialized&#39;);
   bool isInitialized() =&gt; _bluetoothState != BluetoothState.unknown;
-
-  print(_bluetoothState);
 
   if (isInitialized()) {
     return;
@@ -113,7 +112,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

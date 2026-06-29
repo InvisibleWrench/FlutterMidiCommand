@@ -1,0 +1,28 @@
+# Workspace-only dependency linking.
+pubspec_overrides.yaml
+example/pubspec_overrides.yaml
+packages/**/pubspec_overrides.yaml
+
+# Keep federated package sources publishable from their own directories.
+# Ignoring `packages/` here hides nested package pubspecs during `pub publish`.
+
+# Local IDE/workspace artifacts.
+*.iml
+.idea/
+.vscode/
+
+# Generated API docs are published separately.
+doc/api/
+
+# Build and tool caches.
+build/
+**/build/
+.dart_tool/
+**/.dart_tool/
+.pub/
+**/.pub/
+
+# Flutter-generated local files.
+local.properties
+example/ios/Flutter/ephemeral/
+example/android/app/.cxx/

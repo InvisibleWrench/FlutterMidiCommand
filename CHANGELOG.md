@@ -1,8 +1,17 @@
-## 0.5.4
-MR #137, #138, Added timestamps to messages.
-MR #142, Fix MIDI Listener issue.
-MR #143, Fix Device IDs
-MR #144, Update MIDICommandWindows
+## 1.0.0
+- Aligned CI to Flutter `3.44.2` so the newer BLE dependency resolves in GitHub Actions.
+- Resolved the Windows example build failure caused by deprecated coroutine headers in older `universal_ble` releases.
+- Restructured into a melos-managed federated monorepo.
+- Bumped federated subpackages to 1.0.0 for the major API transition.
+- Introduced shared BLE transport package (`flutter_midi_command_ble`) and optional BLE wiring via `configureBleTransport`.
+- Migrated host API contracts to generated Pigeon interfaces.
+- Added typed host models (`MidiDeviceType`, `MidiHostDevice`, `MidiPort`, `MidiPacket`) across platform bridges.
+- Added web implementation package (`flutter_midi_command_web`) using browser Web MIDI.
+- Added transport capabilities/policies and stronger async connection semantics (`connectToDevice` completes on connection).
+- Added a typed MIDI parser/generator API (`MidiMessageParser` and `MidiMessage.parse`) with support for running status, realtime interleaving, SysEx, and NRPN/RPN message flows.
+- Expanded test coverage across shared logic, platform interface, BLE transport, and web backend.
+- Updated the example app with separate transport toggles plus distinct `Refresh Devices` and `Scan BLE` controls.
+- Improved Windows MIDI enumeration with hot-plug device updates and better multi-port full-duplex pairing.
 
 ## 0.5.3
 Adds a runtime check to ensure MIDI is available on the android device before starting. See #125 for further details.
@@ -244,4 +253,3 @@ Readme and formatting
 Initial Release.
 Functioning discovery and connection to MIDI devices on Android and iOS, as well as BLE MIDI devices on Android.
 Functioning sending and receiving of MIDI data
-

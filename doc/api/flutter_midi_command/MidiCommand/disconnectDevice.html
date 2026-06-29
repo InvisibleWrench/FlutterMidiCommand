@@ -55,7 +55,7 @@
     <section class="multi-line-signature">
       
 <span class="returntype">void</span>
-<span class="name ">disconnectDevice</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="disconnectDevice-param-device"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span></li>
+<span class="name ">disconnectDevice</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="disconnectDevice-param-device"><span class="type-annotation"><a href="../../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span></span></li>
 </ol>)
 
       
@@ -71,6 +71,16 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void disconnectDevice(MidiDevice device) {
+  if (device.connected) {
+    device.setConnectionState(MidiConnectionState.disconnecting);
+  }
+  final route = _resolveDeviceRoute(device);
+  if (route == _MidiDeviceRoute.bleTransport) {
+    _requireTransport(MidiTransport.ble, &#39;disconnectDevice&#39;);
+    _requireBleTransport(&#39;disconnectDevice&#39;);
+    _bleTransport!.disconnectDevice(device);
+    return;
+  }
   _platform.disconnectDevice(device);
 }</code></pre>
 </section>
@@ -100,7 +110,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

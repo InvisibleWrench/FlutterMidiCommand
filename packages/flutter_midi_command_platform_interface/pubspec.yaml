@@ -1,0 +1,25 @@
+name: flutter_midi_command_platform_interface
+description: A common platform interface for the FlutterMidiCommand plugin.
+version: 1.0.0
+homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
+repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_platform_interface
+issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues
+documentation: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_platform_interface
+topics:
+  - midi
+  - flutter-plugin
+  - federated-plugin
+  - platform-interface
+
+environment:
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

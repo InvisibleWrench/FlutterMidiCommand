@@ -59,7 +59,7 @@
   <section id="getter">
     <section class="multi-line-signature">
       
-      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://pub.dev/documentation/flutter_midi_command_platform_interface/0.4.3/flutter_midi_command_platform_interface/MidiDevice-class.html">MidiDevice</a></span>&gt;</span>?</span>&gt;</span></span>
+      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span>&gt;</span>?</span>&gt;</span></span>
       get
       <span class="name ">devices</span>
       
@@ -74,7 +74,24 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;List&lt;MidiDevice&gt;?&gt; get devices async {
-  return _platform.devices;
+  final devices = &lt;MidiDevice&gt;[];
+  _deviceRouteById.clear();
+
+  final platformDevices = await _platform.devices ?? &lt;MidiDevice&gt;[];
+  for (final device in platformDevices) {
+    _rememberDeviceRoute(device, _MidiDeviceRoute.platform);
+  }
+  devices.addAll(platformDevices);
+
+  if (_bleTransport != null &amp;&amp; isTransportEnabled(MidiTransport.ble)) {
+    final bleDevices = await _bleTransport!.devices;
+    for (final device in bleDevices) {
+      _rememberDeviceRoute(device, _MidiDeviceRoute.bleTransport);
+    }
+    devices.addAll(bleDevices);
+  }
+
+  return devices;
 }</code></pre>
 </section>
 
@@ -105,7 +122,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

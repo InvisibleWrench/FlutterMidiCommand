@@ -72,6 +72,7 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void setNetworkSessionEnabled(bool enabled) {
+  _requireTransport(MidiTransport.network, &#39;setNetworkSessionEnabled&#39;);
   _platform.setNetworkSessionEnabled(enabled);
 }</code></pre>
 </section>
@@ -101,7 +102,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

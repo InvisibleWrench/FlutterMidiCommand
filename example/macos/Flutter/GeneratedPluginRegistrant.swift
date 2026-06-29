@@ -6,7 +6,7 @@ import FlutterMacOS
 import Foundation
 
 import file_picker
-import flutter_midi_command
+import flutter_midi_command_darwin
 import universal_ble
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {

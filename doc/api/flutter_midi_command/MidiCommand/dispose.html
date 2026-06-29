@@ -54,7 +54,7 @@
 
     <section class="multi-line-signature">
       
-<span class="returntype">dynamic</span>
+<span class="returntype">void</span>
 <span class="name ">dispose</span>(<wbr>)
 
       
@@ -66,9 +66,21 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">dispose() {
+  <pre class="language-dart"><code class="language-dart">void dispose() {
+  __platform?.teardown();
+  _txStreamCtrl.close();
   _bluetoothStateStream.close();
   _onBluetoothStateChangedStreamSubscription?.cancel();
+  _bleTransport?.teardown();
+  _bleTransport = null;
+  _bluetoothIsStarted = false;
+  _bluetoothStartFuture = null;
+  _bluetoothState = BluetoothState.unknown;
+  _deviceRouteById.clear();
+  _resetMessageParsers();
+  if (identical(_instance, this)) {
+    _instance = null;
+  }
 }</code></pre>
 </section>
 
@@ -97,7 +109,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

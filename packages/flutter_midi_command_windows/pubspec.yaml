@@ -1,0 +1,39 @@
+name: flutter_midi_command_windows
+description: FlutterMidiCommand for windows.
+version: 1.0.0
+homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
+repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_windows
+issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues
+documentation: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_windows
+topics:
+  - midi
+  - flutter-plugin
+  - windows
+  - winmidi
+  - serial
+
+environment:
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_midi_command_platform_interface: ^1.0.0
+  ffi: ^2.1.4
+  win32: ^5.14.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+
+# The following section is specific to Flutter.
+flutter:
+  plugin:
+    implements: flutter_midi_command
+    platforms:
+      windows:
+        pluginClass: FlutterMidiCommandWindowsPlugin
+        dartPluginClass: FlutterMidiCommandWindows

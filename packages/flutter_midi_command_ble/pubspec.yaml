@@ -1,0 +1,27 @@
+name: flutter_midi_command_ble
+description: Shared BLE MIDI transport for flutter_midi_command based on universal_ble.
+version: 1.0.0
+homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
+repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_ble
+issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues
+documentation: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_ble
+topics:
+  - midi
+  - flutter-plugin
+  - bluetooth
+  - ble
+  - music-tech
+
+environment:
+  sdk: ">=3.11.4 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_midi_command_platform_interface: ^1.0.0
+  universal_ble: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

@@ -18,36 +18,36 @@ val flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "
 val flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0"
 
 android {
-  compileSdk = 34 // use flutter.compileSdkVersion  when Flutter 3.27.0 is widely used
+  compileSdk = 36
+  ndkVersion = "28.2.13676358"
 
   namespace = "com.invisiblewrench.fluttermidicommand_example"
   sourceSets { getByName("main").java.srcDirs("src/main/kotlin") }
 
   compileOptions {
-      sourceCompatibility = JavaVersion.VERSION_1_8
-      targetCompatibility = JavaVersion.VERSION_1_8
-  }
-
-  kotlinOptions {
-      jvmTarget = JavaVersion.VERSION_1_8.toString()
-  }
-
-  sourceSets {
-    getByName("main").java.srcDirs("src/main/kotlin")
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
   }
 
   defaultConfig {
     applicationId = "com.invisiblewrench.fluttermidicommand_example"
-    minSdkVersion(24)
+    minSdk = 24
     targetSdk = flutter.targetSdkVersion
     versionCode = flutter.versionCode
     versionName = flutter.versionName
   }
 
-  buildTypes { getByName("release") { signingConfig = signingConfigs.getByName("debug") } }
+  buildTypes {
+    getByName("release") {
+      signingConfig = signingConfigs.getByName("debug")
+    }
+  }
+}
 
-
-
+kotlin {
+  compilerOptions {
+    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+  }
 }
 
 flutter { source = "../../" }

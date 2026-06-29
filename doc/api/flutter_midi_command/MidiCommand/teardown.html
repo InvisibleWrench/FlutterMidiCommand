@@ -71,6 +71,9 @@
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void teardown() {
   _platform.teardown();
+  _bleTransport?.teardown();
+  _deviceRouteById.clear();
+  _resetMessageParsers();
 }</code></pre>
 </section>
 
@@ -99,7 +102,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

@@ -1,16 +1,17 @@
-# fluttermidicommand_example
+# flutter_midi_command_example
 
-Demonstrates how to use the fluttermidicommand plugin.
+Demonstrates how to use `flutter_midi_command` across native MIDI, BLE MIDI, virtual MIDI, and RTP/network session controls.
 
-## Getting Started
+## What the example shows
 
-This project is a starting point for a Flutter application.
+- Independent transport toggles for `RTP`, `BLE`, and `Virtual`.
+- A dedicated `Refresh Devices` action for reloading the current device snapshot.
+- A separate `Scan BLE` action so Bluetooth discovery is decoupled from general device enumeration.
+- Hot-plug updates through `onMidiSetupChanged`, including Windows USB MIDI attach/remove events.
+- Device connection, controller-page interaction, and MIDI message sending/receiving.
 
-A few resources to get you started if this is your first Flutter project:
+## Notes
 
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
-
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- BLE controls are only shown when the example is started with BLE enabled.
+- `RTP` support depends on the host platform implementation.
+- On Windows, multi-port USB MIDI devices are shown as full-duplex device pairs when matching input/output ports are detected.

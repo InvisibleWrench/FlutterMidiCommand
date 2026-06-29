@@ -1,22 +1,88 @@
 PODS:
-  - Flutter (1.0.0)
-  - flutter_midi_command (0.4.2):
+  - DKImagePickerController/Core (4.3.9):
+    - DKImagePickerController/ImageDataManager
+    - DKImagePickerController/Resource
+  - DKImagePickerController/ImageDataManager (4.3.9)
+  - DKImagePickerController/PhotoGallery (4.3.9):
+    - DKImagePickerController/Core
+    - DKPhotoGallery
+  - DKImagePickerController/Resource (4.3.9)
+  - DKPhotoGallery (0.0.19):
+    - DKPhotoGallery/Core (= 0.0.19)
+    - DKPhotoGallery/Model (= 0.0.19)
+    - DKPhotoGallery/Preview (= 0.0.19)
+    - DKPhotoGallery/Resource (= 0.0.19)
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Core (0.0.19):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Preview
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Model (0.0.19):
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Preview (0.0.19):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Resource
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Resource (0.0.19):
+    - SDWebImage
+    - SwiftyGif
+  - file_picker (0.0.1):
+    - DKImagePickerController/PhotoGallery
     - Flutter
+  - Flutter (1.0.0)
+  - flutter_midi_command_darwin (1.0.0):
+    - Flutter
+  - integration_test (0.0.1):
+    - Flutter
+  - SDWebImage (5.21.7):
+    - SDWebImage/Core (= 5.21.7)
+  - SDWebImage/Core (5.21.7)
+  - SwiftyGif (5.4.5)
+  - universal_ble (0.0.1):
+    - Flutter
+    - FlutterMacOS
 
 DEPENDENCIES:
+  - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - Flutter (from `Flutter`)
-  - flutter_midi_command (from `.symlinks/plugins/flutter_midi_command/ios`)
+  - flutter_midi_command_darwin (from `.symlinks/plugins/flutter_midi_command_darwin/ios`)
+  - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - universal_ble (from `.symlinks/plugins/universal_ble/darwin`)
+
+SPEC REPOS:
+  trunk:
+    - DKImagePickerController
+    - DKPhotoGallery
+    - SDWebImage
+    - SwiftyGif
 
 EXTERNAL SOURCES:
+  file_picker:
+    :path: ".symlinks/plugins/file_picker/ios"
   Flutter:
     :path: Flutter
-  flutter_midi_command:
-    :path: ".symlinks/plugins/flutter_midi_command/ios"
+  flutter_midi_command_darwin:
+    :path: ".symlinks/plugins/flutter_midi_command_darwin/ios"
+  integration_test:
+    :path: ".symlinks/plugins/integration_test/ios"
+  universal_ble:
+    :path: ".symlinks/plugins/universal_ble/darwin"
 
 SPEC CHECKSUMS:
-  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  flutter_midi_command: 760f0ec4b7c6d3034982f6045e878d9b7d01674e
+  DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
+  DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  file_picker: b159e0c068aef54932bb15dc9fd1571818edaf49
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutter_midi_command_darwin: e8fa6437a7485f77e63d14181d0f7ba2613a6226
+  integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
+  SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
+  SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
+  universal_ble: cf52a7b3fd2e7c14d6d7262e9fdadb72ab6b88a6
 
-PODFILE CHECKSUM: 4e8f8b2be68aeea4c0d5beb6ff1e79fface1d048
+PODFILE CHECKSUM: cc1f88378b4bfcf93a6ce00d2c587857c6008d3b
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2

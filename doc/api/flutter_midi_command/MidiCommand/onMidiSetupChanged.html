@@ -75,7 +75,20 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Stream&lt;String&gt;? get onMidiSetupChanged {
-  return _platform.onMidiSetupChanged;
+  final streams = &lt;Stream&lt;String&gt;&gt;[];
+  if (_platform.onMidiSetupChanged != null) {
+    streams.add(_platform.onMidiSetupChanged!);
+  }
+  if (_bleTransport != null &amp;&amp; isTransportEnabled(MidiTransport.ble)) {
+    streams.add(_bleTransport!.onMidiSetupChanged);
+  }
+  if (streams.isEmpty) {
+    return null;
+  }
+  if (streams.length == 1) {
+    return streams.first;
+  }
+  return StreamGroup.merge(streams).asBroadcastStream();
 }</code></pre>
 </section>
 
@@ -106,7 +119,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

@@ -1,0 +1,25 @@
+# Re-include package contents when publishing from this federated package.
+!**
+
+# Workspace-only dependency linking.
+pubspec_overrides.yaml
+
+# Local IDE/workspace artifacts.
+*.iml
+.idea/
+
+# Build and tool caches.
+.dart_tool/
+**/.dart_tool/
+.pub/
+**/.pub/
+.packages
+build/
+**/build/
+pubspec.lock
+
+# Darwin build products.
+ios/.build/
+
+# OS-specific metadata.
+.DS_Store

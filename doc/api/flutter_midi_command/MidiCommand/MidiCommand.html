@@ -54,7 +54,8 @@
 
     <section class="multi-line-signature">
       
-      <span class="name ">MidiCommand</span>(<wbr>)
+      <span class="name ">MidiCommand</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="-param-bleTransport"><span class="type-annotation">MidiBleTransport?</span> <span class="parameter-name">bleTransport</span>, </span></li>
+</ol>})
     </section>
     
 
@@ -62,9 +63,11 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">factory MidiCommand() {
+  <pre class="language-dart"><code class="language-dart">factory MidiCommand({MidiBleTransport? bleTransport}) {
   if (_instance == null) {
-    _instance = MidiCommand._();
+    _instance = MidiCommand._(bleTransport: bleTransport);
+  } else if (bleTransport != null) {
+    _instance!.configureBleTransport(bleTransport);
   }
   return _instance!;
 }</code></pre>
@@ -95,7 +98,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

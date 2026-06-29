@@ -1,0 +1,51 @@
+name: flutter_midi_command_workspace
+packages:
+  - .
+  - packages/**
+  - example
+
+scripts:
+  bootstrap:
+    run: dart run melos bootstrap
+  analyze:
+    run: dart run melos exec --concurrency=1 --ignore=flutter_midi_command_example -- "flutter analyze --no-fatal-infos --no-fatal-warnings"
+  analyze:example:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter analyze --no-fatal-infos --no-fatal-warnings"
+  test:
+    run: dart run melos exec --dir-exists=test --concurrency=1 --ignore=flutter_midi_command_example --ignore=flutter_midi_command_web -- "flutter test"
+  test:web:chrome:
+    run: dart run melos exec --scope=flutter_midi_command_web -- "flutter test --platform chrome"
+  test:native:android:
+    run: bash ./example/android/gradlew -p example/android :flutter_midi_command_android:testDebugUnitTest
+  test:native:darwin:
+    run: swift test --package-path packages/flutter_midi_command_darwin/ios && swiftc packages/flutter_midi_command_darwin/ios/Classes/MidiPacketParser.swift packages/flutter_midi_command_darwin/ios/Tests/midi_packet_parser_smoke.swift -o /tmp/midi_packet_parser_smoke && /tmp/midi_packet_parser_smoke
+  test:native:linux:
+    run: dart run melos exec --scope=flutter_midi_command_linux -- "flutter test"
+  test:native:windows:
+    run: dart run melos exec --scope=flutter_midi_command_windows -- "flutter test"
+  test:example:integration:android:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "bash tool/run_android_smoke_test.sh"
+  test:example:integration:ios:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "bash tool/run_ios_smoke_test.sh"
+  test:example:integration:linux:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter test integration_test/smoke_test.dart -d linux"
+  test:example:integration:macos:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter test integration_test/smoke_test.dart -d macos"
+  test:example:integration:web:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter test test/smoke_web_test.dart --platform chrome"
+  test:example:integration:windows:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter test integration_test/smoke_test.dart -d windows"
+  build:example:android:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build apk --debug --target-platform android-arm64 --android-skip-build-dependency-validation"
+  build:example:linux:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build linux --debug"
+  build:example:ios:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build ios --debug --no-codesign"
+  build:example:macos:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build macos --debug"
+  build:example:windows:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build windows --debug"
+  build:example:web:
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build web --debug"
+  format:
+    run: dart run melos exec -- "dart format --set-exit-if-changed ."

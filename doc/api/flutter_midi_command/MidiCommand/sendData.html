@@ -74,7 +74,24 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void sendData(Uint8List data, {String? deviceId, int? timestamp}) {
+  if (deviceId != null) {
+    final route = _deviceRouteById[deviceId];
+    if (route == _MidiDeviceRoute.platform) {
+      _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
+      _txStreamCtrl.add(data);
+      return;
+    }
+    if (route == _MidiDeviceRoute.bleTransport &amp;&amp; _bleTransport != null &amp;&amp; isTransportEnabled(MidiTransport.ble)) {
+      _bleTransport!.sendData(data, deviceId: deviceId, timestamp: timestamp);
+      _txStreamCtrl.add(data);
+      return;
+    }
+  }
+
   _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
+  if (_bleTransport != null &amp;&amp; isTransportEnabled(MidiTransport.ble)) {
+    _bleTransport!.sendData(data, deviceId: deviceId, timestamp: timestamp);
+  }
   _txStreamCtrl.add(data);
 }</code></pre>
 </section>
@@ -104,7 +121,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

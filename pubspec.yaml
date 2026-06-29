@@ -1,23 +1,39 @@
 name: flutter_midi_command
-description: A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices. Wraps CoreMIDI and android.media.midi in a thin dart/flutter layer.
+description: A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices.
 
-version: 0.5.4
+version: 1.0.0
 homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
+repository: https://github.com/InvisibleWrench/FlutterMidiCommand
+issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues
+documentation: https://github.com/InvisibleWrench/FlutterMidiCommand#readme
+topics:
+  - midi
+  - flutter-plugin
+  - bluetooth
+  - webmidi
+  - music-tech
 
 environment:
-  sdk: ">=3.1.0 <4.0.0"
-  flutter: ">=2.11.0"
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.24.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_midi_command_platform_interface: ^0.4.1
-  flutter_midi_command_linux: ^0.3.0
-  flutter_midi_command_windows: ^0.3.0
+  async: ^2.12.0
+  flutter_midi_command_platform_interface: ^1.0.0
+  flutter_midi_command_linux: ^1.0.0
+  flutter_midi_command_windows: ^1.0.0
+  flutter_midi_command_web: ^1.0.0
+  flutter_midi_command_android: ^1.0.0
+  flutter_midi_command_darwin: ^1.0.0
     
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^5.0.0
+  melos: ^6.3.2
+  pigeon: ^22.6.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -31,13 +47,14 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.invisiblewrench.fluttermidicommand
-        pluginClass: FlutterMidiCommandPlugin
+        default_package: flutter_midi_command_android
       ios:
-        pluginClass: FlutterMidiCommandPlugin
+        default_package: flutter_midi_command_darwin
       macos:
-        pluginClass: SwiftFlutterMidiCommandPlugin
+        default_package: flutter_midi_command_darwin
       linux:
         default_package: flutter_midi_command_linux
       windows:
         default_package: flutter_midi_command_windows
+      web:
+        default_package: flutter_midi_command_web

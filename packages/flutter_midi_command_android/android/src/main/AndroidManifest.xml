@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.software.midi" android:required="true"/>
+
+    <application>
+        <service android:name="com.invisiblewrench.fluttermidicommand.VirtualDeviceService"
+            android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.midi.MidiDeviceService" />
+            </intent-filter>
+            <meta-data android:name="android.media.midi.MidiDeviceService"
+                android:resource="@xml/virtual_device_info" />
+        </service>
+    </application>
+</manifest>

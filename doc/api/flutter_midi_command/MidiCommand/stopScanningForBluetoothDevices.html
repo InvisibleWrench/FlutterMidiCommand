@@ -70,7 +70,9 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void stopScanningForBluetoothDevices() {
-  _platform.stopScanningForBluetoothDevices();
+  _requireTransport(MidiTransport.ble, &#39;stopScanningForBluetoothDevices&#39;);
+  _requireBleTransport(&#39;stopScanningForBluetoothDevices&#39;);
+  _bleTransport!.stopScanningForBluetoothDevices();
 }</code></pre>
 </section>
 
@@ -99,7 +101,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      0.5.4
+      1.0.0
   </span>
   
 </footer>

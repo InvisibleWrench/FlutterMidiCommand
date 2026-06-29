@@ -1,34 +1,21 @@
 PODS:
-  - file_picker (0.0.1):
-    - FlutterMacOS
-  - flutter_midi_command (0.0.1):
+  - flutter_midi_command_darwin (1.0.0):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
-  - universal_ble (0.0.1):
-    - Flutter
-    - FlutterMacOS
 
 DEPENDENCIES:
-  - file_picker (from `Flutter/ephemeral/.symlinks/plugins/file_picker/macos`)
-  - flutter_midi_command (from `Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/macos`)
+  - flutter_midi_command_darwin (from `Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_darwin/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - universal_ble (from `Flutter/ephemeral/.symlinks/plugins/universal_ble/darwin`)
 
 EXTERNAL SOURCES:
-  file_picker:
-    :path: Flutter/ephemeral/.symlinks/plugins/file_picker/macos
-  flutter_midi_command:
-    :path: Flutter/ephemeral/.symlinks/plugins/flutter_midi_command/macos
+  flutter_midi_command_darwin:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_midi_command_darwin/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
-  universal_ble:
-    :path: Flutter/ephemeral/.symlinks/plugins/universal_ble/darwin
 
 SPEC CHECKSUMS:
-  file_picker: e716a70a9fe5fd9e09ebc922d7541464289443af
-  flutter_midi_command: c1a74de594e48e8fffd195a2ed5746161d507a48
+  flutter_midi_command_darwin: e9d620433803f688c9e9051a866651ccee3c73dc
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  universal_ble: cf52a7b3fd2e7c14d6d7262e9fdadb72ab6b88a6
 
 PODFILE CHECKSUM: 0d3963a09fc94f580682bd88480486da345dc3f0
 
