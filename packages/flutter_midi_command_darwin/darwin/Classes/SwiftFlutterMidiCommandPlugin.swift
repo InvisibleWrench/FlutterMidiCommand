@@ -363,6 +363,38 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         return false
     }
 
+    // The OS BLE-MIDI driver exposes the CoreBluetooth peripheral UUID on the
+    // CoreMIDI device as the custom property "BLE MIDI Device UUID". This is the
+    // same string universal_ble reports as the device id, so we use it to give
+    // both transports a single shared id for the same physical peripheral.
+    static let bleMidiDeviceUUIDPropertyKey = "BLE MIDI Device UUID"
+
+    static func bleMidiDeviceUUID(_ object: MIDIObjectRef) -> String? {
+        var list: Unmanaged<CFPropertyList>?
+        MIDIObjectGetProperties(object, &list, true)
+        guard let dict = list?.takeRetainedValue() as? NSDictionary else {
+            return nil
+        }
+        guard let uuid = dict[bleMidiDeviceUUIDPropertyKey] as? String, !uuid.isEmpty else {
+            return nil
+        }
+        return uuid
+    }
+
+    /// Resolves a BLE MIDI Device UUID back to its CoreMIDI device + entity so a
+    /// connection identified by the shared UUID can open the right endpoints.
+    static func bluetoothEntity(forUUID uuid: String) -> (device: MIDIDeviceRef, entityIndex: Int)? {
+        let deviceCount = MIDIGetNumberOfDevices()
+        for d in 0..<deviceCount {
+            let device = MIDIGetDevice(d)
+            if bleMidiDeviceUUID(device) == uuid, MIDIDeviceGetNumberOfEntities(device) > 0 {
+                // BLE MIDI peripherals expose a single entity.
+                return (device, 0)
+            }
+        }
+        return nil
+    }
+
     static func isOffline(object: MIDIObjectRef) -> Bool {
         var offline: Int32 = 0
         MIDIObjectGetIntegerProperty(object, kMIDIPropertyOffline, &offline)
@@ -439,11 +471,25 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 let isBluetooth = SwiftFlutterMidiCommandPlugin.isBluetooth(device: entity)
                 let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
                 let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-                let baseName = entityName == "Error" || entityName.isEmpty ? deviceName : entityName
-                let baseId = "\(device):\(entityIndex)"
+                var baseName = entityName == "Error" || entityName.isEmpty ? deviceName : entityName
+                var baseId = "\(device):\(entityIndex)"
+
+                // For BLE MIDI, expose the CoreBluetooth peripheral UUID as the id
+                // so it matches the universal_ble device id for the same physical
+                // peripheral. The entity name is the generic "Bluetooth", so prefer
+                // the more descriptive device-level name.
+                let bluetoothUUID = isBluetooth ? SwiftFlutterMidiCommandPlugin.bleMidiDeviceUUID(device) : nil
+                if let bluetoothUUID = bluetoothUUID {
+                    baseId = bluetoothUUID
+                    if !deviceName.isEmpty && deviceName != "Error" {
+                        baseName = deviceName
+                    }
+                }
 
                 for portIndex in 0..<logicalPortCount {
-                    let deviceId = logicalPortCount == 1 ? baseId : "\(baseId):\(portIndex)"
+                    // BLE devices keep their bare UUID id (single port); only
+                    // multi-port native devices get a per-port suffix.
+                    let deviceId = (logicalPortCount == 1 || bluetoothUUID != nil) ? baseId : "\(baseId):\(portIndex)"
                     let displayName = logicalPortCount == 1 ? baseName : "\(baseName) [\(portIndex + 1)]"
 
                     devices.append(
@@ -1001,31 +1047,45 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
 
         self.ports = ports
-        let idParts = id.split(separator: ":")
 
-        // Store entity and get device/entity name
-        if idParts.count >= 2, let deviceId = MIDIDeviceRef(idParts[0]) {
-            if let entityId = Int(idParts[1]) {
-                if idParts.count > 2, let portIndex = Int(idParts[2]) {
-                    selectedPortIndex = portIndex
-                }
-                entity = MIDIDeviceGetEntity(deviceId, entityId)
-                if let e = entity {
-                    let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: e)
+        func resolveEntityName() {
+            if let e = entity {
+                let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: e)
 
-                    var device:MIDIDeviceRef = 0
-                    MIDIEntityGetDevice(e, &device)
-                    let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
+                var device:MIDIDeviceRef = 0
+                MIDIEntityGetDevice(e, &device)
+                let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
 
-                    name = "\(deviceName) \(entityName)"
+                name = "\(deviceName) \(entityName)"
+            } else {
+                midiDebugLog("no entity")
+            }
+        }
+
+        // A BLE MIDI device is identified by its CoreBluetooth UUID (shared with
+        // the universal_ble transport) rather than the "deviceRef:entityIndex"
+        // form, so resolve the UUID back to its CoreMIDI entity.
+        if id.contains("-"), let resolved = SwiftFlutterMidiCommandPlugin.bluetoothEntity(forUUID: id) {
+            selectedPortIndex = 0
+            entity = MIDIDeviceGetEntity(resolved.device, resolved.entityIndex)
+            resolveEntityName()
+        } else {
+            let idParts = id.split(separator: ":")
+
+            // Store entity and get device/entity name
+            if idParts.count >= 2, let deviceId = MIDIDeviceRef(idParts[0]) {
+                if let entityId = Int(idParts[1]) {
+                    if idParts.count > 2, let portIndex = Int(idParts[2]) {
+                        selectedPortIndex = portIndex
+                    }
+                    entity = MIDIDeviceGetEntity(deviceId, entityId)
+                    resolveEntityName()
                 } else {
-                    midiDebugLog("no entity")
+                    midiDebugLog("no entityId")
                 }
             } else {
-                midiDebugLog("no entityId")
+                midiDebugLog("no deviceId")
             }
-        } else {
-            midiDebugLog("no deviceId")
         }
 
 

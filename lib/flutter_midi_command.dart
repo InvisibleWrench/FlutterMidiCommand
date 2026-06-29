@@ -66,6 +66,14 @@ class MidiCommand {
 
   MidiTransportPolicy _transportPolicy = const MidiTransportPolicy();
   MidiBleTransport? _bleTransport;
+
+  /// Optional sink for internal diagnostic messages (device discovery, BLE/
+  /// CoreMIDI merge, connection handoff, disconnect). Defaults to null (silent).
+  /// Pipe it into your own logger, e.g.
+  /// `MidiCommand().logHandler = (m) => talker.debug(m);`
+  void Function(String message)? logHandler;
+
+  void _log(String message) => logHandler?.call('[flutter_midi_command] $message');
   final Expando<_MidiDeviceRoute> _deviceRouteByInstance =
       Expando<_MidiDeviceRoute>('midi_device_route');
   final Map<String, _MidiDeviceRoute> _deviceRouteById =
@@ -197,17 +205,52 @@ class MidiCommand {
     _deviceRouteById.clear();
 
     final platformDevices = await _platform.devices ?? <MidiDevice>[];
-    for (final device in platformDevices) {
-      _rememberDeviceRoute(device, _MidiDeviceRoute.platform);
-    }
-    devices.addAll(platformDevices);
 
-    if (_bleTransport != null && isTransportEnabled(MidiTransport.ble)) {
-      final bleDevices = await _bleTransport!.devices;
-      for (final device in bleDevices) {
-        _rememberDeviceRoute(device, _MidiDeviceRoute.bleTransport);
+    final bleActive =
+        _bleTransport != null && isTransportEnabled(MidiTransport.ble);
+    final bleDevices = bleActive ? await _bleTransport!.devices : <MidiDevice>[];
+    // BLE-transport devices (advertised name) indexed by id.
+    final bleById = <String, MidiDevice>{
+      for (final device in bleDevices) device.id: device,
+    };
+    final platformIds = <String>{};
+
+    for (final device in platformDevices) {
+      platformIds.add(device.id);
+      // On Apple a bonded BLE peripheral is exposed by the platform (CoreMIDI)
+      // under the same id (its CoreBluetooth UUID), and that is the path that
+      // carries data once bonded. Show the platform entry (its connection state
+      // is authoritative) but prefer the advertised name when we have it.
+      if (device.type == MidiDeviceType.ble && bleActive) {
+        final advertisedName = bleById[device.id]?.name;
+        if (advertisedName != null && advertisedName.isNotEmpty) {
+          device.name = advertisedName;
+        }
+        // Remember the bonded device in the BLE transport so it stays listed
+        // and reconnectable by UUID after CoreMIDI drops it on disconnect.
+        _bleTransport!.registerKnownDevice(device.id, device.name);
       }
-      devices.addAll(bleDevices);
+      _rememberDeviceRoute(device, _MidiDeviceRoute.platform);
+      devices.add(device);
+    }
+
+    // BLE devices not currently exposed by the platform: either not yet bonded
+    // (discovery/pairing) or a previously-bonded device that CoreMIDI dropped.
+    // Keep them on the BLE transport so the user can (re)connect by UUID.
+    for (final device in bleDevices) {
+      if (platformIds.contains(device.id)) {
+        continue;
+      }
+      _rememberDeviceRoute(device, _MidiDeviceRoute.bleTransport);
+      devices.add(device);
+    }
+
+    if (logHandler != null) {
+      _log(
+        'devices: platform=${platformDevices.map((d) => '${d.name}(${d.id},${d.type.name})').toList()} '
+        'ble=${bleDevices.map((d) => '${d.name}(${d.id})').toList()} '
+        '=> ${devices.length} merged',
+      );
     }
 
     return devices;
@@ -299,6 +342,13 @@ class MidiCommand {
         _requireTransport(MidiTransport.ble, 'connectToDevice');
         _requireBleTransport('connectToDevice');
         await _bleTransport!.connectToDevice(device);
+        // On Apple platforms a bonded BLE peripheral becomes available through
+        // CoreMIDI under the same id (its CoreBluetooth UUID), and that is the
+        // path that actually carries MIDI data. Hand the data path over to it
+        // once it appears. This is a no-op on platforms where the BLE transport
+        // is itself the data path (e.g. Android), where no platform counterpart
+        // ever shows up.
+        unawaited(_handoffBleToPlatform(device));
       } else {
         await _platform.connectToDevice(device);
       }
@@ -333,9 +383,26 @@ class MidiCommand {
       device.setConnectionState(MidiConnectionState.disconnecting);
     }
     final route = _resolveDeviceRoute(device);
-    if (route == _MidiDeviceRoute.bleTransport) {
-      _requireTransport(MidiTransport.ble, 'disconnectDevice');
-      _requireBleTransport('disconnectDevice');
+    final isBleWithTransport = device.type == MidiDeviceType.ble &&
+        _bleTransport != null &&
+        isTransportEnabled(MidiTransport.ble);
+    _log(
+      'Disconnect "${device.name}" (${device.id}) route=${route.name} '
+      'ble=$isBleWithTransport',
+    );
+
+    if (route == _MidiDeviceRoute.platform) {
+      _platform.disconnectDevice(device);
+      // A bonded BLE device also holds the underlying universal_ble connection
+      // that was used to pair/bond; release it too.
+      if (isBleWithTransport) {
+        _bleTransport!.disconnectDevice(device);
+      }
+      return;
+    }
+
+    // BLE transport route (e.g. not yet bonded, or non-Apple data path).
+    if (isBleWithTransport) {
       _bleTransport!.disconnectDevice(device);
       return;
     }
@@ -539,6 +606,59 @@ class MidiCommand {
     if (device.id.isNotEmpty) {
       _deviceRouteById.putIfAbsent(device.id, () => route);
     }
+  }
+
+  /// Like [_rememberDeviceRoute] but forces the route even if one is already
+  /// recorded for this id (used when merging a bonded BLE device onto the
+  /// platform/CoreMIDI data path).
+  void _setDeviceRoute(MidiDevice device, _MidiDeviceRoute route) {
+    _deviceRouteByInstance[device] = route;
+    if (device.id.isNotEmpty) {
+      _deviceRouteById[device.id] = route;
+    }
+  }
+
+  /// Waits (in the background) for a freshly bonded BLE peripheral to be exposed
+  /// by the platform (CoreMIDI on Apple) under the same id, then opens that
+  /// endpoint and switches the device's data route to it. No-op where no
+  /// platform counterpart appears (e.g. Android), leaving the BLE transport as
+  /// the data path.
+  Future<void> _handoffBleToPlatform(MidiDevice device) async {
+    const pollInterval = Duration(milliseconds: 500);
+    const maxWait = Duration(seconds: 20);
+    final deadline = DateTime.now().add(maxWait);
+
+    _log('Handoff: waiting for CoreMIDI counterpart of ${device.id}');
+    while (DateTime.now().isBefore(deadline)) {
+      if (_deviceRouteById[device.id] == _MidiDeviceRoute.platform) {
+        // Already handed off (e.g. by a concurrent devices() refresh).
+        return;
+      }
+      final platformDevices = await _platform.devices ?? <MidiDevice>[];
+      MidiDevice? match;
+      for (final candidate in platformDevices) {
+        if (candidate.id == device.id &&
+            candidate.type == MidiDeviceType.ble) {
+          match = candidate;
+          break;
+        }
+      }
+      if (match != null) {
+        _setDeviceRoute(device, _MidiDeviceRoute.platform);
+        _setDeviceRoute(match, _MidiDeviceRoute.platform);
+        try {
+          await _platform.connectToDevice(match);
+          _log('Handoff: connected CoreMIDI endpoint for ${device.id}');
+        } catch (e) {
+          // Leave routing on platform; a later devices() refresh/retry can
+          // re-attempt. The BLE transport connection remains as a fallback.
+          _log('Handoff: platform connect failed for ${device.id}: $e');
+        }
+        return;
+      }
+      await Future<void>.delayed(pollInterval);
+    }
+    _log('Handoff: timed out for ${device.id}; keeping BLE transport data path');
   }
 
   _MidiDeviceRoute _resolveDeviceRoute(MidiDevice device) {

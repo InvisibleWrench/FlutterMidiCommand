@@ -18,6 +18,14 @@ abstract class MidiBleTransport {
   Future<void> startScanningForBluetoothDevices();
   void stopScanningForBluetoothDevices();
   Future<List<MidiDevice>> get devices;
+
+  /// Registers a BLE device that may currently only be known via the host
+  /// platform (for example a bonded peripheral exposed by CoreMIDI that this
+  /// transport never scanned). Lets the transport keep it listed so it remains
+  /// reconnectable by id after the host platform drops it. Returns the
+  /// transport's device instance, or null if unsupported.
+  MidiDevice? registerKnownDevice(String id, String name) => null;
+
   Future<void> connectToDevice(MidiDevice device, {List<MidiPort>? ports});
   void disconnectDevice(MidiDevice device);
   void sendData(Uint8List data, {int? timestamp, String? deviceId});

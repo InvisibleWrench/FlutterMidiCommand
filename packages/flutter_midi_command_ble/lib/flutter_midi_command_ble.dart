@@ -122,6 +122,14 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   @override
   Future<void> startScanningForBluetoothDevices() async {
     _activateIfNeeded();
+    // `onScanResult` only fires for newly-seen peripherals (it ignores ids
+    // already in `_devices`). After a previous discovery/disconnect the device
+    // stays cached, so a fresh scan would emit no `deviceAppeared` and
+    // event-driven UIs would never re-surface it. Re-announce known devices so
+    // listeners refresh and can reconnect.
+    if (_devices.isNotEmpty) {
+      _setupStreamController.add(MidiSetupChange.deviceAppeared);
+    }
     await UniversalBle.startScan(
       scanFilter: ScanFilter(withServices: [midiServiceId]),
     );
@@ -136,6 +144,18 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   Future<List<MidiDevice>> get devices async => _devices.values.toList();
 
   @override
+  MidiDevice? registerKnownDevice(String id, String name) {
+    return _devices.putIfAbsent(
+      id,
+      () => _BleMidiDevice(
+        deviceId: id,
+        name: name,
+        rxStream: _rxStreamController,
+      ),
+    );
+  }
+
+  @override
   Future<void> connectToDevice(
     MidiDevice device, {
     List<MidiPort>? ports,
@@ -144,12 +164,19 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     if (device.type != MidiDeviceType.ble) {
       return;
     }
-    final bleDevice = _devices[device.id];
-    if (bleDevice == null) {
-      throw StateError(
-        'BLE MIDI device ${device.id} is not known by this transport.',
-      );
-    }
+    // Create the device on demand if we only know it by id (e.g. a bonded
+    // peripheral exposed via CoreMIDI that was never scanned in this session).
+    // universal_ble can connect to it by UUID via retrievePeripherals.
+    final bleDevice =
+        _devices[device.id] ??
+        _devices.putIfAbsent(
+          device.id,
+          () => _BleMidiDevice(
+            deviceId: device.id,
+            name: device.name,
+            rxStream: _rxStreamController,
+          ),
+        );
     await bleDevice.connect();
   }
 
