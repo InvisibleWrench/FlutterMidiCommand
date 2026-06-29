@@ -413,7 +413,7 @@ class MyAppState extends State<MyApp> {
           bottomNavigationBar: Container(
             padding: const EdgeInsets.all(24.0),
             child: const Text(
-              "Tap to connnect/disconnect, long press to control.",
+              "Tap to connect/disconnect, long press to control.",
               textAlign: TextAlign.center,
             ),
           ),
