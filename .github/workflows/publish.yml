@@ -1,0 +1,109 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - 'flutter_midi_command-v*'
+      - 'flutter_midi_command_android-v*'
+      - 'flutter_midi_command_ble-v*'
+      - 'flutter_midi_command_darwin-v*'
+      - 'flutter_midi_command_linux-v*'
+      - 'flutter_midi_command_platform_interface-v*'
+      - 'flutter_midi_command_web-v*'
+      - 'flutter_midi_command_windows-v*'
+
+env:
+  FLUTTER_VERSION: '3.44.2'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pub.dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Resolve package from tag
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+
+          case "$tag" in
+            flutter_midi_command_platform_interface-v*)
+              package_name="flutter_midi_command_platform_interface"
+              package_dir="packages/flutter_midi_command_platform_interface"
+              version="${tag#flutter_midi_command_platform_interface-v}"
+              ;;
+            flutter_midi_command_android-v*)
+              package_name="flutter_midi_command_android"
+              package_dir="packages/flutter_midi_command_android"
+              version="${tag#flutter_midi_command_android-v}"
+              ;;
+            flutter_midi_command_darwin-v*)
+              package_name="flutter_midi_command_darwin"
+              package_dir="packages/flutter_midi_command_darwin"
+              version="${tag#flutter_midi_command_darwin-v}"
+              ;;
+            flutter_midi_command_windows-v*)
+              package_name="flutter_midi_command_windows"
+              package_dir="packages/flutter_midi_command_windows"
+              version="${tag#flutter_midi_command_windows-v}"
+              ;;
+            flutter_midi_command_linux-v*)
+              package_name="flutter_midi_command_linux"
+              package_dir="packages/flutter_midi_command_linux"
+              version="${tag#flutter_midi_command_linux-v}"
+              ;;
+            flutter_midi_command_web-v*)
+              package_name="flutter_midi_command_web"
+              package_dir="packages/flutter_midi_command_web"
+              version="${tag#flutter_midi_command_web-v}"
+              ;;
+            flutter_midi_command_ble-v*)
+              package_name="flutter_midi_command_ble"
+              package_dir="packages/flutter_midi_command_ble"
+              version="${tag#flutter_midi_command_ble-v}"
+              ;;
+            flutter_midi_command-v*)
+              package_name="flutter_midi_command"
+              package_dir="."
+              version="${tag#flutter_midi_command-v}"
+              ;;
+            *)
+              echo "Unsupported tag: $tag" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_dir=$package_dir" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches pubspec version
+        shell: bash
+        working-directory: ${{ steps.package.outputs.package_dir }}
+        run: |
+          set -euo pipefail
+
+          package_name="$(grep '^name:' pubspec.yaml | head -n1 | cut -d' ' -f2)"
+          pubspec_version="$(grep '^version:' pubspec.yaml | head -n1 | cut -d' ' -f2)"
+
+          test "$package_name" = "${{ steps.package.outputs.package_name }}"
+          test "$pubspec_version" = "${{ steps.package.outputs.version }}"
+
+      - name: Run publish dry run
+        working-directory: ${{ steps.package.outputs.package_dir }}
+        run: flutter pub publish --dry-run
+
+      - name: Publish package
+        working-directory: ${{ steps.package.outputs.package_dir }}
+        run: flutter pub publish --force
