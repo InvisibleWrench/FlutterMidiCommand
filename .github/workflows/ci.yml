@@ -31,12 +31,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
-      - run: melos run analyze
-      - run: melos run analyze:example
-      - run: melos run test
-      - run: melos run test:web:chrome
+      - run: dart run melos bootstrap
+      - run: dart run melos run analyze
+      - run: dart run melos run analyze:example
+      - run: dart run melos run test
+      - run: dart run melos run test:web:chrome
 
   native_android_checks:
     runs-on: ubuntu-latest
@@ -46,10 +45,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Android native unit tests
-        run: bash ./example/android/gradlew -p example/android :flutter_midi_command_android:testDebugUnitTest
+        run: dart run melos run test:native:android
 
   native_darwin_checks:
     runs-on: macos-latest
@@ -59,10 +57,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Darwin native tests
-        run: melos run test:native:darwin
+        run: dart run melos run test:native:darwin
 
   native_linux_checks:
     runs-on: ubuntu-latest
@@ -72,10 +69,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Linux backend tests
-        run: melos run test:native:linux
+        run: dart run melos run test:native:linux
 
   native_windows_checks:
     runs-on: windows-latest
@@ -85,10 +81,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Windows backend tests
-        run: melos run test:native:windows
+        run: dart run melos run test:native:windows
 
   example_android:
     runs-on: ubuntu-latest
@@ -98,10 +93,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Build example app (Android)
-        run: melos run build:example:android
+        run: dart run melos run build:example:android
       - name: Enable KVM
         run: |
           sudo tee /etc/udev/rules.d/99-kvm4all.rules <<'EOF'
@@ -118,7 +112,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save
-          script: melos run test:example:integration:android
+          script: dart run melos run test:example:integration:android
         env:
           ANDROID_DEVICE_ID: emulator-5554
           ANDROID_SMOKE_MAX_ATTEMPTS: "3"
@@ -135,12 +129,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Build example app (Linux)
-        run: melos run build:example:linux
+        run: dart run melos run build:example:linux
       - name: Run smoke test (Linux)
-        run: xvfb-run -a melos run test:example:integration:linux
+        run: xvfb-run -a dart run melos run test:example:integration:linux
 
   example_apple:
     runs-on: macos-latest
@@ -150,16 +143,15 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Build example app (iOS)
-        run: melos run build:example:ios
+        run: dart run melos run build:example:ios
       - name: Build example app (macOS)
-        run: melos run build:example:macos
+        run: dart run melos run build:example:macos
       - name: Run smoke test (macOS)
-        run: melos run test:example:integration:macos
+        run: dart run melos run test:example:integration:macos
       - name: Run smoke test (iOS simulator)
-        run: melos run test:example:integration:ios
+        run: dart run melos run test:example:integration:ios
         env:
           IOS_SMOKE_MAX_ATTEMPTS: "3"
 
@@ -171,12 +163,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Build example app (Windows)
-        run: melos run build:example:windows
+        run: dart run melos run build:example:windows
       - name: Run smoke test (Windows)
-        run: melos run test:example:integration:windows
+        run: dart run melos run test:example:integration:windows
 
   example_web:
     runs-on: ubuntu-latest
@@ -186,9 +177,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: dart pub global activate melos
-      - run: melos bootstrap
+      - run: dart run melos bootstrap
       - name: Build example app (Web)
-        run: melos run build:example:web
+        run: dart run melos run build:example:web
       - name: Run smoke test (Web Chrome)
-        run: melos run test:example:integration:web
+        run: dart run melos run test:example:integration:web
