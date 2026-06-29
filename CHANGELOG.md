@@ -1,5 +1,4 @@
 ## 1.0.0
-- Upgraded `flutter_midi_command_ble` to `universal_ble 2.0.4`.
 - Aligned CI to Flutter `3.44.2` so the newer BLE dependency resolves in GitHub Actions.
 - Resolved the Windows example build failure caused by deprecated coroutine headers in older `universal_ble` releases.
 - Restructured into a melos-managed federated monorepo.
