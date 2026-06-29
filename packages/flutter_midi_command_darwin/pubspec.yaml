@@ -31,5 +31,7 @@ flutter:
     platforms:
       ios:
         pluginClass: FlutterMidiCommandPlugin
+        sharedDarwinSource: true
       macos:
         pluginClass: SwiftFlutterMidiCommandPlugin
+        sharedDarwinSource: true

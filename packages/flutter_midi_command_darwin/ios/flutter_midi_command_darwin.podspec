@@ -1,6 +1,6 @@
 #
 # To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html.
-# Run `pod lib lint flutter_midi_command_darwin.podspec' to validate before publishing.
+# Run `pod lib lint flutter_midi_command_darwin.podspec` to validate before publishing.
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_midi_command_darwin'
@@ -13,7 +13,7 @@ Pod::Spec.new do |s|
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Invisible Wrench ApS' => 'hello@invisiblewrench.com' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.source_files = '../darwin/Classes/**/*'
   s.test_spec 'Tests' do |test_spec|
     test_spec.source_files = 'Tests/**/*'
   end

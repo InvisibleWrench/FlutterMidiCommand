@@ -61,36 +61,36 @@ func midiDeviceTypeFromLegacy(_ value: String?) -> MidiDeviceType {
 }
 
 public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi {
-    
+
     // MIDI
     var midiClient = MIDIClientRef()
     var connectedDevices = Dictionary<String, ConnectedDevice>()
     var knownDeviceSnapshots = Dictionary<String, String>()
-    
+
     // Internal callback buses used by platform MIDI classes.
     var rxStreamHandler = StreamHandler()
     var setupStreamHandler = StreamHandler()
 
     var pigeonFlutterApi: MidiFlutterApiProtocol?
-    
-    
+
+
 #if os(iOS)
     // Network Session
     var session:MIDINetworkSession?
 #endif
-    
+
     let midiLog = OSLog(subsystem: "com.invisiblewrench.FlutterMidiCommand", category: "MIDI")
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = SwiftFlutterMidiCommandPlugin()
         instance.setup(registrar)
     }
-    
+
     deinit {
         NotificationCenter.default.removeObserver(self)
         MIDIClientDispose(midiClient)
     }
-    
+
     func setup(_ registrar: FlutterPluginRegistrar) {
         #if os(macOS)
         let messenger = registrar.messenger
@@ -109,25 +109,25 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             self?.forwardSetupPayloadToPigeon(payload: payload)
         }
 
-        
+
         // MIDI client with notification handler
         MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &midiClient) { (notification) in
             self.handleMIDINotification(notification)
         }
         knownDeviceSnapshots = currentDeviceSnapshots()
-        
+
 #if os(iOS)
         session = MIDINetworkSession.default()
         session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
 #endif
     }
-    
+
     func updateSetupState(data: MidiSetupChange) {
         DispatchQueue.main.async {
             self.setupStreamHandler.send(data:data)
         }
     }
-    
+
     private func legacyDeviceType(from type: MidiDeviceType) -> String {
         switch type {
         case .serial:
@@ -218,59 +218,59 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         session?.isEnabled = enabled
 #endif
     }
-    
-    
+
+
     // Create an own virtual device appearing in other apps.
     // Other apps can use that device to send and receive MIDI to and from this app.
     var ownVirtualDevices = Set<ConnectedOwnVirtualDevice>()
-    
+
     func findOrCreateOwnVirtualDevice(name: String) -> ConnectedOwnVirtualDevice{
         let existingDevice = ownVirtualDevices.first(where: { device in
             device.name == name
         })
-        
+
         let result = existingDevice ?? ConnectedOwnVirtualDevice(name: name, streamHandler: rxStreamHandler, client: midiClient);
         if(existingDevice == nil){
             ownVirtualDevices.insert(result)
         }
-        
+
         return result
     }
-    
+
     func removeOwnVirtualDevice(name: String){
         let existingDevice = ownVirtualDevices.first(where: { device in
             device.name == name
         })
-        
+
         if let existingDevice = existingDevice {
             existingDevice.close()
             ownVirtualDevices.remove(existingDevice)
         }
     }
-    
+
     // Check if an endpoint is an own virtual destination or source
     func isOwnVirtualEndpoint(endpoint: MIDIEndpointRef) -> Bool{
         return ownVirtualDevices.contains { device in
             device.virtualSourceEndpoint == endpoint || device.virtualDestinationEndpoint == endpoint
         }
     }
-    
-    
+
+
     func teardown() {
         for device in connectedDevices {
             disconnectDevice(deviceId: device.value.id)
         }
     }
-    
-    
+
+
     func connectToDevice(deviceId:String, type:String, ports:[Port]?) {
         midiDebugLog("connect \(deviceId) \(type)")
-        
+
         if type == "own-virtual" {
             let device = ownVirtualDevices.first { device in
                 String(device.id) == deviceId
             }
-            
+
             if let device = device {
                 connectedDevices[device.id] = device
                 (device as ConnectedOwnVirtualDevice).isConnected = true
@@ -287,7 +287,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             pigeonFlutterApi?.onDeviceConnectionStateChanged(deviceId: deviceId, connected: true) { _ in }
         }
     }
-    
+
     func disconnectDevice(deviceId:String) {
         let device = connectedDevices[deviceId]
         midiDebugLog("disconnect \(String(describing: device)) for id \(deviceId)")
@@ -305,11 +305,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             connectedDevices.removeValue(forKey: deviceId)
         }
     }
-    
-    
+
+
     func sendData(_ data:FlutterStandardTypedData, deviceId: String?, timestamp: UInt64?) {
         let bytes = [UInt8](data.data)
-        
+
         if let deviceId = deviceId {
             if let device = connectedDevices[deviceId] {
                 device.send(bytes: bytes, timestamp: timestamp)
@@ -320,8 +320,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             })
         }
     }
-    
-    
+
+
     static func getMIDIProperty(_ prop:CFString, fromObject obj:MIDIObjectRef) -> String {
         var param: Unmanaged<CFString>?
         var result: String = "Error"
@@ -329,10 +329,10 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         if err == OSStatus(noErr) { result = param!.takeRetainedValue() as String }
         return result
     }
-    
+
     static func isNetwork(device:MIDIObjectRef) -> Bool {
         var isNetwork:Bool = false
-        
+
         var list: Unmanaged<CFPropertyList>?
         MIDIObjectGetProperties(device, &list, true)
         if let list = list {
@@ -399,22 +399,22 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
         return false
     }
-    
-    
+
+
     func createPorts(count:Int, isInput: Bool) -> [MidiPort?] {
         return (0..<count).map { id in
             MidiPort(id: Int64(id), connected: false, isInput: isInput)
         }
     }
-    
-    
+
+
     func getDevices() -> [MidiHostDevice] {
         var devices:[MidiHostDevice] = []
-        
+
         // ######
         // Native
         // ######
-        
+
         let deviceCount = MIDIGetNumberOfDevices()
         for d in 0..<deviceCount {
             let device = MIDIGetDevice(d)
@@ -462,28 +462,28 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
         let destinationCount = MIDIGetNumberOfDestinations()
         let sourceCount = MIDIGetNumberOfSources()
-        
+
         // #######
         // VIRTUAL
         // #######
-        
+
         var virtualDevices:[MidiHostDevice] = []
         var destinationIndicesByName = Dictionary<String, [Int]>()
-        
+
         for d in 0..<destinationCount {
             let destination = MIDIGetDestination(d)
-            
+
             if(!isVirtualEndpoint(endpoint: destination)){
                 continue
             }
-            
+
             if(isOwnVirtualEndpoint(endpoint: destination)){
                 continue
             }
-            
+
             let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: destination)
             let deviceId = "\(destination)"
-            
+
             let hostDevice = MidiHostDevice(
                 id: deviceId,
                 name: displayName,
@@ -496,25 +496,25 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             virtualDevices.append(hostDevice)
             destinationIndicesByName[displayName, default: []].append(nextIndex)
         }
-        
-        
+
+
         for s in 0..<sourceCount {
             let source = MIDIGetSource(s)
-            
+
             if(!isVirtualEndpoint(endpoint: source)){
                 continue
             }
-            
+
             if(isOwnVirtualEndpoint(endpoint: source)){
                 continue
             }
-            
+
             let displayName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyDisplayName, fromObject: source)
-            
+
             if var matchedDestinationIndices = destinationIndicesByName[displayName], !matchedDestinationIndices.isEmpty {
                 let index = matchedDestinationIndices.removeFirst()
                 destinationIndicesByName[displayName] = matchedDestinationIndices
-                
+
                 var hostDevice = virtualDevices[index]
                 hostDevice.inputs = createPorts(count: 1, isInput: true)
                 let destination = hostDevice.id ?? ""
@@ -536,15 +536,15 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 )
             }
         }
-        
+
         devices.append(contentsOf: virtualDevices)
-        
-        
-        
+
+
+
         // ###########
         // OWN VIRTUAL
         // ###########
-        
+
         for ownVirtualDevice in self.ownVirtualDevices {
             let displayName = ownVirtualDevice.deviceName
             let deviceId = String(ownVirtualDevice.id)
@@ -612,8 +612,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             updateSetupState(data: .deviceStateChanged)
         }
     }
-    
-    
+
+
     func handleMIDINotification(_ midiNotification: UnsafePointer<MIDINotification>) {
         let notification = midiNotification.pointee
 
@@ -623,16 +623,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         default:
             break
         }
-        
+
         if !midiDebugLoggingEnabled {
             return
         }
-        
+
         midiDebugLog("\ngot a MIDINotification!")
         midiDebugLog("MIDI Notify, messageId= \(notification.messageID) \(notification.messageSize)")
-        
+
         switch notification.messageID {
-            
+
             // Some aspect of the current MIDISetup has changed.  No data.  Should ignore this  message if messages 2-6 are handled.
         case .msgSetupChanged:
             midiDebugLog("MIDI setup changed")
@@ -643,14 +643,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             midiDebugLog("id \(m.messageID)")
             midiDebugLog("size \(m.messageSize)")
             break
-            
-            
+
+
             // A device, entity or endpoint was added. Structure is MIDIObjectAddRemoveNotification.
         case .msgObjectAdded:
-            
+
             midiDebugLog("added")
             //            let ptr = UnsafeMutablePointer<MIDIObjectAddRemoveNotification>(midiNotification)
-            
+
             midiNotification.withMemoryRebound(to: MIDIObjectAddRemoveNotification.self, capacity: 1) {
                 let m = $0.pointee
                 midiDebugLog("\(m)")
@@ -664,16 +664,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 showMIDIObjectType(m.parentType)
                 //                midiDebugLog("childName \(String(describing: getDisplayName(m.child)))")
             }
-            
-            
+
+
             break
-            
+
             // A device, entity or endpoint was removed. Structure is MIDIObjectAddRemoveNotification.
         case .msgObjectRemoved:
             midiDebugLog("kMIDIMsgObjectRemoved")
             //            let ptr = UnsafeMutablePointer<MIDIObjectAddRemoveNotification>(midiNotification)
             midiNotification.withMemoryRebound(to: MIDIObjectAddRemoveNotification.self, capacity: 1) {
-                
+
                 let m = $0.pointee
                 midiDebugLog("\(m)")
                 midiDebugLog("id \(m.messageID)")
@@ -682,16 +682,16 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 midiDebugLog("child type \(m.childType)")
                 midiDebugLog("parent \(m.parent)")
                 midiDebugLog("parentType \(m.parentType)")
-                
+
                 //                midiDebugLog("childName \(String(describing: getDisplayName(m.child)))")
             }
             break
-            
+
             // An object's property was changed. Structure is MIDIObjectPropertyChangeNotification.
         case .msgPropertyChanged:
             midiDebugLog("kMIDIMsgPropertyChanged")
             midiNotification.withMemoryRebound(to: MIDIObjectPropertyChangeNotification.self, capacity: 1) {
-                
+
                 let m = $0.pointee
                 midiDebugLog("\(m)")
                 midiDebugLog("id \(m.messageID)")
@@ -700,27 +700,27 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 midiDebugLog("objectType  \(m.objectType)")
                 midiDebugLog("propertyName  \(m.propertyName)")
                 midiDebugLog("propertyName  \(m.propertyName.takeUnretainedValue())")
-                
+
                 if m.propertyName.takeUnretainedValue() as String == "apple.midirtp.session" {
                     midiDebugLog("connected")
                 }
             }
-            
+
             break
-            
+
             //     A persistent MIDI Thru connection wasor destroyed.  No data.
         case .msgThruConnectionsChanged:
             midiDebugLog("MIDI thru connections changed.")
             break
-            
+
             //A persistent MIDI Thru connection was created or destroyed.  No data.
         case .msgSerialPortOwnerChanged:
             midiDebugLog("MIDI serial port owner changed.")
             break
-            
+
         case .msgIOError:
             midiDebugLog("MIDI I/O error.")
-            
+
             //let ptr = UnsafeMutablePointer<MIDIIOErrorNotification>(midiNotification)
             midiNotification.withMemoryRebound(to: MIDIIOErrorNotification.self, capacity: 1) {
                 let m = $0.pointee
@@ -735,51 +735,51 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             break
         }
     }
-    
+
     func showMIDIObjectType(_ ot: MIDIObjectType) {
         switch ot {
         case .other:
             os_log("midiObjectType: Other", log: midiLog, type: .debug)
             break
-            
+
         case .device:
             os_log("midiObjectType: Device", log: midiLog, type: .debug)
             break
-            
+
         case .entity:
             os_log("midiObjectType: Entity", log: midiLog, type: .debug)
             break
-            
+
         case .source:
             os_log("midiObjectType: Source", log: midiLog, type: .debug)
             break
-            
+
         case .destination:
             os_log("midiObjectType: Destination", log: midiLog, type: .debug)
             break
-            
+
         case .externalDevice:
             os_log("midiObjectType: ExternalDevice", log: midiLog, type: .debug)
             break
-            
+
         case .externalEntity:
             midiDebugLog("midiObjectType: ExternalEntity")
             os_log("midiObjectType: ExternalEntity", log: midiLog, type: .debug)
             break
-            
+
         case .externalSource:
             os_log("midiObjectType: ExternalSource", log: midiLog, type: .debug)
             break
-            
+
         case .externalDestination:
             os_log("midiObjectType: ExternalDestination", log: midiLog, type: .debug)
             break
         @unknown default:
             break
         }
-        
+
     }
-    
+
 #if os(iOS)
     /// MIDI Network Session
     @objc func midiNetworkChanged(notification:NSNotification) {
@@ -795,7 +795,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             midiDebugLog("destinationEndpoint \(session.destinationEndpoint())")
             midiDebugLog("networkName \(session.networkName)")
             midiDebugLog("localName \(session.localName)")
-            
+
             //            if let name = getDeviceName(session.sourceEndpoint()) {
             //                midiDebugLog("source name \(name)")
             //            }
@@ -806,7 +806,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         }
         updateSetupState(data: .deviceStateChanged)
     }
-    
+
     @objc func midiNetworkContactsChanged(notification:NSNotification) {
         midiDebugLog("\(#function)")
         midiDebugLog("\(notification)")
@@ -823,7 +823,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
 class StreamHandler : NSObject {
     var onSend: ((Any) -> Void)?
-    
+
     func send(data: Any) {
         onSend?(data)
     }
@@ -832,7 +832,7 @@ class StreamHandler : NSObject {
 class Port {
     var id:Int
     var type:String
-    
+
     init(id:Int, type:String) {
         self.id = id;
         self.type = type
@@ -843,17 +843,17 @@ class ConnectedDevice : NSObject {
     var id:String
     var deviceType:String
     var streamHandler : StreamHandler
-    
+
     init(id:String, type:String, streamHandler:StreamHandler) {
         self.id = id
         self.deviceType = type
         self.streamHandler = streamHandler
     }
-    
+
     func openPorts() {}
-    
+
     func send(bytes:[UInt8], timestamp: UInt64?) {}
-    
+
     func close() {}
 }
 
@@ -866,12 +866,12 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     var outEndpoint : MIDIEndpointRef?
     var inSource : MIDIEndpointRef?
     var deviceInfo: MidiHostDevice
-    
+
     init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
         self.client = client
         self.ports = ports
-        
-        
+
+
         deviceInfo = MidiHostDevice(
             id: id,
             name: name,
@@ -880,13 +880,13 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             inputs: nil,
             outputs: nil
         )
-        
+
         super.init(id: id, type: type, streamHandler: streamHandler)
     }
-    
+
     override func send(bytes: [UInt8], timestamp: UInt64?) {
         midiDebugLog("send \(bytes.count) bytes to \(String(describing: name))")
-        
+
         if let ep = outEndpoint {
             splitDataIntoMIDIPackets(bytes: bytes, timestamp: timestamp) { packetListPointer in
                 MIDISend(outputPort, ep, packetListPointer)
@@ -895,24 +895,24 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             midiDebugLog("No MIDI destination for id \(name ?? "<unknown>")")
         }
     }
-    
+
     func splitDataIntoMIDIPackets(bytes:[UInt8], timestamp: UInt64?, packetCallback:(UnsafePointer<MIDIPacketList>) -> Void) {
         let maxPacketSize = 256 // Maximum size for a single packet's data field
         var offset = 0
         let ts = timestamp ?? mach_absolute_time()
-        
+
         while offset < bytes.count {
             var packetList = MIDIPacketList()
-            
+
             // Calculate the size of the current chunk
             let chunkSize = min(maxPacketSize, bytes.count - offset)
             let chunk = Array(bytes[offset..<offset + chunkSize])
-            
+
             // Create the packet
             chunk.withUnsafeBufferPointer { buffer in
                 packetList = buffer.withMemoryRebound(to: UInt8.self) { dataBuffer in
                     var tempPacketList = MIDIPacketList(numPackets: 1, packet: MIDIPacket())
-                    
+
                     var packet = MIDIPacket()
                     packet.timeStamp = ts
                     packet.length = UInt16(dataBuffer.count)
@@ -923,36 +923,36 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
                             }
                         }
                     }
-                    
+
                     tempPacketList.packet = packet
                     return tempPacketList
                 }
             }
-            
+
             // Send the packet
             withUnsafePointer(to: &packetList) { packetListPointer in
                 packetCallback(packetListPointer)
             }
-            
+
             // Move to the next chunk
             offset += chunkSize
         }
     }
-    
+
     override func close() {
         // We did not create the endpoint so we should not dispose it.
         // if let oEP = outEndpoint {
         //   MIDIEndpointDispose(oEP)
         // }
-        
+
         if let iS = inSource {
             MIDIPortDisconnectSource(inputPort, iS)
         }
-        
+
         MIDIPortDispose(inputPort)
         MIDIPortDispose(outputPort)
     }
-    
+
     var buffer = UnsafeMutablePointer<MIDIPacket>.allocate(capacity: 2) // Don't know why I need to a capacity of 2 here. If I setup 1 I'm getting a crash.
     private lazy var midiPacketParser = MidiPacketParser { [weak self] bytes, timestamp in
         guard let self else {
@@ -968,13 +968,13 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
             )
         }
     }
-    
+
     func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
         let packets = packetList.pointee
         let packet:MIDIPacket = packets.packet
         var ap = buffer;
         buffer.initialize(to:packet)
-        
+
         for _ in 0 ..< packets.numPackets {
             let p = ap.pointee
             var tmp = p.data
@@ -988,21 +988,21 @@ class ConnectedVirtualOrNativeDevice : ConnectedDevice {
     func parseData(data: Data, timestamp: UInt64) {
         midiPacketParser.parse(data: data, timestamp: timestamp)
     }
-    
+
 }
 
 
 class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
-    
+
     var entity : MIDIEntityRef?
     var selectedPortIndex: Int = 0
-    
+
     override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
         super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
-        
+
         self.ports = ports
         let idParts = id.split(separator: ":")
-        
+
         // Store entity and get device/entity name
         if idParts.count >= 2, let deviceId = MIDIDeviceRef(idParts[0]) {
             if let entityId = Int(idParts[1]) {
@@ -1012,11 +1012,11 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
                 entity = MIDIDeviceGetEntity(deviceId, entityId)
                 if let e = entity {
                     let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: e)
-                    
+
                     var device:MIDIDeviceRef = 0
                     MIDIEntityGetDevice(e, &device)
                     let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-                    
+
                     name = "\(deviceName) \(entityName)"
                 } else {
                     midiDebugLog("no entity")
@@ -1027,8 +1027,8 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         } else {
             midiDebugLog("no deviceId")
         }
-        
-        
+
+
         deviceInfo = MidiHostDevice(
             id: String(id),
             name: name,
@@ -1037,26 +1037,26 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             inputs: nil,
             outputs: nil
         )
-        
-        
+
+
         // MIDI Input with handler
         MIDIInputPortCreateWithBlock(client, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
             self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
         }
-        
+
         // MIDI output
         MIDIOutputPortCreate(client, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
-        
+
         openPorts()
     }
-    
+
     override func openPorts() {
         midiDebugLog("open native ports")
-        
+
         if let e = entity {
-            
+
             let ref = Unmanaged.passUnretained(self).toOpaque()
-            
+
             if let ps = ports {
                 for port in ps {
                     switch port.type {
@@ -1087,7 +1087,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             }
         }
     }
-    
+
     override func close() {
         /*
          if let oEP = outEndpoint {
@@ -1097,40 +1097,40 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         if let iS = inSource {
             MIDIPortDisconnectSource(inputPort, iS)
         }
-        
+
         MIDIPortDispose(inputPort)
         MIDIPortDispose(outputPort)
     }
-    
+
     override func handlePacketList(_ packetList:UnsafePointer<MIDIPacketList>, srcConnRefCon:UnsafeMutableRawPointer?) {
         //        let deviceInfo = ["name" : name,
         //                          "id": String(id),
         //                          "type":"native"]
-        
+
         var timestampFactor : Double = 1.0
         var tb = mach_timebase_info_data_t()
         let kError = mach_timebase_info(&tb)
         if (kError == 0) {
             timestampFactor = Double(tb.numer) / Double(tb.denom)
         }
-        
+
         // New implementation: Handles packages with a size larger then 256 bytes
         if #available(macOS 10.15, iOS 13.0, *) {
             let packetListSize = MIDIPacketList.sizeInBytes(pktList: packetList)
-            
+
             // Copy raw data from packetList
             let packetListAsRawData = Data(bytes: packetList, count: packetListSize)
             var packetNumber = 0
-            
+
             for packet in packetList.unsafeSequence() {
                 let offsetStart = getOffsetForPackageData(packetList: packetList, packageNumber: (Int)(packetNumber))
                 let offsetEnd = (offsetStart + (Int)(packet.pointee.length) - 1)
                 let packetData = packetListAsRawData.subdata(in: Range(offsetStart...offsetEnd))
 
                 let timestamp = UInt64(round(Double(packet.pointee.timeStamp) * timestampFactor))
-                
+
                 parseData(data: packetData, timestamp: timestamp)
-                
+
                 packetNumber += 1
             }
         } else {
@@ -1141,7 +1141,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             let packet:MIDIPacket = packets.packet // This will only copy the first 256 bytes!
             var ap = buffer
             ap.initialize(to:packet)
-            
+
             //        midiDebugLog("tb \(tb) timestamp \(timestampFactor)")
             for _ in 0 ..< packets.numPackets {
                 let p = ap.pointee
@@ -1154,7 +1154,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
             //        ap.deallocate()
         }
     }
-    
+
     func getOffsetForPackageData(packetList: UnsafePointer<MIDIPacketList>, packageNumber: Int) -> Int {
             if #available(macOS 10.15, iOS 13.0, *) {
                 var packageCount = 0
@@ -1162,7 +1162,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
                     if (packageCount == packageNumber) {
                         return (Int)(UInt(bitPattern:Int(Int(bitPattern: packet))) - UInt(bitPattern:Int(Int(bitPattern: packetList)))) + MemoryLayout.offset(of: \MIDIPacket.data)!
                     }
-                        
+
                     packageCount += 1
                 }
             }
@@ -1171,31 +1171,31 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
 }
 
 class ConnectedVirtualDevice : ConnectedVirtualOrNativeDevice {
-    
+
     override init(id:String, type:String, streamHandler:StreamHandler, client: MIDIClientRef, ports:[Port]?) {
-        
+
         super.init(id:id, type: type, streamHandler: streamHandler, client: client, ports: ports)
-        
+
         let idParts = id.split(separator: ":")
         assert(idParts.count > 0);
         outEndpoint = idParts.count > 0 && idParts[0].count > 0 ? MIDIEndpointRef(idParts[0]) : nil;
         inSource = idParts.count > 1 && idParts[1].count > 0 ? MIDIEndpointRef(idParts[1]) : nil;
-        
+
         name = displayName(endpoint: outEndpoint ?? inSource ?? 0);
-        
+
         // MIDI Input with handler
         MIDIInputPortCreateWithBlock(client, "FlutterMidiCommand_InPort" as CFString, &inputPort) { (packetList, srcConnRefCon) in
             self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
         }
-        
+
         // MIDI output
         MIDIOutputPortCreate(client, "FlutterMidiCommand_OutPort" as CFString, &outputPort);
-        
+
         openPorts()
     }
-    
+
     override func openPorts() {
-        
+
         if(inSource != nil){
             let ref = Unmanaged.passUnretained(self).toOpaque()
             MIDIPortConnectSource(inputPort, inSource!, ref);
@@ -1212,24 +1212,24 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         initVirtualDestination()
         self.name = name
     }
-    
+
     override func openPorts() {}
-    
+
     var virtualSourceEndpoint: MIDIClientRef = 0
     var virtualDestinationEndpoint: MIDIClientRef = 0
     let midiClient: MIDIClientRef
     let deviceName: String
     var isConnected = false
     var errors: Array<String> = []
-    
-    
+
+
     override func send(bytes: [UInt8], timestamp: UInt64?) {
-        
+
         if(!isConnected){
             return;
         }
-        
-        
+
+
         splitDataIntoMIDIPackets(bytes: bytes, timestamp: timestamp) { packetListPointer in
             let status = MIDIReceived(virtualSourceEndpoint, packetListPointer)
             if(status != noErr){
@@ -1238,28 +1238,28 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
                 midiDebugLog(error)
             }
         }
-        
+
 //        let packetList = UnsafeMutablePointer<MIDIPacketList>.allocate(capacity: 1)
 //        var packet = MIDIPacketListInit(packetList)
 //        let time = MIDITimeStamp(timestamp ?? mach_absolute_time())
 //        packet = MIDIPacketListAdd(packetList, 1024, packet, time, bytes.count, bytes)
-        
+
 //        let status = MIDIReceived(virtualSourceEndpoint, packetList)
 //        if(status != noErr){
 //            let error = "Error \(status) while publishing MIDI on own virtual source endpoint."
 //            errors.append(error)
 //            midiDebugLog(error)
 //        }
-        
+
 //        packetList.deallocate()
     }
-    
+
     override func close() {
         closeVirtualSource()
         closeVirtualDestination()
     }
-    
-    
+
+
     func initVirtualSource(){
         let s = MIDISourceCreate(midiClient, deviceName as CFString, &virtualSourceEndpoint);
         if(s != noErr){
@@ -1268,22 +1268,22 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             midiDebugLog(error)
             return
         }
-        
+
         // Attempt to use saved unique ID
         let defaults = UserDefaults.standard
         var uniqueID = Int32(defaults.integer(forKey: "FlutterMIDICommand Saved Virtual Source ID \(deviceName)"))
-        
+
         //Set unique ID if available
         if ( uniqueID != 0 )
         {
             let s = MIDIObjectSetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, uniqueID);
-            
+
             if ( s == kMIDIIDNotUnique )
             {
                 uniqueID = 0;
             }
         }
-        
+
         // Create and save a new unique id
         if ( uniqueID == 0 ) {
             let s = MIDIObjectGetIntegerProperty(virtualSourceEndpoint, kMIDIPropertyUniqueID, &uniqueID);
@@ -1292,13 +1292,13 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
                 errors.append(error)
                 midiDebugLog(error)
             }
-            
+
             if ( s == noErr ) {
                 defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Source ID \(deviceName)")
             }
         }
     }
-    
+
     func closeVirtualSource(){
         let s = MIDIEndpointDispose(virtualSourceEndpoint);
         if(s != noErr){
@@ -1307,17 +1307,17 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             midiDebugLog(error)
         }
     }
-    
+
     func initVirtualDestination(){
-        
-        
+
+
         let s = MIDIDestinationCreateWithBlock(midiClient, deviceName as CFString, &virtualDestinationEndpoint) { (packetList, srcConnRefCon) in
             if(self.isConnected){
                 self.handlePacketList(packetList, srcConnRefCon: srcConnRefCon)
             }
         }
-        
-        
+
+
         if ( s != noErr ) {
             if(s == -10844){
                 let error = "Error while creating virtual MIDI destination. You need to add the key 'UIBackgroundModes' with value 'audio' to your Info.plist file"
@@ -1326,11 +1326,11 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             }
             return;
         }
-        
+
         // Attempt to use saved unique ID
         let defaults = UserDefaults.standard
         var uniqueID = Int32(defaults.integer(forKey: "FlutterMIDICommand Saved Virtual Destination ID  \(deviceName)"))
-        
+
         if ( uniqueID != 0 )
         {
             let s = MIDIObjectSetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, uniqueID)
@@ -1342,7 +1342,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
         // Save the ID
         if ( uniqueID == 0 ) {
             let s = MIDIObjectGetIntegerProperty(virtualDestinationEndpoint, kMIDIPropertyUniqueID, &uniqueID)
-            
+
             if ( s == noErr ) {
                 defaults.set(uniqueID, forKey: "FlutterMIDICommand Saved Virtual Destination ID \(deviceName)")
             }
@@ -1353,7 +1353,7 @@ class ConnectedOwnVirtualDevice : ConnectedVirtualOrNativeDevice {
             }
         }
     }
-    
+
     func closeVirtualDestination(){
         let s = MIDIEndpointDispose(virtualDestinationEndpoint);
         if(s != 0){

@@ -1,5 +1,5 @@
 import XCTest
-@testable import flutter_midi_command
+@testable import flutter_midi_command_darwin
 
 final class MidiPacketParserTests: XCTestCase {
     func testParsesChannelMessagesWithRunningStatus() {
