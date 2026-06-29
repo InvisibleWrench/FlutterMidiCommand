@@ -30,7 +30,7 @@ flutter:
     implements: flutter_midi_command
     platforms:
       ios:
-        pluginClass: FlutterMidiCommandPlugin
+        pluginClass: SwiftFlutterMidiCommandPlugin
         sharedDarwinSource: true
       macos:
         pluginClass: SwiftFlutterMidiCommandPlugin

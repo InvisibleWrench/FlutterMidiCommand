@@ -21,7 +21,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: dart run melos bootstrap
       - run: dart run pigeon --input pigeons/midi_api.dart
-      - run: git diff --exit-code -- packages/flutter_midi_command_platform_interface/lib/src/pigeon packages/flutter_midi_command_android/android/src/main/kotlin/com/invisiblewrench/fluttermidicommand/pigeon packages/flutter_midi_command_darwin/ios/Classes/pigeon
+      - run: git diff --exit-code -- packages/flutter_midi_command_platform_interface/lib/src/pigeon packages/flutter_midi_command_android/android/src/main/kotlin/com/invisiblewrench/fluttermidicommand/pigeon packages/flutter_midi_command_darwin/darwin/flutter_midi_command_darwin/Sources/flutter_midi_command_darwin/pigeon
 
   dart_checks:
     runs-on: ubuntu-latest

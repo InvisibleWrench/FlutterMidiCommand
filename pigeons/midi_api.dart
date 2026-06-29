@@ -11,7 +11,7 @@ import 'package:pigeon/pigeon.dart';
       package: 'com.invisiblewrench.fluttermidicommand.pigeon',
     ),
     swiftOut:
-        'packages/flutter_midi_command_darwin/ios/Classes/pigeon/MidiApi.g.swift',
+        'packages/flutter_midi_command_darwin/darwin/flutter_midi_command_darwin/Sources/flutter_midi_command_darwin/pigeon/MidiApi.g.swift',
     swiftOptions: SwiftOptions(),
   ),
 )

@@ -16,7 +16,9 @@ physical and virtual MIDI devices.
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Invisible Wrench ApS' => 'hello@invisiblewrench.com' }
   s.source           = { :path => '.' }
-  s.source_files     = 'Classes/**/*'
+  # Sources live in the Swift Package so CocoaPods and Swift Package Manager
+  # share one source of truth.
+  s.source_files     = 'flutter_midi_command_darwin/Sources/flutter_midi_command_darwin/**/*.swift'
 
   s.ios.dependency 'Flutter'
   s.osx.dependency 'FlutterMacOS'
