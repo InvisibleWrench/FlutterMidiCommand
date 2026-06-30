@@ -472,7 +472,9 @@ void main() {
 
       midi.disconnectDevice(device);
       expect(platform.disconnected, contains('host-ble-1'));
-      expect(ble.disconnected, isEmpty);
+      // A bonded BLE device also holds the underlying universal_ble link used
+      // to pair/bond, so disconnect releases it too (a no-op when none is held).
+      expect(ble.disconnected, contains('host-ble-1'));
     },
   );
 
