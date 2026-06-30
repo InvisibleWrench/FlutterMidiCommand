@@ -22,7 +22,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   web: ^1.1.1
-  flutter_midi_command_platform_interface: ^1.0.2
+  flutter_midi_command_platform_interface: ^1.0.1
 
 dev_dependencies:
   flutter_test:
