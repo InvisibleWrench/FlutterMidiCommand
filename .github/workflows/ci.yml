@@ -143,6 +143,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      # The example integrates Apple plugins via Swift Package Manager (no
+      # Podfile). Enable SPM explicitly so the build is deterministic across
+      # Flutter versions/defaults.
+      - name: Enable Swift Package Manager
+        run: flutter config --enable-swift-package-manager
       - run: dart run melos bootstrap
       - name: Build example app (iOS)
         run: dart run melos run build:example:ios
