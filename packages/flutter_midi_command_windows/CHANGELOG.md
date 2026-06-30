@@ -1,3 +1,7 @@
+## 1.0.2
+
+ - **FIX**: port to win32 6, csv 8 and file_picker 12 APIs.
+
 ## 1.0.1
 
  - Update a dependency to the latest release.

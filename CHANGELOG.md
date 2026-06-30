@@ -1,3 +1,9 @@
+## 1.0.2
+
+ - **FIX**: update example app to iOS v14 minimum.
+ - **FIX**: port to win32 6, csv 8 and file_picker 12 APIs.
+ - **FIX**: example app dependency update.
+
 ## 1.0.1
  - fix(darwin) fix corebluetooth to coremidi handover
 
