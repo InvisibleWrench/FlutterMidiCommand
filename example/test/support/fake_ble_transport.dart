@@ -61,6 +61,9 @@ class FakeBleTransport implements MidiBleTransport {
       scanning ? <MidiDevice>[bleDevice] : <MidiDevice>[];
 
   @override
+  MidiDevice? registerKnownDevice(String id, String name) => null;
+
+  @override
   Future<void> connectToDevice(
     MidiDevice device, {
     List<MidiPort>? ports,

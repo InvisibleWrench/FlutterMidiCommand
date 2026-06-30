@@ -101,6 +101,9 @@ class _FakeBleTransport implements MidiBleTransport {
   ];
 
   @override
+  MidiDevice? registerKnownDevice(String id, String name) => null;
+
+  @override
   Future<void> connectToDevice(
     MidiDevice device, {
     List<MidiPort>? ports,
