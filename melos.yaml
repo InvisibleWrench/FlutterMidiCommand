@@ -4,6 +4,13 @@ packages:
   - packages/**
   - example
 
+command:
+  version:
+    # The root package (flutter_midi_command) shares its CHANGELOG.md with the
+    # workspace root, so the generated workspace changelog would overwrite the
+    # package's own changelog. Disable it and keep per-package changelogs only.
+    workspaceChangelog: false
+
 scripts:
   bootstrap:
     run: dart run melos bootstrap
