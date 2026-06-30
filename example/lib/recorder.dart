@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -59,19 +60,20 @@ class MidiRecorder extends ChangeNotifier {
         )
         .toList();
 
-    var csv = const ListToCsvConverter().convert(rows);
+    final csvString = Csv().encode(rows);
 
-    String? outputFile = await FilePicker.platform.saveFile(
+    String? outputFile = await FilePicker.saveFile(
       dialogTitle: 'Please select an output file:',
       fileName: 'midi_recording.csv',
       type: FileType.custom,
       allowedExtensions: ['csv'],
+      bytes: utf8.encode(csvString),
     );
 
     if (outputFile == null) {
       // User canceled the picker
     } else {
-      await File(outputFile).writeAsString(csv);
+      await File(outputFile).writeAsString(csvString);
     }
 
     print("recording exported");

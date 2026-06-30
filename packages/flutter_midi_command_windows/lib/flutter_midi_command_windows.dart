@@ -424,8 +424,14 @@ String midiErrorMessage(int status) {
   }
 }
 
+// win32 6 types the MIDIINPROC callback with the HMIDIIN extension type, which
+// `NativeCallable` can't accept directly. Declare the equivalent native
+// signature explicitly instead; HMIDIIN is pointer-sized, so receiving it as an
+// IntPtr (int address) is ABI-compatible and keeps the int-based device lookup.
 final NativeCallable<Void Function(IntPtr, Uint32, IntPtr, IntPtr, IntPtr)>
-_midiCB = NativeCallable<MIDIINPROC>.listener(_onMidiData);
+_midiCB =
+    NativeCallable<Void Function(IntPtr, Uint32, IntPtr, IntPtr, IntPtr)>
+        .listener(_onMidiData);
 
 const int mHdrDone = 0x00000001;
 const int mHdrPrepared = 0x00000002;
