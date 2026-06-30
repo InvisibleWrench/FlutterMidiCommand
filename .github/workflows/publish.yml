@@ -22,8 +22,35 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read
     steps:
       - uses: actions/checkout@v6
+
+      # Only publish if the CI workflow for this exact commit succeeded.
+      # The tagged commit lives on a pushed branch, so CI (ci.yml) runs the
+      # full test matrix against it; here we wait for that run and require
+      # success before publishing.
+      - name: Require successful CI for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="${GITHUB_SHA}"
+          echo "Locating CI run for commit $sha ..."
+          run_id=""
+          for i in $(seq 1 30); do
+            run_id="$(gh run list --workflow=ci.yml --commit="$sha" \
+              --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            [ -n "$run_id" ] && break
+            echo "No CI run for $sha yet, retrying ($i/30)..."
+            sleep 20
+          done
+          if [ -z "$run_id" ]; then
+            echo "::error::No CI run found for commit $sha; refusing to publish."
+            exit 1
+          fi
+          echo "Waiting for CI run $run_id to conclude..."
+          gh run watch "$run_id" --exit-status --interval 30
 
       - uses: subosito/flutter-action@v2
         with:
