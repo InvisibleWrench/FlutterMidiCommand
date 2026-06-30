@@ -1,3 +1,7 @@
+## 1.0.1
+
+ - Update a dependency to the latest release.
+
 ## 1.0.0
 
 - Updated the shared BLE transport and tests for the `universal_ble` 2.x API.

@@ -15,27 +15,36 @@ Packages with breaking changes:
 
 Packages with other changes:
 
- - [`flutter_midi_command` - `v1.0.1`](#flutter_midi_command---v101)
+ - [`flutter_midi_command_platform_interface` - `v1.0.1`](#flutter_midi_command_platform_interface---v101)
+ - [`flutter_midi_command` - `v1.0.2`](#flutter_midi_command---v102)
+ - [`flutter_midi_command_windows` - `v1.0.1`](#flutter_midi_command_windows---v101)
+ - [`flutter_midi_command_linux` - `v1.0.1`](#flutter_midi_command_linux---v101)
+ - [`flutter_midi_command_android` - `v1.0.1`](#flutter_midi_command_android---v101)
+ - [`flutter_midi_command_web` - `v1.0.1`](#flutter_midi_command_web---v101)
+ - [`flutter_midi_command_darwin` - `v1.0.1`](#flutter_midi_command_darwin---v101)
+ - [`flutter_midi_command_ble` - `v1.0.1`](#flutter_midi_command_ble---v101)
+
+Packages with dependency updates only:
+
+> Packages listed below depend on other packages in this workspace that have had changes. Their versions have been incremented to bump the minimum dependency versions of the packages they depend upon in this project.
+
+ - `flutter_midi_command` - `v1.0.2`
+ - `flutter_midi_command_windows` - `v1.0.1`
+ - `flutter_midi_command_linux` - `v1.0.1`
+ - `flutter_midi_command_android` - `v1.0.1`
+ - `flutter_midi_command_web` - `v1.0.1`
+ - `flutter_midi_command_darwin` - `v1.0.1`
+ - `flutter_midi_command_ble` - `v1.0.1`
 
 ---
 
-#### `flutter_midi_command` - `v1.0.1`
+#### `flutter_midi_command_platform_interface` - `v1.0.1`
 
- - **FIX**(android): wrap MethodChannel.Result in thread-safe SafeResult to prevent 'Reply already submitted' crash.
- - **FIX**(android): match native device by `Device.deviceIdForInfo`.
- - **FIX**: resolve too many MIDI listeners for UID = xxxx.
- - **FIX**: Make sure "timestamp" is an UInt64 so it doesn't overflow on 32-bit systems.
- - **FIX**: Network Session on iOS and macOS broke while adding the Virtual Device feature.
- - **FEAT**: allow devices without midi support.
+ - fix(darwin) fix corebluetooth to coremidi handover
 
-## 1.0.1
+## 1.0.2
 
- - **FIX**(android): wrap MethodChannel.Result in thread-safe SafeResult to prevent 'Reply already submitted' crash.
- - **FIX**(android): match native device by `Device.deviceIdForInfo`.
- - **FIX**: resolve too many MIDI listeners for UID = xxxx.
- - **FIX**: Make sure "timestamp" is an UInt64 so it doesn't overflow on 32-bit systems.
- - **FIX**: Network Session on iOS and macOS broke while adding the Virtual Device feature.
- - **FEAT**: allow devices without midi support.
+ - Update a dependency to the latest release.
 
 ## 1.0.0
 - Aligned CI to Flutter `3.44.2` so the newer BLE dependency resolves in GitHub Actions.

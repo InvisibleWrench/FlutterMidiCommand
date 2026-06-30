@@ -1,6 +1,6 @@
 name: flutter_midi_command_web
 description: Web MIDI browser implementation for flutter_midi_command.
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
 repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_web
 issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues
@@ -22,7 +22,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   web: ^1.1.1
-  flutter_midi_command_platform_interface: ^1.0.0
+  flutter_midi_command_platform_interface: ^1.0.1
 
 dev_dependencies:
   flutter_test:

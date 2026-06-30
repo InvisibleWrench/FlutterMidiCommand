@@ -1,3 +1,7 @@
+## 1.0.1
+
+ - Update a dependency to the latest release.
+
 ## Unreleased
 - Fixed Linux connection lifecycle handling, including stale-wrapper disconnects and received-message subscription cleanup.
 - Fixed targeted sends so `deviceId` sends only to the requested connected Linux device.
