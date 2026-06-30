@@ -246,6 +246,7 @@ class MyAppState extends State<MyApp> {
       print("start bluetooth");
     }
     await _midiCommand.startBluetooth().catchError((err) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(err.toString()),
       ));
@@ -262,7 +263,7 @@ class MyAppState extends State<MyApp> {
       }
     });
 
-    if (!mounted) {
+    if (!context.mounted) {
       return;
     }
 
@@ -272,7 +273,7 @@ class MyAppState extends State<MyApp> {
           print("Error $err");
         }
       });
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
       setState(() {
@@ -647,6 +648,7 @@ class MyAppState extends State<MyApp> {
                   print("device connected async");
                 }
               }).catchError((err) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text(
                         "Error: ${(err as PlatformException?)?.message}")));

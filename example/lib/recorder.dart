@@ -76,7 +76,7 @@ class MidiRecorder extends ChangeNotifier {
       await File(outputFile).writeAsString(csvString);
     }
 
-    print("recording exported");
+    debugPrint("recording exported");
   }
 
   clearRecording() {

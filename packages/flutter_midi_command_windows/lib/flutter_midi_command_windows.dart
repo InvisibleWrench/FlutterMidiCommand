@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_midi_command_windows/src/windows_device_discovery.dart';
@@ -486,21 +487,21 @@ void _onMidiData(
         }
       } else {
         if ((midiHdr.dwFlags & mHdrPrepared) != 0) {
-          print('MHDR_PREPARED is set');
+          debugPrint('MHDR_PREPARED is set');
         }
         if ((midiHdr.dwFlags & mHdrInQueue) != 0) {
-          print('MHDR_INQUEUE is set');
+          debugPrint('MHDR_INQUEUE is set');
         }
       }
       break;
     case MM_MIM_MOREDATA:
-      print("More data - unhandled!");
+      debugPrint("More data - unhandled!");
       break;
     case MM_MIM_ERROR:
-      print("Error");
+      debugPrint("Error");
       break;
     case MM_MIM_LONGERROR:
-      print("Long error");
+      debugPrint("Long error");
       break;
   }
 }

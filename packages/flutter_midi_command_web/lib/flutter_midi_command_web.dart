@@ -1,3 +1,6 @@
+// buildWebMidiDevices and its snapshot types are an internal, test-visible
+// helper surface; exposing the private types here is intentional.
+// ignore_for_file: library_private_types_in_public_api
 import 'dart:async';
 import 'dart:typed_data';
 

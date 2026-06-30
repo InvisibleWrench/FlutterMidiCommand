@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:win32/win32.dart';
 
@@ -71,7 +71,7 @@ class WindowsMidiDevice extends MidiDevice {
         CALLBACK_FUNCTION,
       );
       if (result != 0) {
-        print("OPEN ERROR($result): ${midiErrorMessage(result)}");
+        debugPrint("OPEN ERROR($result): ${midiErrorMessage(result)}");
         return false;
       } else {
         _midiInHandle = hMidiInDevicePtr.value.address;
@@ -91,7 +91,7 @@ class WindowsMidiDevice extends MidiDevice {
             sizeOf<MIDIHDR>(),
           );
           if (result != 0) {
-            print("HDR PREP ERROR: ${midiErrorMessage(result)}");
+            debugPrint("HDR PREP ERROR: ${midiErrorMessage(result)}");
             return false;
           }
 
@@ -101,14 +101,14 @@ class WindowsMidiDevice extends MidiDevice {
             sizeOf<MIDIHDR>(),
           );
           if (result != 0) {
-            print("HDR ADD ERROR: ${midiErrorMessage(result)}");
+            debugPrint("HDR ADD ERROR: ${midiErrorMessage(result)}");
             return false;
           }
         }
 
         result = midiInStart(HMIDIIN(hMidiInDevicePtr.value));
         if (result != 0) {
-          print("START ERROR: ${midiErrorMessage(result)}");
+          debugPrint("START ERROR: ${midiErrorMessage(result)}");
           return false;
         }
       }
@@ -121,7 +121,7 @@ class WindowsMidiDevice extends MidiDevice {
 
       int result = midiOutOpen(hMidiOutDevicePtr, id, 0, 0, CALLBACK_NULL);
       if (result != 0) {
-        print("OUT OPEN ERROR: result");
+        debugPrint("OUT OPEN ERROR: result");
         return false;
       }
       _midiOutHandle = hMidiOutDevicePtr.value.address;
@@ -144,12 +144,12 @@ class WindowsMidiDevice extends MidiDevice {
     if (_midiInHandle != 0) {
       result = midiInStop(_hMidiIn);
       if (result != 0) {
-        print("STOP ERROR($result): ${midiErrorMessage(result)}");
+        debugPrint("STOP ERROR($result): ${midiErrorMessage(result)}");
       }
 
       result = midiInReset(_hMidiIn);
       if (result != 0) {
-        print("RESET ERROR($result): ${midiErrorMessage(result)}");
+        debugPrint("RESET ERROR($result): ${midiErrorMessage(result)}");
       }
 
       for (int i = 0; i < _numberOfBuffers; i++) {
@@ -170,7 +170,7 @@ class WindowsMidiDevice extends MidiDevice {
 
       result = midiInClose(_hMidiIn);
       if (result != 0) {
-        print("CLOSE ERROR($result): ${midiErrorMessage(result)}");
+        debugPrint("CLOSE ERROR($result): ${midiErrorMessage(result)}");
       }
       _midiInHandle = 0;
       hMidiInDevicePtr.value = nullptr;
@@ -179,12 +179,12 @@ class WindowsMidiDevice extends MidiDevice {
     if (_midiOutHandle != 0) {
       result = midiOutReset(_hMidiOut);
       if (result != 0) {
-        print("OUT RESET ERROR($result): ${midiErrorMessage(result)}");
+        debugPrint("OUT RESET ERROR($result): ${midiErrorMessage(result)}");
       }
 
       result = midiOutClose(_hMidiOut);
       if (result != 0) {
-        print("OUT CLOSE ERROR($result): ${midiErrorMessage(result)}");
+        debugPrint("OUT CLOSE ERROR($result): ${midiErrorMessage(result)}");
       }
       _midiOutHandle = 0;
       hMidiOutDevicePtr.value = nullptr;
@@ -257,12 +257,12 @@ class WindowsMidiDevice extends MidiDevice {
       sizeOf<MIDIHDR>(),
     );
     if (result != 0) {
-      print("HDR OUT PREP ERROR: ${midiErrorMessage(result)}");
+      debugPrint("HDR OUT PREP ERROR: ${midiErrorMessage(result)}");
     }
 
     result = midiOutLongMsg(_hMidiOut, _midiOutHeader, sizeOf<MIDIHDR>());
     if (result != 0) {
-      print("SEND ERROR($result): ${midiErrorMessage(result)}");
+      debugPrint("SEND ERROR($result): ${midiErrorMessage(result)}");
     }
 
     result = midiOutUnprepareHeader(
@@ -271,7 +271,7 @@ class WindowsMidiDevice extends MidiDevice {
       sizeOf<MIDIHDR>(),
     );
     if (result != 0) {
-      print("OUT UNPREPARE ERROR($result): ${midiErrorMessage(result)}");
+      debugPrint("OUT UNPREPARE ERROR($result): ${midiErrorMessage(result)}");
     }
   }
 }

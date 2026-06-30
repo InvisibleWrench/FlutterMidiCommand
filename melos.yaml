@@ -8,9 +8,9 @@ scripts:
   bootstrap:
     run: dart run melos bootstrap
   analyze:
-    run: dart run melos exec --concurrency=1 --ignore=flutter_midi_command_example -- "flutter analyze --no-fatal-infos --no-fatal-warnings"
+    run: dart run melos exec --concurrency=1 --ignore=flutter_midi_command_example -- "flutter analyze"
   analyze:example:
-    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter analyze --no-fatal-infos --no-fatal-warnings"
+    run: dart run melos exec --scope=flutter_midi_command_example -- "flutter analyze"
   test:
     run: dart run melos exec --dir-exists=test --concurrency=1 --ignore=flutter_midi_command_example --ignore=flutter_midi_command_web -- "flutter test"
   test:web:chrome:

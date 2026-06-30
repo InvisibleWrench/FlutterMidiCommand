@@ -1,3 +1,6 @@
+// Constant names follow MIDI domain conventions (e.g. CC, NoteOn, PitchBend)
+// and are part of the public API; renaming them would be a breaking change.
+// ignore_for_file: constant_identifier_names
 import 'dart:typed_data';
 
 import 'flutter_midi_command.dart';
