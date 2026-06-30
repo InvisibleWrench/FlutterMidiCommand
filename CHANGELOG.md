@@ -1,3 +1,42 @@
+# Change Log
+
+All notable changes to this project will be documented in this file.
+See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
+
+## 2026-06-30
+
+### Changes
+
+---
+
+Packages with breaking changes:
+
+ - There are no breaking changes in this release.
+
+Packages with other changes:
+
+ - [`flutter_midi_command` - `v1.0.1`](#flutter_midi_command---v101)
+
+---
+
+#### `flutter_midi_command` - `v1.0.1`
+
+ - **FIX**(android): wrap MethodChannel.Result in thread-safe SafeResult to prevent 'Reply already submitted' crash.
+ - **FIX**(android): match native device by `Device.deviceIdForInfo`.
+ - **FIX**: resolve too many MIDI listeners for UID = xxxx.
+ - **FIX**: Make sure "timestamp" is an UInt64 so it doesn't overflow on 32-bit systems.
+ - **FIX**: Network Session on iOS and macOS broke while adding the Virtual Device feature.
+ - **FEAT**: allow devices without midi support.
+
+## 1.0.1
+
+ - **FIX**(android): wrap MethodChannel.Result in thread-safe SafeResult to prevent 'Reply already submitted' crash.
+ - **FIX**(android): match native device by `Device.deviceIdForInfo`.
+ - **FIX**: resolve too many MIDI listeners for UID = xxxx.
+ - **FIX**: Make sure "timestamp" is an UInt64 so it doesn't overflow on 32-bit systems.
+ - **FIX**: Network Session on iOS and macOS broke while adding the Virtual Device feature.
+ - **FEAT**: allow devices without midi support.
+
 ## 1.0.0
 - Aligned CI to Flutter `3.44.2` so the newer BLE dependency resolves in GitHub Actions.
 - Resolved the Windows example build failure caused by deprecated coroutine headers in older `universal_ble` releases.
