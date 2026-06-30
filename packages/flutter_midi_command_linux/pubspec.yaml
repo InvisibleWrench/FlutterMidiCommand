@@ -1,5 +1,5 @@
 name: flutter_midi_command_linux
-description: FlutterMidiCommand for Linux.
+description: The Linux implementation of flutter_midi_command, using ALSA sequencer to send and receive MIDI messages.
 version: 1.0.1
 homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
 repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_linux

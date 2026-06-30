@@ -1,5 +1,5 @@
 name: flutter_midi_command_android
-description: Android serial MIDI wrapper for flutter_midi_command.
+description: The Android implementation of flutter_midi_command, bridging the platform MIDI APIs to send and receive MIDI messages.
 version: 1.0.1
 homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
 repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_android
