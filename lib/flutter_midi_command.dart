@@ -73,7 +73,8 @@ class MidiCommand {
   /// `MidiCommand().logHandler = (m) => talker.debug(m);`
   void Function(String message)? logHandler;
 
-  void _log(String message) => logHandler?.call('[flutter_midi_command] $message');
+  void _log(String message) =>
+      logHandler?.call('[flutter_midi_command] $message');
   final Expando<_MidiDeviceRoute> _deviceRouteByInstance =
       Expando<_MidiDeviceRoute>('midi_device_route');
   final Map<String, _MidiDeviceRoute> _deviceRouteById =
@@ -208,7 +209,8 @@ class MidiCommand {
 
     final bleActive =
         _bleTransport != null && isTransportEnabled(MidiTransport.ble);
-    final bleDevices = bleActive ? await _bleTransport!.devices : <MidiDevice>[];
+    final bleDevices =
+        bleActive ? await _bleTransport!.devices : <MidiDevice>[];
     // BLE-transport devices (advertised name) indexed by id.
     final bleById = <String, MidiDevice>{
       for (final device in bleDevices) device.id: device,
@@ -383,7 +385,8 @@ class MidiCommand {
       device.setConnectionState(MidiConnectionState.disconnecting);
     }
     final route = _resolveDeviceRoute(device);
-    final isBleWithTransport = device.type == MidiDeviceType.ble &&
+    final isBleWithTransport =
+        device.type == MidiDeviceType.ble &&
         _bleTransport != null &&
         isTransportEnabled(MidiTransport.ble);
     _log(
@@ -461,7 +464,7 @@ class MidiCommand {
     if (_bleTransport != null && isTransportEnabled(MidiTransport.ble)) {
       streams.add(
         _mapPacketsToTypedEvents(
-          _bleTransport!.onMidiDataReceived,
+          _bleTransportPackets(),
           fallbackTransport: MidiTransport.ble,
         ),
       );
@@ -484,7 +487,7 @@ class MidiCommand {
       streams.add(_platform.onMidiDataReceived!);
     }
     if (_bleTransport != null && isTransportEnabled(MidiTransport.ble)) {
-      streams.add(_bleTransport!.onMidiDataReceived);
+      streams.add(_bleTransportPackets());
     }
     if (streams.isEmpty) {
       return null;
@@ -630,15 +633,10 @@ class MidiCommand {
 
     _log('Handoff: waiting for CoreMIDI counterpart of ${device.id}');
     while (DateTime.now().isBefore(deadline)) {
-      if (_deviceRouteById[device.id] == _MidiDeviceRoute.platform) {
-        // Already handed off (e.g. by a concurrent devices() refresh).
-        return;
-      }
       final platformDevices = await _platform.devices ?? <MidiDevice>[];
       MidiDevice? match;
       for (final candidate in platformDevices) {
-        if (candidate.id == device.id &&
-            candidate.type == MidiDeviceType.ble) {
+        if (candidate.id == device.id && candidate.type == MidiDeviceType.ble) {
           match = candidate;
           break;
         }
@@ -646,6 +644,13 @@ class MidiCommand {
       if (match != null) {
         _setDeviceRoute(device, _MidiDeviceRoute.platform);
         _setDeviceRoute(match, _MidiDeviceRoute.platform);
+        // A concurrent devices() refresh may have routed this id already,
+        // but routing alone does not open the platform endpoint; skip the
+        // connect only when the platform reports it live.
+        if (match.connected) {
+          _log('Handoff: CoreMIDI endpoint already connected for ${device.id}');
+          return;
+        }
         try {
           await _platform.connectToDevice(match);
           _log('Handoff: connected CoreMIDI endpoint for ${device.id}');
@@ -658,7 +663,9 @@ class MidiCommand {
       }
       await Future<void>.delayed(pollInterval);
     }
-    _log('Handoff: timed out for ${device.id}; keeping BLE transport data path');
+    _log(
+      'Handoff: timed out for ${device.id}; keeping BLE transport data path',
+    );
   }
 
   _MidiDeviceRoute _resolveDeviceRoute(MidiDevice device) {
@@ -677,6 +684,16 @@ class MidiCommand {
     }
 
     return _MidiDeviceRoute.platform;
+  }
+
+  /// BLE transport packets, excluding devices handed off to the platform
+  /// backend (see [_handoffBleToPlatform]), whose CoreMIDI endpoint would
+  /// otherwise deliver every message a second time.
+  Stream<MidiPacket> _bleTransportPackets() {
+    return _bleTransport!.onMidiDataReceived.where(
+      (packet) =>
+          _deviceRouteById[packet.device.id] != _MidiDeviceRoute.platform,
+    );
   }
 
   Stream<MidiDataReceivedEvent> _mapPacketsToTypedEvents(

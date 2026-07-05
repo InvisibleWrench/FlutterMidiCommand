@@ -478,6 +478,51 @@ void main() {
     },
   );
 
+  test('BLE transport packets are suppressed for devices routed to the '
+      'platform backend', () async {
+    final platform = _FakePlatformWithBleHost();
+    final ble = _FakeBleTransport();
+    MidiCommand.setPlatformOverride(platform);
+    final midi = MidiCommand(bleTransport: ble);
+
+    // Routes host-ble-1 to the platform backend.
+    await midi.devices;
+
+    final received = <MidiDataReceivedEvent>[];
+    final sub = midi.onMidiDataReceived!.listen(received.add);
+
+    // The same peripheral seen through both paths (e.g. after the CoreMIDI
+    // handoff); only the platform copy should surface.
+    ble.emitPacket(
+      MidiPacket(
+        Uint8List.fromList([0x90, 0x3C, 0x64]),
+        1,
+        MidiDevice('host-ble-1', 'Host BLE', MidiDeviceType.ble, true),
+      ),
+    );
+    platform.emitPacket(
+      MidiPacket(
+        Uint8List.fromList([0x90, 0x3C, 0x64]),
+        2,
+        MidiDevice('host-ble-1', 'Host BLE', MidiDeviceType.ble, true),
+      ),
+    );
+    // A device still owned by the BLE transport is unaffected.
+    ble.emitPacket(
+      MidiPacket(
+        Uint8List.fromList([0x80, 0x3C, 0x00]),
+        3,
+        MidiDevice('ble-1', 'BLE', MidiDeviceType.ble, true),
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    await sub.cancel();
+
+    expect(received.length, 2);
+    expect(received.map((event) => event.timestamp), containsAll(<int>[2, 3]));
+  });
+
   test('sendData does not fan out to BLE when BLE transport is excluded', () {
     final platform = _FakePlatform();
     final ble = _FakeBleTransport();
