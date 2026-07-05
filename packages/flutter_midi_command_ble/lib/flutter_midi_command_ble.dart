@@ -392,8 +392,25 @@ class _BleMidiDevice extends MidiDevice {
       return;
     }
 
-    final isPaired = await UniversalBle.isPaired(deviceId) ?? false;
-    if (isPaired) {
+    final isPaired = await UniversalBle.isPaired(deviceId);
+    if (isPaired ?? false) {
+      _devState = _DeviceState.available;
+      _startNotify();
+      return;
+    }
+    // Platforms without a system pairing API (Apple, web) return null and
+    // never fire onPairingStateChange, so notifications would never start.
+    // Read the MIDI characteristic once (per the BLE MIDI spec; triggers OS
+    // pairing when encryption is required) and subscribe directly.
+    if (isPaired == null) {
+      try {
+        await UniversalBle.read(
+          deviceId,
+          _midiService!.uuid,
+          _midiCharacteristic!.uuid,
+          timeout: const Duration(seconds: 5),
+        );
+      } catch (_) {}
       _devState = _DeviceState.available;
       _startNotify();
       return;
@@ -407,13 +424,15 @@ class _BleMidiDevice extends MidiDevice {
     if (_midiService == null || _midiCharacteristic == null) {
       return;
     }
-    try {
+    // subscribeNotifications is async, so a synchronous try/catch cannot
+    // catch its errors; swallow them explicitly instead.
+    unawaited(
       UniversalBle.subscribeNotifications(
         deviceId,
         _midiService!.uuid,
         _midiCharacteristic!.uuid,
-      );
-    } catch (_) {}
+      ).catchError((Object _) {}),
+    );
   }
 
   void handleData(Uint8List data) {
