@@ -59,7 +59,7 @@
   <section id="getter">
     <section class="multi-line-signature">
       
-      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiDataReceivedEvent-class.html">MidiDataReceivedEvent</a></span>&gt;</span>?</span>
+      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiDataReceivedEvent-class.html">MidiDataReceivedEvent</a></span>&gt;</span>?</span>
       get
       <span class="name ">onMidiDataReceived</span>
       
@@ -78,10 +78,20 @@
   <pre class="language-dart"><code class="language-dart">Stream&lt;MidiDataReceivedEvent&gt;? get onMidiDataReceived {
   final streams = &lt;Stream&lt;MidiDataReceivedEvent&gt;&gt;[];
   if (_platform.onMidiDataReceived != null) {
-    streams.add(_mapPacketsToTypedEvents(_platform.onMidiDataReceived!, fallbackTransport: MidiTransport.native));
+    streams.add(
+      _mapPacketsToTypedEvents(
+        _platform.onMidiDataReceived!,
+        fallbackTransport: MidiTransport.native,
+      ),
+    );
   }
   if (_bleTransport != null &amp;&amp; isTransportEnabled(MidiTransport.ble)) {
-    streams.add(_mapPacketsToTypedEvents(_bleTransport!.onMidiDataReceived, fallbackTransport: MidiTransport.ble));
+    streams.add(
+      _mapPacketsToTypedEvents(
+        _bleTransportPackets(),
+        fallbackTransport: MidiTransport.ble,
+      ),
+    );
   }
   if (streams.isEmpty) {
     return null;
@@ -120,7 +130,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

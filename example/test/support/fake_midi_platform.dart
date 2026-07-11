@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 
 class FakeMidiPlatform extends MidiCommandPlatform {
-  FakeMidiPlatform({bool? networkEnabled})
+  FakeMidiPlatform({bool? networkEnabled, this.connectError})
       : networkEnabled = networkEnabled ?? false {
     devicesList = <MidiDevice>[
       MidiDevice(
@@ -30,6 +30,7 @@ class FakeMidiPlatform extends MidiCommandPlatform {
   final StreamController<MidiSetupChange> _setupStreamController =
       StreamController<MidiSetupChange>.broadcast();
   bool networkEnabled;
+  Object? connectError;
   int devicesCallCount = 0;
   var _isClosed = false;
 
@@ -45,6 +46,11 @@ class FakeMidiPlatform extends MidiCommandPlatform {
     List<MidiPort>? ports,
   }) async {
     connectedDeviceIds.add(device.id);
+    final error = connectError;
+    if (error != null) {
+      device.setConnectionState(MidiConnectionState.disconnected);
+      throw error;
+    }
     device.setConnectionState(MidiConnectionState.connected);
   }
 

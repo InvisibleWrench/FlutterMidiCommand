@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:async/async.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_midi_command/src/midi_transports.dart';
@@ -9,10 +9,18 @@ import 'package:flutter_midi_command/src/midi_transports.dart';
 export 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart'
     show
         MidiBleTransport,
+        MidiConnectionException,
+        MidiConnectionStage,
+        MidiConnectionTimeoutException,
+        MidiCoreMidiHandoffException,
         MidiDevice,
         MidiDeviceTypeWire,
+        MidiNotificationSubscriptionException,
         MidiPacket,
+        MidiPairingFailedException,
+        MidiPairingRejectedException,
         MidiPort,
+        MidiServiceDiscoveryException,
         MidiSetupChange;
 export 'package:flutter_midi_command_platform_interface/midi_device.dart'
     show MidiConnectionState, MidiDeviceType;
@@ -331,11 +339,15 @@ class MidiCommand {
   /// Connects to the device
   Future<void> connectToDevice(
     MidiDevice device, {
-    Duration? awaitConnectionTimeout = const Duration(seconds: 10),
+    Duration? awaitConnectionTimeout = const Duration(seconds: 30),
   }) async {
     if (!device.connected) {
       device.setConnectionState(MidiConnectionState.connecting);
     }
+    final budget = _ConnectionBudget(
+      deviceId: device.id,
+      timeout: awaitConnectionTimeout,
+    );
     final connectionEstablished = _awaitConnectedOrFailed(device);
 
     try {
@@ -343,19 +355,33 @@ class MidiCommand {
       if (route == _MidiDeviceRoute.bleTransport) {
         _requireTransport(MidiTransport.ble, 'connectToDevice');
         _requireBleTransport('connectToDevice');
-        await _bleTransport!.connectToDevice(device);
+        await budget.run(
+          MidiConnectionStage.bluetoothConnect,
+          (timeout) => _bleTransport!.connectToDevice(device, timeout: timeout),
+        );
         // On Apple platforms a bonded BLE peripheral becomes available through
         // CoreMIDI under the same id (its CoreBluetooth UUID), and that is the
-        // path that actually carries MIDI data. Hand the data path over to it
-        // once it appears. This is a no-op on platforms where the BLE transport
-        // is itself the data path (e.g. Android), where no platform counterpart
-        // ever shows up.
-        unawaited(_handoffBleToPlatform(device));
+        // path that actually carries MIDI data.
+        if (_requiresBlePlatformHandoff) {
+          await _handoffBleToPlatform(
+            device,
+            timeout: budget.remaining(MidiConnectionStage.platformHandoff),
+            required: true,
+          );
+        } else {
+          // No-op where no platform counterpart appears (e.g. Android), leaving
+          // the BLE transport as the data path.
+          unawaited(_handoffBleToPlatform(device));
+        }
       } else {
-        await _platform.connectToDevice(device);
+        await budget.run(
+          MidiConnectionStage.platformConnect,
+          (_) => _platform.connectToDevice(device),
+        );
       }
     } catch (_) {
-      if (device.connectionState == MidiConnectionState.connecting) {
+      unawaited(connectionEstablished.catchError((_) {}));
+      if (device.connectionState != MidiConnectionState.disconnected) {
         device.setConnectionState(MidiConnectionState.disconnected);
       }
       rethrow;
@@ -365,13 +391,12 @@ class MidiCommand {
       return;
     }
 
-    if (awaitConnectionTimeout == null) {
-      await connectionEstablished;
-      return;
-    }
     try {
-      await connectionEstablished.timeout(awaitConnectionTimeout);
-    } on TimeoutException {
+      await budget.run(
+        MidiConnectionStage.connectionState,
+        (_) => connectionEstablished,
+      );
+    } catch (_) {
       if (device.connectionState == MidiConnectionState.connecting) {
         device.setConnectionState(MidiConnectionState.disconnected);
       }
@@ -621,19 +646,44 @@ class MidiCommand {
     }
   }
 
-  /// Waits (in the background) for a freshly bonded BLE peripheral to be exposed
+  bool get _requiresBlePlatformHandoff =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
+  /// Waits for a freshly bonded BLE peripheral to be exposed
   /// by the platform (CoreMIDI on Apple) under the same id, then opens that
-  /// endpoint and switches the device's data route to it. No-op where no
+  /// endpoint and switches the device's data route to it. Optional where no
   /// platform counterpart appears (e.g. Android), leaving the BLE transport as
   /// the data path.
-  Future<void> _handoffBleToPlatform(MidiDevice device) async {
+  Future<void> _handoffBleToPlatform(
+    MidiDevice device, {
+    Duration? timeout,
+    bool required = false,
+  }) async {
     const pollInterval = Duration(milliseconds: 500);
-    const maxWait = Duration(seconds: 20);
-    final deadline = DateTime.now().add(maxWait);
+    final budget = _ConnectionBudget(
+      deviceId: device.id,
+      timeout: timeout ?? (required ? null : const Duration(seconds: 20)),
+    );
 
     _log('Handoff: waiting for CoreMIDI counterpart of ${device.id}');
-    while (DateTime.now().isBefore(deadline)) {
-      final platformDevices = await _platform.devices ?? <MidiDevice>[];
+    while (true) {
+      Duration? remaining;
+      try {
+        remaining = budget.remaining(MidiConnectionStage.platformHandoff);
+      } on MidiConnectionTimeoutException {
+        _log('Handoff: timed out for ${device.id}');
+        if (required) {
+          rethrow;
+        }
+        return;
+      }
+
+      final platformDevices = await budget.run(
+        MidiConnectionStage.platformHandoff,
+        (_) async => await _platform.devices ?? <MidiDevice>[],
+      );
       MidiDevice? match;
       for (final candidate in platformDevices) {
         if (candidate.id == device.id && candidate.type == MidiDeviceType.ble) {
@@ -652,20 +702,34 @@ class MidiCommand {
           return;
         }
         try {
-          await _platform.connectToDevice(match);
+          await budget.run(
+            MidiConnectionStage.platformConnect,
+            (_) => _platform.connectToDevice(match!),
+          );
+          if (!match.connected) {
+            await budget.run(
+              MidiConnectionStage.connectionState,
+              (_) => _awaitConnectedOrFailed(match!),
+            );
+          }
           _log('Handoff: connected CoreMIDI endpoint for ${device.id}');
         } catch (e) {
-          // Leave routing on platform; a later devices() refresh/retry can
-          // re-attempt. The BLE transport connection remains as a fallback.
           _log('Handoff: platform connect failed for ${device.id}: $e');
+          if (required) {
+            throw MidiCoreMidiHandoffException(deviceId: device.id, cause: e);
+          }
         }
         return;
       }
-      await Future<void>.delayed(pollInterval);
+
+      final delay =
+          remaining == null || remaining > pollInterval
+              ? pollInterval
+              : remaining;
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
     }
-    _log(
-      'Handoff: timed out for ${device.id}; keeping BLE transport data path',
-    );
   }
 
   _MidiDeviceRoute _resolveDeviceRoute(MidiDevice device) {
@@ -769,5 +833,50 @@ class MidiCommand {
     _messageParsersByAnonymousDevice = Expando<MidiMessageParser>(
       'midi_message_parser',
     );
+  }
+}
+
+class _ConnectionBudget {
+  _ConnectionBudget({required this.deviceId, required this.timeout})
+    : _deadline = timeout == null ? null : DateTime.now().add(timeout);
+
+  final String deviceId;
+  final Duration? timeout;
+  final DateTime? _deadline;
+
+  Duration? remaining(MidiConnectionStage stage) {
+    final deadline = _deadline;
+    if (deadline == null) {
+      return null;
+    }
+    final remaining = deadline.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      throw MidiConnectionTimeoutException(
+        deviceId: deviceId,
+        stage: stage,
+        timeout: timeout,
+      );
+    }
+    return remaining;
+  }
+
+  Future<T> run<T>(
+    MidiConnectionStage stage,
+    Future<T> Function(Duration? timeout) action,
+  ) async {
+    final stageTimeout = remaining(stage);
+    try {
+      final future = action(stageTimeout);
+      return stageTimeout == null
+          ? await future
+          : await future.timeout(stageTimeout);
+    } on TimeoutException catch (e) {
+      throw MidiConnectionTimeoutException(
+        deviceId: deviceId,
+        stage: stage,
+        timeout: timeout,
+        cause: e,
+      );
+    }
   }
 }

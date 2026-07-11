@@ -26,7 +26,11 @@ abstract class MidiBleTransport {
   /// transport's device instance, or null if unsupported.
   MidiDevice? registerKnownDevice(String id, String name) => null;
 
-  Future<void> connectToDevice(MidiDevice device, {List<MidiPort>? ports});
+  Future<void> connectToDevice(
+    MidiDevice device, {
+    List<MidiPort>? ports,
+    Duration? timeout,
+  });
   void disconnectDevice(MidiDevice device);
   void sendData(Uint8List data, {int? timestamp, String? deviceId});
   Stream<MidiPacket> get onMidiDataReceived;

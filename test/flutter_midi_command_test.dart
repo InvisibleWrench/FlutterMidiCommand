@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
@@ -25,9 +25,8 @@ class _FakePlatform extends MidiCommandPlatform {
     List<MidiPort>? ports,
   }) async {
     connected.add(device.id);
-    Future<void>.delayed(const Duration(milliseconds: 10), () {
-      device.connected = true;
-    });
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    device.connected = true;
   }
 
   @override
@@ -107,11 +106,11 @@ class _FakeBleTransport implements MidiBleTransport {
   Future<void> connectToDevice(
     MidiDevice device, {
     List<MidiPort>? ports,
+    Duration? timeout,
   }) async {
     connected.add(device.id);
-    Future<void>.delayed(const Duration(milliseconds: 10), () {
-      device.connected = true;
-    });
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    device.connected = true;
   }
 
   @override
@@ -175,9 +174,24 @@ class _FakePlatformWithBleHost extends _FakePlatform {
   ];
 }
 
+class _ToggleBleHostPlatform extends _FakePlatform {
+  bool showBleHost = false;
+
+  @override
+  Future<List<MidiDevice>?> get devices async =>
+      showBleHost
+          ? [MidiDevice('ble-1', 'Host BLE', MidiDeviceType.ble, false)]
+          : <MidiDevice>[];
+}
+
 void main() {
   setUp(() {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     MidiCommand.resetForTest();
+  });
+
+  tearDown(() {
+    debugDefaultTargetPlatformOverride = null;
   });
 
   test('BLE APIs require BLE transport implementation', () async {
@@ -260,7 +274,7 @@ void main() {
         device,
         awaitConnectionTimeout: const Duration(milliseconds: 25),
       ),
-      throwsA(isA<TimeoutException>()),
+      throwsA(isA<MidiConnectionTimeoutException>()),
     );
   });
 
@@ -475,6 +489,54 @@ void main() {
       // A bonded BLE device also holds the underlying universal_ble link used
       // to pair/bond, so disconnect releases it too (a no-op when none is held).
       expect(ble.disconnected, contains('host-ble-1'));
+    },
+  );
+
+  test('Apple BLE connect waits for CoreMIDI handoff', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    final platform = _ToggleBleHostPlatform();
+    final ble = _FakeBleTransport();
+    MidiCommand.setPlatformOverride(platform);
+    final midi = MidiCommand(bleTransport: ble);
+
+    final device = (await midi.devices)!.single;
+    platform.showBleHost = true;
+
+    await midi.connectToDevice(
+      device,
+      awaitConnectionTimeout: const Duration(seconds: 1),
+    );
+
+    expect(ble.connected, contains('ble-1'));
+    expect(platform.connected, contains('ble-1'));
+    expect(device.connected, isTrue);
+  });
+
+  test(
+    'Apple BLE connect times out when CoreMIDI handoff never appears',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      final platform = _ToggleBleHostPlatform();
+      final ble = _FakeBleTransport();
+      MidiCommand.setPlatformOverride(platform);
+      final midi = MidiCommand(bleTransport: ble);
+
+      final device = (await midi.devices)!.single;
+
+      await expectLater(
+        midi.connectToDevice(
+          device,
+          awaitConnectionTimeout: const Duration(milliseconds: 30),
+        ),
+        throwsA(
+          isA<MidiConnectionTimeoutException>().having(
+            (error) => error.stage,
+            'stage',
+            MidiConnectionStage.platformHandoff,
+          ),
+        ),
+      );
+      expect(device.connected, isFalse);
     },
   );
 

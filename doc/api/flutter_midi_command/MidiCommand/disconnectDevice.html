@@ -75,9 +75,27 @@
     device.setConnectionState(MidiConnectionState.disconnecting);
   }
   final route = _resolveDeviceRoute(device);
-  if (route == _MidiDeviceRoute.bleTransport) {
-    _requireTransport(MidiTransport.ble, &#39;disconnectDevice&#39;);
-    _requireBleTransport(&#39;disconnectDevice&#39;);
+  final isBleWithTransport =
+      device.type == MidiDeviceType.ble &amp;&amp;
+      _bleTransport != null &amp;&amp;
+      isTransportEnabled(MidiTransport.ble);
+  _log(
+    &#39;Disconnect &quot;${device.name}&quot; (${device.id}) route=${route.name} &#39;
+    &#39;ble=$isBleWithTransport&#39;,
+  );
+
+  if (route == _MidiDeviceRoute.platform) {
+    _platform.disconnectDevice(device);
+    &#47;&#47; A bonded BLE device also holds the underlying universal_ble connection
+    &#47;&#47; that was used to pair&#47;bond; release it too.
+    if (isBleWithTransport) {
+      _bleTransport!.disconnectDevice(device);
+    }
+    return;
+  }
+
+  &#47;&#47; BLE transport route (e.g. not yet bonded, or non-Apple data path).
+  if (isBleWithTransport) {
     _bleTransport!.disconnectDevice(device);
     return;
   }
@@ -110,7 +128,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

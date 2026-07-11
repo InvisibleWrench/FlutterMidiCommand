@@ -54,10 +54,10 @@
 
     <section class="multi-line-signature">
       const
-      <span class="name ">MidiDataReceivedEvent</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="-param-message"><span>required</span> <span class="type-annotation"><a href="../../flutter_midi_command_messages/MidiMessage-class.html">MidiMessage</a></span> <span class="parameter-name">message</span>, </span></li>
-<li><span class="parameter" id="-param-device"><span>required</span> <span class="type-annotation"><a href="../../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span>, </span></li>
-<li><span class="parameter" id="-param-transport"><span>required</span> <span class="type-annotation"><a href="../../flutter_midi_command/MidiTransport.html">MidiTransport</a></span> <span class="parameter-name">transport</span>, </span></li>
-<li><span class="parameter" id="-param-timestamp"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">timestamp</span>, </span></li>
+      <span class="name ">MidiDataReceivedEvent</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="param-message"><span>required</span> <span class="type-annotation"><a href="../../flutter_midi_command_messages/MidiMessage-class.html">MidiMessage</a></span> <span class="parameter-name">message</span>, </span></li>
+<li><span class="parameter" id="param-device"><span>required</span> <span class="type-annotation"><a href="../../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span>, </span></li>
+<li><span class="parameter" id="param-transport"><span>required</span> <span class="type-annotation"><a href="../../flutter_midi_command/MidiTransport.html">MidiTransport</a></span> <span class="parameter-name">transport</span>, </span></li>
+<li><span class="parameter" id="param-timestamp"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">timestamp</span>, </span></li>
 </ol>})
     </section>
     
@@ -66,7 +66,12 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">const MidiDataReceivedEvent({required this.message, required this.device, required this.transport, required this.timestamp});</code></pre>
+  <pre class="language-dart"><code class="language-dart">const MidiDataReceivedEvent({
+  required this.message,
+  required this.device,
+  required this.transport,
+  required this.timestamp,
+});</code></pre>
 </section>
 
 
@@ -94,7 +99,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

@@ -88,4 +88,17 @@ void main() {
       expect(find.textContaining('90 3C 64'), findsOneWidget);
     },
   );
+
+  test('connectionErrorMessage handles typed MIDI connection errors', () {
+    expect(
+      app.connectionErrorMessage(
+        MidiConnectionTimeoutException(
+          deviceId: 'serial-1',
+          stage: MidiConnectionStage.connectionState,
+          timeout: const Duration(milliseconds: 25),
+        ),
+      ),
+      contains('Timed out after 25 ms'),
+    );
+  });
 }

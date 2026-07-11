@@ -1,12 +1,16 @@
 import 'dart:typed_data';
 
 import 'package:flutter_midi_command_ble/flutter_midi_command_ble.dart';
+import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_ble/universal_ble.dart';
 
 class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   AvailabilityState availabilityState = AvailabilityState.poweredOn;
   final Set<String> failingConnectIds = <String>{};
+  final Set<String> failingReadIds = <String>{};
+  final Set<String> failingSubscribeIds = <String>{};
+  final Set<String> rejectedPairIds = <String>{};
   final Map<String, List<BleService>> servicesByDevice =
       <String, List<BleService>>{};
   final Map<String, bool> _pairedByDevice = <String, bool>{};
@@ -15,6 +19,9 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
 
   final List<String> connectCalls = <String>[];
   final List<String> disconnectCalls = <String>[];
+  final List<String> pairCalls = <String>[];
+  final List<String> readCalls = <String>[];
+  final List<String> subscribeCalls = <String>[];
   int startScanCalls = 0;
   int stopScanCalls = 0;
 
@@ -83,7 +90,12 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     String service,
     String characteristic,
     BleInputProperty bleInputProperty,
-  ) async {}
+  ) async {
+    subscribeCalls.add(deviceId);
+    if (failingSubscribeIds.contains(deviceId)) {
+      throw StateError('subscribe-failed');
+    }
+  }
 
   @override
   Future<Uint8List> readValue(
@@ -92,6 +104,10 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     String characteristic, {
     Duration? timeout,
   }) async {
+    readCalls.add(deviceId);
+    if (failingReadIds.contains(deviceId)) {
+      throw StateError('read-failed');
+    }
     return Uint8List(0);
   }
 
@@ -127,6 +143,10 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
 
   @override
   Future<bool> pair(String deviceId) async {
+    pairCalls.add(deviceId);
+    if (rejectedPairIds.contains(deviceId)) {
+      return false;
+    }
     _pairedByDevice[deviceId] = true;
     updatePairingState(deviceId, true);
     return true;
@@ -158,14 +178,32 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   }
 }
 
+List<BleService> midiServices() {
+  return <BleService>[
+    BleService(midiServiceId, <BleCharacteristic>[
+      BleCharacteristic(midiCharacteristicId, <CharacteristicProperty>[
+        CharacteristicProperty.read,
+        CharacteristicProperty.notify,
+      ], const <BleDescriptor>[]),
+    ]),
+  ];
+}
+
 void main() {
   late _FakeUniversalBlePlatform fakePlatform;
   late UniversalBleMidiTransport transport;
+  late bool previousSystemPairingApi;
 
   setUp(() {
+    previousSystemPairingApi = BleCapabilities.hasSystemPairingApi;
+    BleCapabilities.hasSystemPairingApi = true;
     fakePlatform = _FakeUniversalBlePlatform();
     UniversalBle.setInstance(fakePlatform);
     transport = UniversalBleMidiTransport();
+  });
+
+  tearDown(() {
+    BleCapabilities.hasSystemPairingApi = previousSystemPairingApi;
   });
 
   test(
@@ -186,13 +224,7 @@ void main() {
   );
 
   test('connectToDevice completes only when BLE connection succeeds', () async {
-    fakePlatform.servicesByDevice['ble-1'] = <BleService>[
-      BleService(midiServiceId, <BleCharacteristic>[
-        BleCharacteristic(midiCharacteristicId, <CharacteristicProperty>[
-          CharacteristicProperty.notify,
-        ], const <BleDescriptor>[]),
-      ]),
-    ];
+    fakePlatform.servicesByDevice['ble-1'] = midiServices();
 
     fakePlatform.emitScanDevice(
       BleDevice(deviceId: 'ble-1', name: 'BLE Device', services: <String>[]),
@@ -205,6 +237,8 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 5));
 
     expect(fakePlatform.connectCalls, <String>['ble-1']);
+    expect(fakePlatform.pairCalls, <String>['ble-1']);
+    expect(fakePlatform.subscribeCalls, <String>['ble-1']);
     expect(device.connected, isTrue);
   });
 
@@ -226,6 +260,7 @@ void main() {
   });
 
   test('disconnectDevice forwards to BLE backend', () async {
+    fakePlatform.servicesByDevice['ble-3'] = midiServices();
     fakePlatform.emitScanDevice(
       BleDevice(
         deviceId: 'ble-3',
@@ -240,6 +275,104 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 5));
 
     expect(fakePlatform.disconnectCalls, contains('ble-3'));
+    expect(device.connected, isFalse);
+  });
+
+  test('connectToDevice fails when BLE MIDI service is missing', () async {
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-no-midi',
+        name: 'No MIDI Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiServiceDiscoveryException>()),
+    );
+    expect(device.connected, isFalse);
+  });
+
+  test('connectToDevice surfaces explicit pairing rejection', () async {
+    fakePlatform.servicesByDevice['ble-reject'] = midiServices();
+    fakePlatform.rejectedPairIds.add('ble-reject');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-reject',
+        name: 'Reject Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiPairingRejectedException>()),
+    );
+    expect(device.connected, isFalse);
+  });
+
+  test(
+    'connectToDevice awaits native-UI pairing trigger when no pairing API',
+    () async {
+      BleCapabilities.hasSystemPairingApi = false;
+      fakePlatform.servicesByDevice['ble-native-ui'] = midiServices();
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-native-ui',
+          name: 'Native UI Device',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      await transport.connectToDevice(device);
+
+      expect(fakePlatform.readCalls, <String>['ble-native-ui']);
+      expect(fakePlatform.pairCalls, isEmpty);
+      expect(fakePlatform.subscribeCalls, <String>['ble-native-ui']);
+      expect(device.connected, isTrue);
+    },
+  );
+
+  test('connectToDevice surfaces native-UI pairing trigger failures', () async {
+    BleCapabilities.hasSystemPairingApi = false;
+    fakePlatform.servicesByDevice['ble-read-fail'] = midiServices();
+    fakePlatform.failingReadIds.add('ble-read-fail');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-read-fail',
+        name: 'Read Fail Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiPairingFailedException>()),
+    );
+    expect(device.connected, isFalse);
+  });
+
+  test('connectToDevice surfaces notification subscription failures', () async {
+    fakePlatform.servicesByDevice['ble-subscribe-fail'] = midiServices();
+    fakePlatform.failingSubscribeIds.add('ble-subscribe-fail');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-subscribe-fail',
+        name: 'Subscribe Fail Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiNotificationSubscriptionException>()),
+    );
     expect(device.connected, isFalse);
   });
 

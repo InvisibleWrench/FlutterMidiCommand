@@ -61,7 +61,7 @@
     <h2>Constructors</h2>
     <dl class="constructor-summary-list">
         <dt id="MidiCommand.new" class="callable">
-          <span class="name"><a href="../flutter_midi_command/MidiCommand/MidiCommand.html">MidiCommand</a></span><span class="signature">({<span class="parameter" id="-param-bleTransport"><span class="type-annotation">MidiBleTransport?</span> <span class="parameter-name">bleTransport</span></span>})</span>
+          <span class="name"><a href="../flutter_midi_command/MidiCommand/MidiCommand.html">MidiCommand</a></span><span class="signature">({<span class="parameter" id="param-bleTransport"><span class="type-annotation"><a href="../flutter_midi_command/MidiBleTransport-class.html">MidiBleTransport</a>?</span> <span class="parameter-name">bleTransport</span></span>})</span>
         </dt>
         <dd>
           
@@ -101,7 +101,7 @@
 
         <dt id="devices" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/devices.html">devices</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span>&gt;</span>?</span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span>&gt;</span>?</span>&gt;</span></span>
   
 
 </dt>
@@ -137,7 +137,7 @@
 
         <dt id="isNetworkSessionEnabled" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/isNetworkSessionEnabled.html">isNetworkSessionEnabled</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a>?</span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a>?</span>&gt;</span></span>
   
 
 </dt>
@@ -147,9 +147,24 @@
 
 </dd>
 
+        <dt id="logHandler" class="property">
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/logHandler.html">logHandler</a></span>
+  <span class="signature">&#8596; void Function<span class="signature">(<span class="parameter" id="param-message"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">message</span></span>)</span>?</span>
+  
+
+</dt>
+<dd>
+  Optional sink for internal diagnostic messages (device discovery, BLE/
+CoreMIDI merge, connection handoff, disconnect). Defaults to null (silent).
+Pipe it into your own logger, e.g.
+<code>MidiCommand().logHandler = (m) =&gt; talker.debug(m);</code>
+  <div class="features"><span class="feature">getter/setter pair</span></div>
+
+</dd>
+
         <dt id="onBluetoothStateChanged" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onBluetoothStateChanged.html">onBluetoothStateChanged</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/BluetoothState.html">BluetoothState</a></span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/BluetoothState.html">BluetoothState</a></span>&gt;</span></span>
   
 
 </dt>
@@ -161,7 +176,7 @@
 
         <dt id="onMidiDataReceived" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiDataReceived.html">onMidiDataReceived</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiDataReceivedEvent-class.html">MidiDataReceivedEvent</a></span>&gt;</span>?</span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiDataReceivedEvent-class.html">MidiDataReceivedEvent</a></span>&gt;</span>?</span>
   
 
 </dt>
@@ -173,7 +188,7 @@
 
         <dt id="onMidiDataSent" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiDataSent.html">onMidiDataSent</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span>&gt;</span></span>
   
 
 </dt>
@@ -185,7 +200,7 @@
 
         <dt id="onMidiPacketReceived" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiPacketReceived.html">onMidiPacketReceived</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiPacket-class.html">MidiPacket</a></span>&gt;</span>?</span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiPacket-class.html">MidiPacket</a></span>&gt;</span>?</span>
   
 
 </dt>
@@ -197,12 +212,12 @@
 
         <dt id="onMidiSetupChanged" class="property">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/onMidiSetupChanged.html">onMidiSetupChanged</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>?</span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../flutter_midi_command/MidiSetupChange.html">MidiSetupChange</a></span>&gt;</span>?</span>
   
 
 </dt>
 <dd>
-  Stream firing events whenever a change in the MIDI setup occurs
+  Stream firing events whenever a change in the MIDI setup occurs.
   <div class="features"><span class="feature">no setter</span></div>
 
 </dd>
@@ -242,7 +257,7 @@
 </dd>
 
         <dt id="configureBleTransport" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/configureBleTransport.html">configureBleTransport</a></span><span class="signature">(<wbr><span class="parameter" id="configureBleTransport-param-transport"><span class="type-annotation">MidiBleTransport?</span> <span class="parameter-name">transport</span></span>)
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/configureBleTransport.html">configureBleTransport</a></span><span class="signature">(<wbr><span class="parameter" id="configureBleTransport-param-transport"><span class="type-annotation"><a href="../flutter_midi_command/MidiBleTransport-class.html">MidiBleTransport</a>?</span> <span class="parameter-name">transport</span></span>)
     <span class="returntype parameter">&#8594; void</span>
   </span>
   
@@ -268,8 +283,8 @@
 </dd>
 
         <dt id="connectToDevice" class="callable">
-  <span class="name"><a href="../flutter_midi_command/MidiCommand/connectToDevice.html">connectToDevice</a></span><span class="signature">(<wbr><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span>, {</span><span class="parameter" id="connectToDevice-param-awaitConnectionTimeout"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a>?</span> <span class="parameter-name">awaitConnectionTimeout</span> = <span class="default-value">const Duration(seconds: 10)</span></span>})
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  <span class="name"><a href="../flutter_midi_command/MidiCommand/connectToDevice.html">connectToDevice</a></span><span class="signature">(<wbr><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span>, {</span><span class="parameter" id="connectToDevice-param-awaitConnectionTimeout"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a>?</span> <span class="parameter-name">awaitConnectionTimeout</span> = <span class="default-value">const Duration(seconds: 30)</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -374,7 +389,7 @@ Currently only supported on iOS.
 
         <dt id="startBluetooth" class="callable">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/startBluetooth.html">startBluetooth</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -387,7 +402,7 @@ Currently only supported on iOS.
 
         <dt id="startScanningForBluetoothDevices" class="callable">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/startScanningForBluetoothDevices.html">startScanningForBluetoothDevices</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -439,7 +454,7 @@ Currently only supported on iOS.
 
         <dt id="waitUntilBluetoothIsInitialized" class="callable">
   <span class="name"><a href="../flutter_midi_command/MidiCommand/waitUntilBluetoothIsInitialized.html">waitUntilBluetoothIsInitialized</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
@@ -548,7 +563,7 @@ Currently only supported on iOS.
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

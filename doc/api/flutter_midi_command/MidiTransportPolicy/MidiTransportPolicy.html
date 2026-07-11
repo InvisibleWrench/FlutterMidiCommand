@@ -54,8 +54,8 @@
 
     <section class="multi-line-signature">
       const
-      <span class="name ">MidiTransportPolicy</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="-param-includedTransports"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Set-class.html">Set</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiTransport.html">MidiTransport</a></span>&gt;</span>?</span> <span class="parameter-name">includedTransports</span>, </span></li>
-<li><span class="parameter" id="-param-excludedTransports"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Set-class.html">Set</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiTransport.html">MidiTransport</a></span>&gt;</span></span> <span class="parameter-name">excludedTransports</span> = <span class="default-value">const &lt;MidiTransport&gt;{}</span>, </span></li>
+      <span class="name ">MidiTransportPolicy</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="param-includedTransports"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Set-class.html">Set</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiTransport.html">MidiTransport</a></span>&gt;</span>?</span> <span class="parameter-name">includedTransports</span>, </span></li>
+<li><span class="parameter" id="param-excludedTransports"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Set-class.html">Set</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiTransport.html">MidiTransport</a></span>&gt;</span></span> <span class="parameter-name">excludedTransports</span> = <span class="default-value">const &lt;MidiTransport&gt;{}</span>, </span></li>
 </ol>})
     </section>
     
@@ -64,7 +64,10 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">const MidiTransportPolicy({this.includedTransports, this.excludedTransports = const &lt;MidiTransport&gt;{}});</code></pre>
+  <pre class="language-dart"><code class="language-dart">const MidiTransportPolicy({
+  this.includedTransports,
+  this.excludedTransports = const &lt;MidiTransport&gt;{},
+});</code></pre>
 </section>
 
 
@@ -92,7 +95,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

@@ -67,6 +67,7 @@ class FakeBleTransport implements MidiBleTransport {
   Future<void> connectToDevice(
     MidiDevice device, {
     List<MidiPort>? ports,
+    Duration? timeout,
   }) async {
     device.setConnectionState(MidiConnectionState.connected);
   }

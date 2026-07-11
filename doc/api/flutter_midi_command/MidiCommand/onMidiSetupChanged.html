@@ -59,7 +59,7 @@
   <section id="getter">
     <section class="multi-line-signature">
       
-      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>?</span>
+      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiSetupChange.html">MidiSetupChange</a></span>&gt;</span>?</span>
       get
       <span class="name ">onMidiSetupChanged</span>
       
@@ -67,15 +67,14 @@
     </section>
     
 <section class="desc markdown">
-  <p>Stream firing events whenever a change in the MIDI setup occurs</p>
-<p>For example, when a new BLE devices is discovered</p>
+  <p>Stream firing events whenever a change in the MIDI setup occurs.</p>
 </section>
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Stream&lt;String&gt;? get onMidiSetupChanged {
-  final streams = &lt;Stream&lt;String&gt;&gt;[];
+  <pre class="language-dart"><code class="language-dart">Stream&lt;MidiSetupChange&gt;? get onMidiSetupChanged {
+  final streams = &lt;Stream&lt;MidiSetupChange&gt;&gt;[];
   if (_platform.onMidiSetupChanged != null) {
     streams.add(_platform.onMidiSetupChanged!);
   }
@@ -119,7 +118,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

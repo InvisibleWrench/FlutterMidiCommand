@@ -54,9 +54,9 @@
 
     <section class="multi-line-signature">
       
-<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
 <span class="name ">connectToDevice</span>(<wbr><ol class="parameter-list"> <li><span class="parameter" id="connectToDevice-param-device"><span class="type-annotation"><a href="../../flutter_midi_command/MidiDevice-class.html">MidiDevice</a></span> <span class="parameter-name">device</span>, {</span></li>
-<li><span class="parameter" id="connectToDevice-param-awaitConnectionTimeout"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a>?</span> <span class="parameter-name">awaitConnectionTimeout</span> = <span class="default-value">const Duration(seconds: 10)</span>, </span></li>
+<li><span class="parameter" id="connectToDevice-param-awaitConnectionTimeout"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a>?</span> <span class="parameter-name">awaitConnectionTimeout</span> = <span class="default-value">const Duration(seconds: 30)</span>, </span></li>
 </ol>})
 
       
@@ -71,10 +71,17 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; connectToDevice(MidiDevice device, {Duration? awaitConnectionTimeout = const Duration(seconds: 10)}) async {
+  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; connectToDevice(
+  MidiDevice device, {
+  Duration? awaitConnectionTimeout = const Duration(seconds: 30),
+}) async {
   if (!device.connected) {
     device.setConnectionState(MidiConnectionState.connecting);
   }
+  final budget = _ConnectionBudget(
+    deviceId: device.id,
+    timeout: awaitConnectionTimeout,
+  );
   final connectionEstablished = _awaitConnectedOrFailed(device);
 
   try {
@@ -82,12 +89,33 @@
     if (route == _MidiDeviceRoute.bleTransport) {
       _requireTransport(MidiTransport.ble, &#39;connectToDevice&#39;);
       _requireBleTransport(&#39;connectToDevice&#39;);
-      await _bleTransport!.connectToDevice(device);
+      await budget.run(
+        MidiConnectionStage.bluetoothConnect,
+        (timeout) =&gt; _bleTransport!.connectToDevice(device, timeout: timeout),
+      );
+      &#47;&#47; On Apple platforms a bonded BLE peripheral becomes available through
+      &#47;&#47; CoreMIDI under the same id (its CoreBluetooth UUID), and that is the
+      &#47;&#47; path that actually carries MIDI data.
+      if (_requiresBlePlatformHandoff) {
+        await _handoffBleToPlatform(
+          device,
+          timeout: budget.remaining(MidiConnectionStage.platformHandoff),
+          required: true,
+        );
+      } else {
+        &#47;&#47; No-op where no platform counterpart appears (e.g. Android), leaving
+        &#47;&#47; the BLE transport as the data path.
+        unawaited(_handoffBleToPlatform(device));
+      }
     } else {
-      await _platform.connectToDevice(device);
+      await budget.run(
+        MidiConnectionStage.platformConnect,
+        (_) =&gt; _platform.connectToDevice(device),
+      );
     }
   } catch (_) {
-    if (device.connectionState == MidiConnectionState.connecting) {
+    unawaited(connectionEstablished.catchError((_) {}));
+    if (device.connectionState != MidiConnectionState.disconnected) {
       device.setConnectionState(MidiConnectionState.disconnected);
     }
     rethrow;
@@ -97,13 +125,12 @@
     return;
   }
 
-  if (awaitConnectionTimeout == null) {
-    await connectionEstablished;
-    return;
-  }
   try {
-    await connectionEstablished.timeout(awaitConnectionTimeout);
-  } on TimeoutException {
+    await budget.run(
+      MidiConnectionStage.connectionState,
+      (_) =&gt; connectionEstablished,
+    );
+  } catch (_) {
     if (device.connectionState == MidiConnectionState.connecting) {
       device.setConnectionState(MidiConnectionState.disconnected);
     }
@@ -137,7 +164,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

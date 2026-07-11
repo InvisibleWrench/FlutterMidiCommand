@@ -10,6 +10,7 @@ import 'method_channel_midi_command.dart';
 
 export 'package:flutter_midi_command_platform_interface/midi_device.dart';
 export 'package:flutter_midi_command_platform_interface/midi_ble_transport.dart';
+export 'package:flutter_midi_command_platform_interface/midi_connection_exception.dart';
 export 'package:flutter_midi_command_platform_interface/midi_packet.dart';
 export 'package:flutter_midi_command_platform_interface/midi_port.dart';
 export 'package:flutter_midi_command_platform_interface/midi_setup_change.dart';

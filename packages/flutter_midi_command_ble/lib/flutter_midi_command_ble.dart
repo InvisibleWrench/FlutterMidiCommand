@@ -68,7 +68,6 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       }
       if (isConnected) {
         device.updateConnectionState(BleConnectionState.connected);
-        _setupStreamController.add(MidiSetupChange.deviceConnected);
       } else {
         device.updateConnectionState(BleConnectionState.disconnected);
         _setupStreamController.add(MidiSetupChange.deviceDisconnected);
@@ -173,6 +172,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   Future<void> connectToDevice(
     MidiDevice device, {
     List<MidiPort>? ports,
+    Duration? timeout,
   }) async {
     _activateIfNeeded();
     if (device.type != MidiDeviceType.ble) {
@@ -191,7 +191,18 @@ class UniversalBleMidiTransport implements MidiBleTransport {
             rxStream: _rxStreamController,
           ),
         );
-    await bleDevice.connect();
+    try {
+      await bleDevice.connect(timeout: timeout);
+      if (!identical(bleDevice, device)) {
+        device.connected = bleDevice.connected;
+      }
+      _setupStreamController.add(MidiSetupChange.deviceConnected);
+    } catch (_) {
+      if (!identical(bleDevice, device)) {
+        device.connected = false;
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -258,11 +269,14 @@ class _BleMidiDevice extends MidiDevice {
   _DeviceState _devState = _DeviceState.none;
   BleService? _midiService;
   BleCharacteristic? _midiCharacteristic;
+  bool _bleLinkConnected = false;
+  bool _readinessInProgress = false;
 
   void updateConnectionState(BleConnectionState state) {
     final isConnected = state == BleConnectionState.connected;
-    connected = isConnected;
+    _bleLinkConnected = isConnected;
     if (!isConnected) {
+      connected = false;
       _devState = _DeviceState.none;
       _midiService = null;
       _midiCharacteristic = null;
@@ -270,22 +284,66 @@ class _BleMidiDevice extends MidiDevice {
     }
 
     unawaited(_requestMtu());
-    if (_devState.index < _DeviceState.interrogating.index) {
-      unawaited(_discoverServices());
+    if (!_readinessInProgress &&
+        _devState.index < _DeviceState.interrogating.index) {
+      unawaited(
+        _prepareMidiReadiness().catchError((Object _) {
+          connected = false;
+        }),
+      );
     }
   }
 
   void updatePairingState(bool value) {
-    if (value) {
-      _startNotify();
+    if (value && !_readinessInProgress) {
+      unawaited(
+        _startNotify()
+            .then((_) {
+              _devState = _DeviceState.available;
+              connected = true;
+            })
+            .catchError((Object _) {}),
+      );
     }
   }
 
-  Future<void> connect() async {
+  Future<void> connect({Duration? timeout}) async {
     if (connected) {
       return;
     }
-    await UniversalBle.connect(deviceId);
+    _readinessInProgress = true;
+    try {
+      await _runStage(
+        MidiConnectionStage.bluetoothConnect,
+        () => UniversalBle.connect(deviceId, timeout: timeout),
+        timeout,
+      );
+      if (!_bleLinkConnected) {
+        final connectionState = await _runStage(
+          MidiConnectionStage.bluetoothConnect,
+          () => UniversalBle.getConnectionState(deviceId, timeout: timeout),
+          timeout,
+        );
+        _bleLinkConnected = connectionState == BleConnectionState.connected;
+      }
+      if (!_bleLinkConnected) {
+        throw MidiConnectionException(
+          deviceId: deviceId,
+          stage: MidiConnectionStage.bluetoothConnect,
+          message: 'BLE link did not reach the connected state.',
+        );
+      }
+      await _prepareMidiReadiness(timeout: timeout);
+      connected = true;
+    } catch (_) {
+      connected = false;
+      try {
+        await disconnect();
+      } catch (_) {}
+      rethrow;
+    } finally {
+      _readinessInProgress = false;
+    }
   }
 
   Future<void> disconnect() async {
@@ -304,6 +362,7 @@ class _BleMidiDevice extends MidiDevice {
       // Ignore failures on teardown/disconnect path.
     }
     connected = false;
+    _bleLinkConnected = false;
     _devState = _DeviceState.none;
     _midiService = null;
     _midiCharacteristic = null;
@@ -387,15 +446,26 @@ class _BleMidiDevice extends MidiDevice {
     } catch (_) {}
   }
 
-  Future<void> _discoverServices() async {
+  Future<void> _prepareMidiReadiness({Duration? timeout}) async {
+    await _discoverServices(timeout: timeout);
+    await _ensurePaired(timeout: timeout);
+    await _startNotify(timeout: timeout);
+    _devState = _DeviceState.available;
+  }
+
+  Future<void> _discoverServices({Duration? timeout}) async {
     _devState = _DeviceState.interrogating;
-    final services = await UniversalBle.discoverServices(deviceId);
+    final services = await _runStage(
+      MidiConnectionStage.serviceDiscovery,
+      () => UniversalBle.discoverServices(deviceId, timeout: timeout),
+      timeout,
+    );
     _midiService = services
         .where((s) => s.uuid.toUpperCase() == midiServiceId)
         .firstOrNull;
     if (_midiService == null) {
       _devState = _DeviceState.irrelevant;
-      return;
+      throw MidiServiceDiscoveryException(deviceId: deviceId);
     }
 
     _midiCharacteristic = _midiService!.characteristics
@@ -403,50 +473,95 @@ class _BleMidiDevice extends MidiDevice {
         .firstOrNull;
     if (_midiCharacteristic == null) {
       _devState = _DeviceState.irrelevant;
-      return;
+      throw MidiServiceDiscoveryException(deviceId: deviceId);
     }
-
-    final isPaired = await UniversalBle.isPaired(deviceId);
-    if (isPaired ?? false) {
-      _devState = _DeviceState.available;
-      _startNotify();
-      return;
-    }
-    // Platforms without a system pairing API (Apple, web) return null and
-    // never fire onPairingStateChange, so notifications would never start.
-    // Read the MIDI characteristic once (per the BLE MIDI spec; triggers OS
-    // pairing when encryption is required) and subscribe directly.
-    if (isPaired == null) {
-      try {
-        await UniversalBle.read(
-          deviceId,
-          _midiService!.uuid,
-          _midiCharacteristic!.uuid,
-          timeout: const Duration(seconds: 5),
-        );
-      } catch (_) {}
-      _devState = _DeviceState.available;
-      _startNotify();
-      return;
-    }
-    try {
-      await UniversalBle.pair(deviceId);
-    } catch (_) {}
   }
 
-  void _startNotify() {
+  Future<void> _ensurePaired({Duration? timeout}) async {
+    final isPaired = await _runStage(
+      MidiConnectionStage.pairing,
+      () => UniversalBle.isPaired(deviceId, timeout: timeout),
+      timeout,
+    );
+    if (isPaired ?? false) {
+      return;
+    }
+
+    try {
+      if (isPaired == null) {
+        await _runStage(
+          MidiConnectionStage.pairing,
+          () => UniversalBle.read(
+            deviceId,
+            _midiService!.uuid,
+            _midiCharacteristic!.uuid,
+            timeout: timeout,
+          ),
+          timeout,
+        );
+        return;
+      }
+
+      await _runStage(
+        MidiConnectionStage.pairing,
+        () => UniversalBle.pair(deviceId, timeout: timeout),
+        timeout,
+      );
+      final pairedAfterPair = await _runStage(
+        MidiConnectionStage.pairing,
+        () => UniversalBle.isPaired(deviceId, timeout: timeout),
+        timeout,
+      );
+      if (pairedAfterPair != true) {
+        throw MidiPairingRejectedException(deviceId: deviceId);
+      }
+    } on MidiConnectionException {
+      rethrow;
+    } on PairingException catch (e) {
+      throw MidiPairingRejectedException(deviceId: deviceId, cause: e);
+    } catch (e) {
+      throw MidiPairingFailedException(deviceId: deviceId, cause: e);
+    }
+  }
+
+  Future<void> _startNotify({Duration? timeout}) async {
     if (_midiService == null || _midiCharacteristic == null) {
       return;
     }
-    // subscribeNotifications is async, so a synchronous try/catch cannot
-    // catch its errors; swallow them explicitly instead.
-    unawaited(
-      UniversalBle.subscribeNotifications(
-        deviceId,
-        _midiService!.uuid,
-        _midiCharacteristic!.uuid,
-      ).catchError((Object _) {}),
-    );
+    try {
+      await _runStage(
+        MidiConnectionStage.notificationSubscription,
+        () => UniversalBle.subscribeNotifications(
+          deviceId,
+          _midiService!.uuid,
+          _midiCharacteristic!.uuid,
+          timeout: timeout,
+        ),
+        timeout,
+      );
+    } on MidiConnectionException {
+      rethrow;
+    } catch (e) {
+      throw MidiNotificationSubscriptionException(deviceId: deviceId, cause: e);
+    }
+  }
+
+  Future<T> _runStage<T>(
+    MidiConnectionStage stage,
+    Future<T> Function() action,
+    Duration? timeout,
+  ) async {
+    try {
+      final future = action();
+      return timeout == null ? await future : await future.timeout(timeout);
+    } on TimeoutException catch (e) {
+      throw MidiConnectionTimeoutException(
+        deviceId: deviceId,
+        stage: stage,
+        timeout: timeout,
+        cause: e,
+      );
+    }
   }
 
   void handleData(Uint8List data) {

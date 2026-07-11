@@ -40,6 +40,10 @@ class _HomeViewState extends State<HomeView> {
       if (!device.connected) {
         try {
           await midi.connectToDevice(device);
+        } on MidiConnectionException catch (e) {
+          debugPrint(
+            'Could not connect to device ${device.name}: ${e.stage} ${e.message}',
+          );
         } catch (_) {
           debugPrint('Could not connect to device: $device');
         }

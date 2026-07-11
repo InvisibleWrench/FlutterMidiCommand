@@ -59,7 +59,7 @@
   <section id="getter">
     <section class="multi-line-signature">
       
-      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiPacket-class.html">MidiPacket</a></span>&gt;</span>?</span>
+      <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../flutter_midi_command/MidiPacket-class.html">MidiPacket</a></span>&gt;</span>?</span>
       get
       <span class="name ">onMidiPacketReceived</span>
       
@@ -80,7 +80,7 @@
     streams.add(_platform.onMidiDataReceived!);
   }
   if (_bleTransport != null &amp;&amp; isTransportEnabled(MidiTransport.ble)) {
-    streams.add(_bleTransport!.onMidiDataReceived);
+    streams.add(_bleTransportPackets());
   }
   if (streams.isEmpty) {
     return null;
@@ -119,7 +119,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

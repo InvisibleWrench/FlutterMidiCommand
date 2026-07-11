@@ -55,7 +55,7 @@ class MidiSessionController {
   final bool enableBle;
   final MidiCommand midi = MidiCommand();
   StreamSubscription<MidiDataReceivedEvent>? _rxSub;
-  StreamSubscription<String>? _setupSub;
+  StreamSubscription<MidiSetupChange>? _setupSub;
   MidiDevice? selectedDevice;
 
   Future<void> initialize() async {
@@ -97,7 +97,22 @@ class MidiSessionController {
       (d) => d.name.toLowerCase().contains(q),
       orElse: () => throw StateError('No MIDI device found for "$query".'),
     );
-    await midi.connectToDevice(device);
+    try {
+      await midi.connectToDevice(device);
+    } on MidiConnectionTimeoutException catch (e) {
+      // Timed out while waiting for a usable MIDI connection.
+      print('Connection timed out at ${e.stage}: ${e.message}');
+      rethrow;
+    } on MidiPairingRejectedException catch (e) {
+      // The user rejected the OS pairing/bonding prompt, or pairing did not complete.
+      print('Pairing rejected: ${e.message}');
+      rethrow;
+    } on MidiConnectionException catch (e) {
+      // Other connection-readiness failures such as service discovery,
+      // notification subscription, or CoreMIDI handoff.
+      print('Connection failed at ${e.stage}: ${e.message}');
+      rethrow;
+    }
     selectedDevice = device;
   }
 
@@ -147,7 +162,18 @@ class MidiSessionController {
 }
 ```
 
-`connectToDevice` completes when the connection is established, throws `StateError` on connection failure, and times out after 10 seconds by default.
+`connectToDevice` completes when the MIDI path is ready for use, or throws. The default `awaitConnectionTimeout` is 30 seconds and covers the full connection-readiness flow, not just the initial radio/socket connection. For BLE MIDI this includes BLE connection, service discovery, pairing/bonding through native UI when required, notification subscription, and on Apple platforms the CoreMIDI handoff for bonded BLE MIDI devices.
+
+Connection failures are surfaced as typed `MidiConnectionException` subclasses where possible:
+
+- `MidiConnectionTimeoutException`: the readiness flow exceeded `awaitConnectionTimeout`.
+- `MidiPairingRejectedException`: pairing/bonding was rejected or did not complete.
+- `MidiPairingFailedException`: pairing failed before a clear rejection was reported.
+- `MidiServiceDiscoveryException`: the BLE MIDI service/characteristic was not found.
+- `MidiNotificationSubscriptionException`: BLE MIDI notifications could not be enabled.
+- `MidiCoreMidiHandoffException`: a paired Apple BLE MIDI device was not exposed through CoreMIDI.
+
+Pass `awaitConnectionTimeout: null` only if you explicitly want to let the readiness flow wait indefinitely.
 
 ### Setup change events
 
@@ -282,7 +308,9 @@ If you still need old wire values for logging or compatibility, use `device.type
 
 ### 4) Connection semantics are stricter
 
-`await midi.connectToDevice(device)` now resolves only when connected (or throws on failure/timeout), so completion means a real connected state.
+`await midi.connectToDevice(device)` now resolves only when the MIDI path is ready for use (or throws on failure/timeout), so completion means a real connected state. The default timeout is 30 seconds and is a full connection-readiness budget. For BLE MIDI it covers BLE connection, service discovery, native pairing/bonding UI if required, notification subscription, and Apple CoreMIDI handoff when that is the data path.
+
+Connection failures use typed exceptions such as `MidiConnectionTimeoutException`, `MidiPairingRejectedException`, and `MidiCoreMidiHandoffException`, all deriving from `MidiConnectionException`.
 
 `MidiDevice` also exposes `onConnectionStateChanged` for reactive flows.
 
@@ -373,6 +401,8 @@ await midi.startScanningForBluetoothDevices();
 final state = midi.bluetoothState;
 final stateStream = midi.onBluetoothStateChanged;
 ```
+
+BLE `connectToDevice` completion means the BLE MIDI path is ready. On platforms without an explicit pairing API, such as Apple platforms, the transport triggers native pairing/bonding by accessing the encrypted MIDI characteristic and waits for that readiness step to finish or fail.
 
 ### Architecture note
 

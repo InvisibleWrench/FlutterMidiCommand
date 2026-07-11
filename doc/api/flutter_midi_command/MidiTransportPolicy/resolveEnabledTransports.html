@@ -70,7 +70,8 @@
   <pre class="language-dart"><code class="language-dart">Set&lt;MidiTransport&gt; resolveEnabledTransports(Set&lt;MidiTransport&gt; supported) {
   final included = includedTransports ?? supported;
   return included.where((transport) {
-    return supported.contains(transport) &amp;&amp; !excludedTransports.contains(transport);
+    return supported.contains(transport) &amp;&amp;
+        !excludedTransports.contains(transport);
   }).toSet();
 }</code></pre>
 </section>
@@ -100,7 +101,7 @@
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

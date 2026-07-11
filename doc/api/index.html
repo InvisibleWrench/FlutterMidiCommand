@@ -138,7 +138,7 @@ class MidiSessionController {
   final bool enableBle;
   final MidiCommand midi = MidiCommand();
   StreamSubscription&lt;MidiDataReceivedEvent&gt;? _rxSub;
-  StreamSubscription&lt;String&gt;? _setupSub;
+  StreamSubscription&lt;MidiSetupChange&gt;? _setupSub;
   MidiDevice? selectedDevice;
 
   Future&lt;void&gt; initialize() async {
@@ -180,7 +180,22 @@ class MidiSessionController {
       (d) =&gt; d.name.toLowerCase().contains(q),
       orElse: () =&gt; throw StateError('No MIDI device found for "$query".'),
     );
-    await midi.connectToDevice(device);
+    try {
+      await midi.connectToDevice(device);
+    } on MidiConnectionTimeoutException catch (e) {
+      // Timed out while waiting for a usable MIDI connection.
+      print('Connection timed out at ${e.stage}: ${e.message}');
+      rethrow;
+    } on MidiPairingRejectedException catch (e) {
+      // The user rejected the OS pairing/bonding prompt, or pairing did not complete.
+      print('Pairing rejected: ${e.message}');
+      rethrow;
+    } on MidiConnectionException catch (e) {
+      // Other connection-readiness failures such as service discovery,
+      // notification subscription, or CoreMIDI handoff.
+      print('Connection failed at ${e.stage}: ${e.message}');
+      rethrow;
+    }
     selectedDevice = device;
   }
 
@@ -229,8 +244,34 @@ class MidiSessionController {
   }
 }
 </code></pre>
-<p><code>connectToDevice</code> completes when the connection is established, throws <code>StateError</code> on connection failure, and times out after 10 seconds by default.</p>
-<p>See <code>example/</code> for a complete app with UI and transport toggles.</p>
+<p><code>connectToDevice</code> completes when the MIDI path is ready for use, or throws. The default <code>awaitConnectionTimeout</code> is 30 seconds and covers the full connection-readiness flow, not just the initial radio/socket connection. For BLE MIDI this includes BLE connection, service discovery, pairing/bonding through native UI when required, notification subscription, and on Apple platforms the CoreMIDI handoff for bonded BLE MIDI devices.</p>
+<p>Connection failures are surfaced as typed <code>MidiConnectionException</code> subclasses where possible:</p>
+<ul>
+<li><code>MidiConnectionTimeoutException</code>: the readiness flow exceeded <code>awaitConnectionTimeout</code>.</li>
+<li><code>MidiPairingRejectedException</code>: pairing/bonding was rejected or did not complete.</li>
+<li><code>MidiPairingFailedException</code>: pairing failed before a clear rejection was reported.</li>
+<li><code>MidiServiceDiscoveryException</code>: the BLE MIDI service/characteristic was not found.</li>
+<li><code>MidiNotificationSubscriptionException</code>: BLE MIDI notifications could not be enabled.</li>
+<li><code>MidiCoreMidiHandoffException</code>: a paired Apple BLE MIDI device was not exposed through CoreMIDI.</li>
+</ul>
+<p>Pass <code>awaitConnectionTimeout: null</code> only if you explicitly want to let the readiness flow wait indefinitely.</p>
+<h3 id="setup-change-events">Setup change events</h3>
+<p>Listen to <code>onMidiSetupChanged</code> to refresh your device list when the host MIDI topology changes. Native desktop/mobile transports monitor platform setup notifications and emit <code>MidiSetupChange</code> values:</p>
+<ul>
+<li><code>MidiSetupChange.deviceAppeared</code>: a MIDI device or logical port became available.</li>
+<li><code>MidiSetupChange.deviceDisappeared</code>: a MIDI device or logical port was removed.</li>
+<li><code>MidiSetupChange.deviceStateChanged</code>: an existing device changed name, port shape, or availability state.</li>
+<li><code>MidiSetupChange.deviceConnected</code>: this app connected to a device.</li>
+<li><code>MidiSetupChange.deviceDisconnected</code>: this app disconnected from a device, or a connected device was removed.</li>
+</ul>
+<p>Android, iOS/macOS, Linux, Windows, and Web use platform notifications to wake a fresh device snapshot and emit setup events only after a real MIDI-device change is observed. BLE MIDI is scan-driven: <code>MidiSetupChange.deviceAppeared</code> is emitted for scan results, and connection loss is emitted as <code>MidiSetupChange.deviceDisconnected</code>.</p>
+<p>On Windows, native device monitoring now keeps USB MIDI hot-plug changes in sync with <code>devices</code>, and multi-port WinMM endpoints are paired into full-duplex devices when matching input/output port sets can be inferred consistently.</p>
+<p>See <code>example/</code> for a complete app with:</p>
+<ul>
+<li>independent transport toggles for RTP, BLE, and Virtual MIDI</li>
+<li>a manual <code>Refresh Devices</code> action for the current device snapshot</li>
+<li>a separate <code>Scan BLE</code> action so Bluetooth discovery does not double as general device refresh</li>
+</ul>
 <h2 id="message-parser">Message parser</h2>
 <p><code>onMidiDataReceived</code> already emits typed MIDI messages.
 Use <code>MidiMessageParser</code> (or <code>MidiMessage.parse</code>) when you need to parse raw bytes from <code>onMidiPacketReceived</code> or from custom byte streams.
@@ -313,7 +354,8 @@ midi.configureBleTransport(UniversalBleMidiTransport());
 </code></pre>
 <p>If you still need old wire values for logging or compatibility, use <code>device.type.wireValue</code>.</p>
 <h3 id="4-connection-semantics-are-stricter">4) Connection semantics are stricter</h3>
-<p><code>await midi.connectToDevice(device)</code> now resolves only when connected (or throws on failure/timeout), so completion means a real connected state.</p>
+<p><code>await midi.connectToDevice(device)</code> now resolves only when the MIDI path is ready for use (or throws on failure/timeout), so completion means a real connected state. The default timeout is 30 seconds and is a full connection-readiness budget. For BLE MIDI it covers BLE connection, service discovery, native pairing/bonding UI if required, notification subscription, and Apple CoreMIDI handoff when that is the data path.</p>
+<p>Connection failures use typed exceptions such as <code>MidiConnectionTimeoutException</code>, <code>MidiPairingRejectedException</code>, and <code>MidiCoreMidiHandoffException</code>, all deriving from <code>MidiConnectionException</code>.</p>
 <p><code>MidiDevice</code> also exposes <code>onConnectionStateChanged</code> for reactive flows.</p>
 <h3 id="5-transport-policies-are-first-class">5) Transport policies are first-class</h3>
 <p>Use <code>MidiTransportPolicy</code> to enable/disable transports at runtime. Transport-specific calls throw <code>StateError</code> when that transport is disabled.</p>
@@ -374,6 +416,7 @@ await midi.startScanningForBluetoothDevices();
 final state = midi.bluetoothState;
 final stateStream = midi.onBluetoothStateChanged;
 </code></pre>
+<p>BLE <code>connectToDevice</code> completion means the BLE MIDI path is ready. On platforms without an explicit pairing API, such as Apple platforms, the transport triggers native pairing/bonding by accessing the encrypted MIDI characteristic and waits for that readiness step to finish or fail.</p>
 <h3 id="architecture-note">Architecture note</h3>
 <p><code>MidiCommandPlatform</code> now only describes native host MIDI operations.
 Shared BLE discovery/connection lives in <code>MidiBleTransport</code>, implemented in Dart (<code>flutter_midi_command_ble</code>).
@@ -429,7 +472,7 @@ Web MIDI is implemented by <code>flutter_midi_command_web</code> using browser W
 <footer>
   <span class="no-break">
     flutter_midi_command
-      1.0.0
+      1.0.2
   </span>
   
 </footer>

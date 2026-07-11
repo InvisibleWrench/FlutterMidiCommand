@@ -24,6 +24,16 @@ void runExampleApp({
   );
 }
 
+String connectionErrorMessage(Object error) {
+  if (error is MidiConnectionException) {
+    return error.message;
+  }
+  if (error is PlatformException) {
+    return error.message ?? error.code;
+  }
+  return error.toString();
+}
+
 class MyApp extends StatefulWidget {
   const MyApp({
     super.key,
@@ -650,8 +660,8 @@ class MyAppState extends State<MyApp> {
               }).catchError((err) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(
-                        "Error: ${(err as PlatformException?)?.message}")));
+                  content: Text("Error: ${connectionErrorMessage(err)}"),
+                ));
               });
               setState(() {});
             }
