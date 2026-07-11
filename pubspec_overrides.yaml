@@ -1,0 +1,14 @@
+# melos_managed_dependency_overrides: flutter_midi_command_android,flutter_midi_command_darwin,flutter_midi_command_linux,flutter_midi_command_platform_interface,flutter_midi_command_web,flutter_midi_command_windows
+dependency_overrides:
+  flutter_midi_command_android:
+    path: packages/flutter_midi_command_android
+  flutter_midi_command_darwin:
+    path: packages/flutter_midi_command_darwin
+  flutter_midi_command_linux:
+    path: packages/flutter_midi_command_linux
+  flutter_midi_command_platform_interface:
+    path: packages/flutter_midi_command_platform_interface
+  flutter_midi_command_web:
+    path: packages/flutter_midi_command_web
+  flutter_midi_command_windows:
+    path: packages/flutter_midi_command_windows

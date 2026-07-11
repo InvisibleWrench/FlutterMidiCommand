@@ -4,7 +4,11 @@
 .packages
 .pub/
 pubspec.lock
-pubspec_overrides.yaml
+# pubspec_overrides.yaml is intentionally tracked: none of the federated
+# packages are published to pub.dev yet, so their `^1.0.x` inter-package
+# constraints only resolve via these local path overrides. On a clean checkout
+# `melos bootstrap` cannot regenerate them (its initial root `pub get` fails
+# before any override is written), so CI needs them committed.
 
 build/
 local.properties
