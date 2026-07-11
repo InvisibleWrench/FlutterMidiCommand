@@ -107,6 +107,20 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   @override
   Future<void> startBluetooth() async {
     _activateIfNeeded();
+    // On Apple, when the host app declares the `bluetooth-central` background
+    // mode, universal_ble intentionally defers creating the CBCentralManager
+    // (and the permission prompt) until a central operation runs. Until then
+    // `getBluetoothAvailabilityState()` reports "unknown" without ever
+    // initialising CoreBluetooth, so `onAvailabilityChange` never fires and
+    // callers waiting for a resolved state deadlock. Requesting permission
+    // forces the manager to be created, which makes CoreBluetooth report its
+    // real state (and surfaces the OS prompt on first launch).
+    try {
+      await UniversalBle.requestPermissions();
+    } catch (_) {
+      // A denial/unsupported result is reflected in the availability state
+      // read below; nothing else to do here.
+    }
     final state = await UniversalBle.getBluetoothAvailabilityState();
     _bleState = state.name;
     _bluetoothStateStreamController.add(state.name);
