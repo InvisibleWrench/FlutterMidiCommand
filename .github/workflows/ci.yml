@@ -21,8 +21,11 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - run: dart run pigeon --input pigeons/midi_api.dart
       - run: git diff --exit-code -- packages/flutter_midi_command_platform_interface/lib/src/pigeon packages/flutter_midi_command_android/android/src/main/kotlin/com/invisiblewrench/fluttermidicommand/pigeon packages/flutter_midi_command_darwin/darwin/flutter_midi_command_darwin/Sources/flutter_midi_command_darwin/pigeon
 
@@ -35,12 +38,15 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
-      - run: dart pub global run melos run analyze
-      - run: dart pub global run melos run analyze:example
-      - run: dart pub global run melos run test
-      - run: dart pub global run melos run test:web:chrome
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
+      - run: melos run analyze
+      - run: melos run analyze:example
+      - run: melos run test
+      - run: melos run test:web:chrome
 
   native_android_checks:
     runs-on: ubuntu-latest
@@ -51,10 +57,13 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Android native unit tests
-        run: dart pub global run melos run test:native:android
+        run: melos run test:native:android
 
   native_darwin_checks:
     runs-on: macos-latest
@@ -65,10 +74,13 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Darwin native tests
-        run: dart pub global run melos run test:native:darwin
+        run: melos run test:native:darwin
 
   native_linux_checks:
     runs-on: ubuntu-latest
@@ -79,10 +91,13 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Linux backend tests
-        run: dart pub global run melos run test:native:linux
+        run: melos run test:native:linux
 
   native_windows_checks:
     runs-on: windows-latest
@@ -93,10 +108,13 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Windows backend tests
-        run: dart pub global run melos run test:native:windows
+        run: melos run test:native:windows
 
   example_android:
     runs-on: ubuntu-latest
@@ -107,10 +125,13 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Build example app (Android)
-        run: dart pub global run melos run build:example:android
+        run: melos run build:example:android
       - name: Enable KVM
         run: |
           sudo tee /etc/udev/rules.d/99-kvm4all.rules <<'EOF'
@@ -127,7 +148,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save
-          script: dart pub global run melos run test:example:integration:android
+          script: melos run test:example:integration:android
         env:
           ANDROID_DEVICE_ID: emulator-5554
           ANDROID_SMOKE_MAX_ATTEMPTS: "3"
@@ -145,12 +166,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Build example app (Linux)
-        run: dart pub global run melos run build:example:linux
+        run: melos run build:example:linux
       - name: Run smoke test (Linux)
-        run: xvfb-run -a dart pub global run melos run test:example:integration:linux
+        run: xvfb-run -a melos run test:example:integration:linux
 
   example_apple:
     runs-on: macos-latest
@@ -166,16 +190,19 @@ jobs:
       - name: Enable Swift Package Manager
         run: flutter config --enable-swift-package-manager
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Build example app (iOS)
-        run: dart pub global run melos run build:example:ios
+        run: melos run build:example:ios
       - name: Build example app (macOS)
-        run: dart pub global run melos run build:example:macos
+        run: melos run build:example:macos
       - name: Run smoke test (macOS)
-        run: dart pub global run melos run test:example:integration:macos
+        run: melos run test:example:integration:macos
       - name: Run smoke test (iOS simulator)
-        run: dart pub global run melos run test:example:integration:ios
+        run: melos run test:example:integration:ios
         env:
           IOS_SMOKE_MAX_ATTEMPTS: "3"
 
@@ -188,12 +215,15 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Build example app (Windows)
-        run: dart pub global run melos run build:example:windows
+        run: melos run build:example:windows
       - name: Run smoke test (Windows)
-        run: dart pub global run melos run test:example:integration:windows
+        run: melos run test:example:integration:windows
 
   example_web:
     runs-on: ubuntu-latest
@@ -204,9 +234,12 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install Melos
-        run: dart pub global activate melos ${{ env.MELOS_VERSION }}
-      - run: dart pub global run melos bootstrap
+        shell: bash
+        run: |
+          dart pub global activate melos ${{ env.MELOS_VERSION }}
+          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
       - name: Build example app (Web)
-        run: dart pub global run melos run build:example:web
+        run: melos run build:example:web
       - name: Run smoke test (Web Chrome)
-        run: dart pub global run melos run test:example:integration:web
+        run: melos run test:example:integration:web
