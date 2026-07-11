@@ -50,10 +50,19 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     };
 
     UniversalBle.onScanResult = (result) {
-      if (_devices.containsKey(result.deviceId) || result.name == null) {
+      if (result.name == null) {
         return;
       }
-      _devices[result.deviceId] = _BleMidiDevice(
+      final existing = _devices[result.deviceId];
+      if (existing != null) {
+        existing.name = result.name!;
+        if (!existing.visible) {
+          existing.visible = true;
+          _setupStreamController.add(MidiSetupChange.deviceAppeared);
+        }
+        return;
+      }
+      _devices[result.deviceId] = _BleMidiDevice.visible(
         deviceId: result.deviceId,
         name: result.name!,
         rxStream: _rxStreamController,
@@ -146,7 +155,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     // already in `_devices`). Re-announce connected/known devices so
     // event-driven UIs refresh while scanning; disconnected devices are removed
     // from the cache and must be seen again before they are listed.
-    if (_devices.isNotEmpty) {
+    if (_devices.values.any((device) => device.visible)) {
       _setupStreamController.add(MidiSetupChange.deviceAppeared);
     }
     await UniversalBle.startScan(
@@ -160,13 +169,14 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   }
 
   @override
-  Future<List<MidiDevice>> get devices async => _devices.values.toList();
+  Future<List<MidiDevice>> get devices async =>
+      _devices.values.where((device) => device.visible).toList();
 
   @override
   MidiDevice? registerKnownDevice(String id, String name) {
     return _devices.putIfAbsent(
       id,
-      () => _BleMidiDevice(
+      () => _BleMidiDevice.hidden(
         deviceId: id,
         name: name,
         rxStream: _rxStreamController,
@@ -191,7 +201,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         _devices[device.id] ??
         _devices.putIfAbsent(
           device.id,
-          () => _BleMidiDevice(
+          () => _BleMidiDevice.visible(
             deviceId: device.id,
             name: device.name,
             rxStream: _rxStreamController,
@@ -199,6 +209,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         );
     try {
       await bleDevice.connect(timeout: timeout);
+      bleDevice.visible = true;
       if (!identical(bleDevice, device)) {
         device.connected = bleDevice.connected;
       }
@@ -267,15 +278,25 @@ class UniversalBleMidiTransport implements MidiBleTransport {
 }
 
 class _BleMidiDevice extends MidiDevice {
-  _BleMidiDevice({
+  _BleMidiDevice.visible({
     required this.deviceId,
     required String name,
     required StreamController<MidiPacket> rxStream,
-  }) : _rxStreamCtrl = rxStream,
+  }) : visible = true,
+       _rxStreamCtrl = rxStream,
+       super(deviceId, name, MidiDeviceType.ble, false);
+
+  _BleMidiDevice.hidden({
+    required this.deviceId,
+    required String name,
+    required StreamController<MidiPacket> rxStream,
+  }) : visible = false,
+       _rxStreamCtrl = rxStream,
        super(deviceId, name, MidiDeviceType.ble, false);
 
   final String deviceId;
   final StreamController<MidiPacket> _rxStreamCtrl;
+  bool visible;
 
   _DeviceState _devState = _DeviceState.none;
   BleService? _midiService;

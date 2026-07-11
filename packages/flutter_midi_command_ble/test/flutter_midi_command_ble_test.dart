@@ -280,6 +280,46 @@ void main() {
   });
 
   test(
+    'registerKnownDevice stays hidden until BLE scan rediscovers it',
+    () async {
+      final registered = transport.registerKnownDevice(
+        'ble-known',
+        'Known Device',
+      );
+
+      expect(registered, isNotNull);
+      expect(await transport.devices, isEmpty);
+
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-known',
+          name: 'Known Device',
+          services: <String>[],
+        ),
+      );
+
+      final devices = await transport.devices;
+      expect(devices.single.id, 'ble-known');
+    },
+  );
+
+  test('connectToDevice makes registered known BLE device visible', () async {
+    fakePlatform.servicesByDevice['ble-known-connect'] = midiServices();
+    final registered = transport.registerKnownDevice(
+      'ble-known-connect',
+      'Known Connect Device',
+    )!;
+
+    expect(await transport.devices, isEmpty);
+
+    await transport.connectToDevice(registered);
+
+    final devices = await transport.devices;
+    expect(devices.single.id, 'ble-known-connect');
+    expect(devices.single.connected, isTrue);
+  });
+
+  test(
     'disconnectDevice removes stale BLE device until rediscovered',
     () async {
       fakePlatform.servicesByDevice['ble-stale'] = midiServices();
