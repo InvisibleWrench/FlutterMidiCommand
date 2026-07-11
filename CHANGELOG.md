@@ -6,9 +6,6 @@
  - **FIX**: bluetooth discovery with latest Universal_ble.
  - **FIX**: suppress duplicate BLE packets after the CoreMIDI handoff.
  - **FIX**: subscribe to BLE MIDI notifications on platforms without a pairing.
- - **FIX**: update example app to iOS v14 minimum.
- - **FIX**: port to win32 6, csv 8 and file_picker 12 APIs.
- - **FIX**: example app dependency update.
 
 ## 1.0.2
 
