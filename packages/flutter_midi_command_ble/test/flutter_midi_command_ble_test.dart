@@ -257,6 +257,7 @@ void main() {
       transport.connectToDevice(device),
       throwsA(isA<ConnectionException>()),
     );
+    expect(await transport.devices, isEmpty);
   });
 
   test('disconnectDevice forwards to BLE backend', () async {
@@ -277,6 +278,37 @@ void main() {
     expect(fakePlatform.disconnectCalls, contains('ble-3'));
     expect(device.connected, isFalse);
   });
+
+  test(
+    'disconnectDevice removes stale BLE device until rediscovered',
+    () async {
+      fakePlatform.servicesByDevice['ble-stale'] = midiServices();
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-stale',
+          name: 'Stale Device',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      await transport.connectToDevice(device);
+      transport.disconnectDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(await transport.devices, isEmpty);
+
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-stale',
+          name: 'Stale Device',
+          services: <String>[],
+        ),
+      );
+
+      expect((await transport.devices).single.id, 'ble-stale');
+    },
+  );
 
   test('connectToDevice fails when BLE MIDI service is missing', () async {
     fakePlatform.emitScanDevice(

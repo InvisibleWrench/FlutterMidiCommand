@@ -236,8 +236,9 @@ class MidiCommand {
         if (advertisedName != null && advertisedName.isNotEmpty) {
           device.name = advertisedName;
         }
-        // Remember the bonded device in the BLE transport so it stays listed
-        // and reconnectable by UUID after CoreMIDI drops it on disconnect.
+        // Remember the bonded device in the BLE transport so the BLE side can
+        // finish pairing/connection work; it will be removed when its BLE link
+        // disconnects and rediscovered on a fresh scan if still present.
         _bleTransport!.registerKnownDevice(device.id, device.name);
       }
       _rememberDeviceRoute(device, _MidiDeviceRoute.platform);

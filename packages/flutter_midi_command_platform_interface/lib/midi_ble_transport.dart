@@ -21,9 +21,9 @@ abstract class MidiBleTransport {
 
   /// Registers a BLE device that may currently only be known via the host
   /// platform (for example a bonded peripheral exposed by CoreMIDI that this
-  /// transport never scanned). Lets the transport keep it listed so it remains
-  /// reconnectable by id after the host platform drops it. Returns the
-  /// transport's device instance, or null if unsupported.
+  /// transport never scanned). Lets the transport prepare or release the
+  /// matching BLE link by id. Returns the transport's device instance, or null
+  /// if unsupported.
   MidiDevice? registerKnownDevice(String id, String name) => null;
 
   Future<void> connectToDevice(

@@ -100,8 +100,9 @@
       if (advertisedName != null &amp;&amp; advertisedName.isNotEmpty) {
         device.name = advertisedName;
       }
-      &#47;&#47; Remember the bonded device in the BLE transport so it stays listed
-      &#47;&#47; and reconnectable by UUID after CoreMIDI drops it on disconnect.
+      &#47;&#47; Remember the bonded device in the BLE transport so the BLE side can
+      &#47;&#47; finish pairing&#47;connection work; it will be removed when its BLE link
+      &#47;&#47; disconnects and rediscovered on a fresh scan if still present.
       _bleTransport!.registerKnownDevice(device.id, device.name);
     }
     _rememberDeviceRoute(device, _MidiDeviceRoute.platform);

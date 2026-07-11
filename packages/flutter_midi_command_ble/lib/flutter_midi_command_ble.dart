@@ -70,7 +70,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         device.updateConnectionState(BleConnectionState.connected);
       } else {
         device.updateConnectionState(BleConnectionState.disconnected);
-        _setupStreamController.add(MidiSetupChange.deviceDisconnected);
+        _removeDisconnectedDevice(deviceId);
       }
     };
 
@@ -101,6 +101,13 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     }
     _isTornDown = false;
     _registerCallbacks();
+  }
+
+  void _removeDisconnectedDevice(String deviceId) {
+    final removed = _devices.remove(deviceId);
+    if (removed != null) {
+      _setupStreamController.add(MidiSetupChange.deviceDisconnected);
+    }
   }
 
   @override
@@ -136,10 +143,9 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   Future<void> startScanningForBluetoothDevices() async {
     _activateIfNeeded();
     // `onScanResult` only fires for newly-seen peripherals (it ignores ids
-    // already in `_devices`). After a previous discovery/disconnect the device
-    // stays cached, so a fresh scan would emit no `deviceAppeared` and
-    // event-driven UIs would never re-surface it. Re-announce known devices so
-    // listeners refresh and can reconnect.
+    // already in `_devices`). Re-announce connected/known devices so
+    // event-driven UIs refresh while scanning; disconnected devices are removed
+    // from the cache and must be seen again before they are listed.
     if (_devices.isNotEmpty) {
       _setupStreamController.add(MidiSetupChange.deviceAppeared);
     }
@@ -201,6 +207,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       if (!identical(bleDevice, device)) {
         device.connected = false;
       }
+      _removeDisconnectedDevice(bleDevice.deviceId);
       rethrow;
     }
   }
@@ -215,7 +222,11 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     if (bleDevice == null) {
       return;
     }
-    unawaited(bleDevice.disconnect());
+    unawaited(
+      bleDevice.disconnect().whenComplete(() {
+        _removeDisconnectedDevice(device.id);
+      }),
+    );
   }
 
   @override
