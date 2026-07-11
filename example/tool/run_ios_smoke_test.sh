@@ -3,15 +3,9 @@ set -euo pipefail
 
 SMOKE_TEST_PATH="${IOS_SMOKE_TEST_PATH:-integration_test/smoke_test.dart}"
 MAX_ATTEMPTS="${IOS_SMOKE_MAX_ATTEMPTS:-2}"
+ATTEMPT_TIMEOUT_SECONDS="${IOS_SMOKE_ATTEMPT_TIMEOUT_SECONDS:-600}"
 
 SIMULATOR_ID="${IOS_DEVICE_ID:-}"
-if [[ -z "${SIMULATOR_ID}" ]]; then
-  SIMULATOR_ID="$(
-    flutter devices 2>/dev/null |
-      awk -F '•' '/ios/ {id=$2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id); print id; exit}'
-  )"
-fi
-
 if [[ -z "${SIMULATOR_ID}" ]]; then
   SIMULATOR_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"
 fi
@@ -32,14 +26,40 @@ boot_target() {
   fi
   xcrun simctl boot "${SIMULATOR_ID}" >/dev/null 2>&1 || true
   xcrun simctl bootstatus "${SIMULATOR_ID}" -b >/dev/null
-  open -a Simulator --args -CurrentDeviceUDID "${SIMULATOR_ID}" >/dev/null 2>&1 || true
 }
 
 run_smoke_test() {
   flutter test "${SMOKE_TEST_PATH}" \
     -d "${SIMULATOR_ID}" \
     --reporter expanded \
-    --timeout 4m
+    --timeout 4m &
+  local test_pid=$!
+  local timed_out_file
+  timed_out_file="$(mktemp)"
+
+  (
+    sleep "${ATTEMPT_TIMEOUT_SECONDS}"
+    if kill -0 "${test_pid}" 2>/dev/null; then
+      echo "iOS smoke test exceeded ${ATTEMPT_TIMEOUT_SECONDS}s; terminating it."
+      echo timed-out >"${timed_out_file}"
+      pkill -TERM -P "${test_pid}" >/dev/null 2>&1 || true
+      kill -TERM "${test_pid}" >/dev/null 2>&1 || true
+      sleep 10
+      pkill -KILL -P "${test_pid}" >/dev/null 2>&1 || true
+      kill -KILL "${test_pid}" >/dev/null 2>&1 || true
+    fi
+  ) &
+  local watchdog_pid=$!
+
+  local status=0
+  wait "${test_pid}" || status=$?
+  kill "${watchdog_pid}" >/dev/null 2>&1 || true
+  wait "${watchdog_pid}" 2>/dev/null || true
+  if [[ -s "${timed_out_file}" ]]; then
+    status=124
+  fi
+  rm -f "${timed_out_file}"
+  return "${status}"
 }
 
 echo "Running iOS smoke test on target: ${SIMULATOR_ID}"

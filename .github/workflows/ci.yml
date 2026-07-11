@@ -140,6 +140,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run smoke test (Android emulator)
+        timeout-minutes: 25
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -174,6 +175,7 @@ jobs:
       - name: Build example app (Linux)
         run: melos run build:example:linux
       - name: Run smoke test (Linux)
+        timeout-minutes: 15
         run: xvfb-run -a melos run test:example:integration:linux
 
   example_apple:
@@ -200,11 +202,46 @@ jobs:
       - name: Build example app (macOS)
         run: melos run build:example:macos
       - name: Run smoke test (macOS)
+        timeout-minutes: 15
         run: melos run test:example:integration:macos
+      - name: Boot iOS simulator
+        shell: bash
+        run: |
+          IOS_DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"
+          if [[ -z "$IOS_DEVICE_ID" ]]; then
+            echo "No available iPhone simulator found."
+            exit 1
+          fi
+          echo "IOS_DEVICE_ID=$IOS_DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl shutdown all || true
+          xcrun simctl erase "$IOS_DEVICE_ID"
+          xcrun simctl boot "$IOS_DEVICE_ID"
+          xcrun simctl bootstatus "$IOS_DEVICE_ID" -b
+          # Flutter discovers the debug VM service over the local network on
+          # iOS. Pre-authorize it so a fresh CI simulator cannot block on the
+          # native permission dialog before the Dart test has loaded.
+          xcrun simctl privacy "$IOS_DEVICE_ID" grant local-network \
+            com.invisiblewrench.fluttermidicommandExample || true
       - name: Run smoke test (iOS simulator)
+        timeout-minutes: 25
         run: melos run test:example:integration:ios
         env:
-          IOS_SMOKE_MAX_ATTEMPTS: "3"
+          IOS_SMOKE_MAX_ATTEMPTS: "2"
+          IOS_SMOKE_ATTEMPT_TIMEOUT_SECONDS: "600"
+      - name: Collect iOS simulator diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          xcrun simctl list
+          mkdir -p "$RUNNER_TEMP/simulator-diagnostics"
+          xcrun simctl diagnose -b --output="$RUNNER_TEMP/simulator-diagnostics" || true
+      - name: Upload iOS simulator diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-diagnostics
+          path: ${{ runner.temp }}/simulator-diagnostics
+          if-no-files-found: ignore
 
   example_windows:
     runs-on: windows-latest
@@ -223,6 +260,7 @@ jobs:
       - name: Build example app (Windows)
         run: melos run build:example:windows
       - name: Run smoke test (Windows)
+        timeout-minutes: 15
         run: melos run test:example:integration:windows
 
   example_web:
@@ -242,4 +280,5 @@ jobs:
       - name: Build example app (Web)
         run: melos run build:example:web
       - name: Run smoke test (Web Chrome)
+        timeout-minutes: 15
         run: melos run test:example:integration:web
