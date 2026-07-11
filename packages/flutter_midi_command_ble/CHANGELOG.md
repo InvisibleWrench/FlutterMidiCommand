@@ -1,3 +1,11 @@
+## 1.0.3
+
+ - **FIX**(ble): hide registered devices until rediscovered.
+ - **FIX**(ble): remove stale BLE devices on disconnect.
+ - **FIX**: await BLE MIDI readiness in connectToDevice.
+ - **FIX**: bluetooth discovery with latest Universal_ble.
+ - **FIX**: subscribe to BLE MIDI notifications on platforms without a pairing.
+
 ## 1.0.2
 
  - N

@@ -1,3 +1,8 @@
+## 1.0.3
+
+ - **FIX**(ble): remove stale BLE devices on disconnect.
+ - **FIX**: await BLE MIDI readiness in connectToDevice.
+
 ## 1.0.2
 
 ## 1.0.1
