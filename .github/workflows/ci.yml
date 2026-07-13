@@ -27,6 +27,10 @@ jobs:
           echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
       - run: melos bootstrap
       - run: dart run pigeon --input pigeons/midi_api.dart
+      # The workspace format check normalizes generated Dart. Pigeon emits
+      # functionally identical Dart with generator-specific whitespace, so
+      # apply the same formatter before comparing checked-in contracts.
+      - run: dart format packages/flutter_midi_command_platform_interface/lib/src/pigeon/midi_api.g.dart
       - run: git diff --exit-code -- packages/flutter_midi_command_platform_interface/lib/src/pigeon packages/flutter_midi_command_android/android/src/main/kotlin/com/invisiblewrench/fluttermidicommand/pigeon packages/flutter_midi_command_darwin/darwin/flutter_midi_command_darwin/Sources/flutter_midi_command_darwin/pigeon
 
   dart_checks:
