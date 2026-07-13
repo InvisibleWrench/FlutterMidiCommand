@@ -32,7 +32,8 @@ Supports
   - iOS: plugin package minimum is `11.0` (`packages/flutter_midi_command_darwin/ios/flutter_midi_command_darwin.podspec`), while the example app currently targets `13.0` (`example/ios/Podfile`).
   - macOS: plugin package minimum is `10.13` (`packages/flutter_midi_command_darwin/macos/flutter_midi_command_darwin.podspec`), while the example app currently targets `10.15` (`example/macos/Podfile`).
   - Android: plugin package minimum is `minSdkVersion(21)` (`packages/flutter_midi_command_android/android/build.gradle.kts`), while the example app currently uses `minSdkVersion(24)` (`example/android/app/build.gradle.kts`).
-- If BLE is enabled on iOS, add `NSBluetoothAlwaysUsageDescription` (and related Bluetooth/location keys as required by your BLE flow) to `Info.plist`.
+- Android BLE permissions are merged automatically when `flutter_midi_command_ble` is installed.
+- Apple usage descriptions/capabilities and packaged Windows/Linux permissions remain application-owned. See the [BLE platform setup guide](https://pub.dev/packages/flutter_midi_command_ble#platform-setup).
 - If using network MIDI on iOS, add `NSLocalNetworkUsageDescription`.
 - On Linux, make sure ALSA is installed.
 - On Web, use HTTPS and a browser with Web MIDI enabled (for example Chrome/Edge).
