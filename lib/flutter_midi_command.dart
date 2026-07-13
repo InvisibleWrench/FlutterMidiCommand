@@ -85,8 +85,10 @@ class MidiCommand {
       logHandler?.call('[flutter_midi_command] $message');
   final Expando<_MidiDeviceRoute> _deviceRouteByInstance =
       Expando<_MidiDeviceRoute>('midi_device_route');
-  final Map<String, _MidiDeviceRoute> _deviceRouteById =
+  final Map<String, _MidiDeviceRoute> _activeDeviceRouteById =
       <String, _MidiDeviceRoute>{};
+  final Map<String, int> _blePlatformHandoffById = <String, int>{};
+  int _nextBlePlatformHandoff = 0;
   final Map<String, MidiMessageParser> _messageParsersBySource =
       <String, MidiMessageParser>{};
   Expando<MidiMessageParser> _messageParsersByAnonymousDevice =
@@ -117,7 +119,8 @@ class MidiCommand {
     _bleTransport = transport;
     _bluetoothIsStarted = false;
     _bluetoothState = BluetoothState.unknown;
-    _deviceRouteById.clear();
+    _cancelAllBlePlatformHandoffs();
+    _activeDeviceRouteById.clear();
     _resetMessageParsers();
   }
 
@@ -151,7 +154,8 @@ class MidiCommand {
     _bluetoothIsStarted = false;
     _bluetoothStartFuture = null;
     _bluetoothState = BluetoothState.unknown;
-    _deviceRouteById.clear();
+    _cancelAllBlePlatformHandoffs();
+    _activeDeviceRouteById.clear();
     _resetMessageParsers();
     if (identical(_instance, this)) {
       _instance = null;
@@ -186,6 +190,9 @@ class MidiCommand {
         ?.onBluetoothStateChanged
         .listen((s) {
           _bluetoothState = BluetoothState.values.byName(s);
+          if (_bluetoothState != BluetoothState.poweredOn) {
+            _cancelAllBlePlatformHandoffs();
+          }
           _bluetoothStateStream.add(_bluetoothState);
         });
 
@@ -211,7 +218,6 @@ class MidiCommand {
   /// Gets a list of available MIDI devices and returns it
   Future<List<MidiDevice>?> get devices async {
     final devices = <MidiDevice>[];
-    _deviceRouteById.clear();
 
     final platformDevices = await _platform.devices ?? <MidiDevice>[];
 
@@ -240,6 +246,13 @@ class MidiCommand {
         // finish pairing/connection work; it will be removed when its BLE link
         // disconnects and rediscovered on a fresh scan if still present.
         _bleTransport!.registerKnownDevice(device.id, device.name);
+        // Until a live CoreMIDI endpoint has taken over, keep returning the
+        // BLE object whose connection state and data path are authoritative.
+        if (_activeDeviceRouteById[device.id] ==
+            _MidiDeviceRoute.bleTransport) {
+          _rememberDeviceRoute(device, _MidiDeviceRoute.platform);
+          continue;
+        }
       }
       _rememberDeviceRoute(device, _MidiDeviceRoute.platform);
       devices.add(device);
@@ -249,7 +262,8 @@ class MidiCommand {
     // (discovery/pairing) or a previously-bonded device that CoreMIDI dropped.
     // Keep them on the BLE transport so the user can (re)connect by UUID.
     for (final device in bleDevices) {
-      if (platformIds.contains(device.id)) {
+      if (platformIds.contains(device.id) &&
+          _activeDeviceRouteById[device.id] != _MidiDeviceRoute.bleTransport) {
         continue;
       }
       _rememberDeviceRoute(device, _MidiDeviceRoute.bleTransport);
@@ -337,7 +351,11 @@ class MidiCommand {
     _bleTransport!.stopScanningForBluetoothDevices();
   }
 
-  /// Connects to the device
+  /// Connects to the device and completes when a usable MIDI path is ready.
+  ///
+  /// For BLE this includes pairing when required and notification readiness.
+  /// On Apple, a subsequent CoreMIDI handoff is an optional background upgrade
+  /// and does not delay or fail an already-usable direct BLE connection.
   Future<void> connectToDevice(
     MidiDevice device, {
     Duration? awaitConnectionTimeout = const Duration(seconds: 30),
@@ -353,6 +371,8 @@ class MidiCommand {
 
     try {
       final route = _resolveDeviceRoute(device);
+      _cancelBlePlatformHandoff(device.id);
+      _activeDeviceRouteById[device.id] = route;
       if (route == _MidiDeviceRoute.bleTransport) {
         _requireTransport(MidiTransport.ble, 'connectToDevice');
         _requireBleTransport('connectToDevice');
@@ -360,15 +380,11 @@ class MidiCommand {
           MidiConnectionStage.bluetoothConnect,
           (timeout) => _bleTransport!.connectToDevice(device, timeout: timeout),
         );
-        // On Apple platforms a bonded BLE peripheral becomes available through
-        // CoreMIDI under the same id (its CoreBluetooth UUID), and that is the
-        // path that actually carries MIDI data.
+        // A usable direct BLE MIDI path is sufficient for connection success.
+        // Bonded Apple peripherals may subsequently move to CoreMIDI, but that
+        // optional transport upgrade must not fail or delay this connection.
         if (_requiresBlePlatformHandoff) {
-          await _handoffBleToPlatform(
-            device,
-            timeout: budget.remaining(MidiConnectionStage.platformHandoff),
-            required: true,
-          );
+          _startBlePlatformHandoff(device);
         }
         // On non-Apple platforms there is no CoreMIDI counterpart, so the BLE
         // transport is already the data path and there is nothing to hand off.
@@ -384,6 +400,8 @@ class MidiCommand {
       }
     } catch (_) {
       unawaited(connectionEstablished.catchError((_) {}));
+      _cancelBlePlatformHandoff(device.id);
+      _activeDeviceRouteById.remove(device.id);
       if (device.connectionState != MidiConnectionState.disconnected) {
         device.setConnectionState(MidiConnectionState.disconnected);
       }
@@ -413,6 +431,8 @@ class MidiCommand {
       device.setConnectionState(MidiConnectionState.disconnecting);
     }
     final route = _resolveDeviceRoute(device);
+    _cancelBlePlatformHandoff(device.id);
+    _activeDeviceRouteById.remove(device.id);
     final isBleWithTransport =
         device.type == MidiDeviceType.ble &&
         _bleTransport != null &&
@@ -442,9 +462,10 @@ class MidiCommand {
 
   /// Disconnects from all devices
   void teardown() {
+    _cancelAllBlePlatformHandoffs();
     _platform.teardown();
     _bleTransport?.teardown();
-    _deviceRouteById.clear();
+    _activeDeviceRouteById.clear();
     _resetMessageParsers();
   }
 
@@ -453,7 +474,7 @@ class MidiCommand {
   /// Data is an UInt8List of individual MIDI command bytes
   void sendData(Uint8List data, {String? deviceId, int? timestamp}) {
     if (deviceId != null) {
-      final route = _deviceRouteById[deviceId];
+      final route = _activeDeviceRouteById[deviceId];
       if (route == _MidiDeviceRoute.platform) {
         _platform.sendData(data, deviceId: deviceId, timestamp: timestamp);
         _txStreamCtrl.add(data);
@@ -484,7 +505,7 @@ class MidiCommand {
     if (_platform.onMidiDataReceived != null) {
       streams.add(
         _mapPacketsToTypedEvents(
-          _platform.onMidiDataReceived!,
+          _platformPackets(),
           fallbackTransport: MidiTransport.native,
         ),
       );
@@ -512,7 +533,7 @@ class MidiCommand {
   Stream<MidiPacket>? get onMidiPacketReceived {
     final streams = <Stream<MidiPacket>>[];
     if (_platform.onMidiDataReceived != null) {
-      streams.add(_platform.onMidiDataReceived!);
+      streams.add(_platformPackets());
     }
     if (_bleTransport != null && isTransportEnabled(MidiTransport.ble)) {
       streams.add(_bleTransportPackets());
@@ -634,18 +655,11 @@ class MidiCommand {
 
   void _rememberDeviceRoute(MidiDevice device, _MidiDeviceRoute route) {
     _deviceRouteByInstance[device] = route;
-    if (device.id.isNotEmpty) {
-      _deviceRouteById.putIfAbsent(device.id, () => route);
-    }
   }
 
-  /// Like [_rememberDeviceRoute] but forces the route even if one is already
-  /// recorded for this id (used when merging a bonded BLE device onto the
-  /// platform/CoreMIDI data path).
-  void _setDeviceRoute(MidiDevice device, _MidiDeviceRoute route) {
-    _deviceRouteByInstance[device] = route;
+  void _setActiveDeviceRoute(MidiDevice device, _MidiDeviceRoute route) {
     if (device.id.isNotEmpty) {
-      _deviceRouteById[device.id] = route;
+      _activeDeviceRouteById[device.id] = route;
     }
   }
 
@@ -654,32 +668,61 @@ class MidiCommand {
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS);
 
-  /// Waits for a freshly bonded BLE peripheral to be exposed
-  /// by the platform (CoreMIDI on Apple) under the same id, then opens that
-  /// endpoint and switches the device's data route to it. Optional where no
-  /// platform counterpart appears (e.g. Android), leaving the BLE transport as
-  /// the data path.
+  void _startBlePlatformHandoff(MidiDevice device) {
+    final handoff = ++_nextBlePlatformHandoff;
+    _blePlatformHandoffById[device.id] = handoff;
+    unawaited(() async {
+      try {
+        await _handoffBleToPlatform(device, handoff: handoff);
+      } catch (e) {
+        _log('Handoff: failed for ${device.id}: $e');
+      } finally {
+        _finishBlePlatformHandoff(device.id, handoff);
+      }
+    }());
+  }
+
+  void _cancelBlePlatformHandoff(String deviceId) {
+    _blePlatformHandoffById.remove(deviceId);
+  }
+
+  void _cancelAllBlePlatformHandoffs() {
+    _blePlatformHandoffById.clear();
+  }
+
+  bool _isBlePlatformHandoffCurrent(String deviceId, int handoff) =>
+      _blePlatformHandoffById[deviceId] == handoff;
+
+  void _finishBlePlatformHandoff(String deviceId, int handoff) {
+    if (_isBlePlatformHandoffCurrent(deviceId, handoff)) {
+      _blePlatformHandoffById.remove(deviceId);
+    }
+  }
+
+  /// Waits briefly for a freshly bonded BLE peripheral to be exposed by
+  /// CoreMIDI, then atomically upgrades the active route after that endpoint is
+  /// connected. Absence or failure leaves the already-usable BLE path intact.
   Future<void> _handoffBleToPlatform(
     MidiDevice device, {
-    Duration? timeout,
-    bool required = false,
+    required int handoff,
   }) async {
     const pollInterval = Duration(milliseconds: 500);
     final budget = _ConnectionBudget(
       deviceId: device.id,
-      timeout: timeout ?? (required ? null : const Duration(seconds: 20)),
+      timeout: const Duration(seconds: 20),
     );
 
     _log('Handoff: waiting for CoreMIDI counterpart of ${device.id}');
     while (true) {
+      if (!_isBlePlatformHandoffCurrent(device.id, handoff)) {
+        _log('Handoff: cancelled for ${device.id}');
+        return;
+      }
       Duration? remaining;
       try {
         remaining = budget.remaining(MidiConnectionStage.platformHandoff);
       } on MidiConnectionTimeoutException {
         _log('Handoff: timed out for ${device.id}');
-        if (required) {
-          rethrow;
-        }
         return;
       }
 
@@ -695,32 +738,35 @@ class MidiCommand {
         }
       }
       if (match != null) {
-        _setDeviceRoute(device, _MidiDeviceRoute.platform);
-        _setDeviceRoute(match, _MidiDeviceRoute.platform);
-        // A concurrent devices() refresh may have routed this id already,
-        // but routing alone does not open the platform endpoint; skip the
-        // connect only when the platform reports it live.
-        if (match.connected) {
-          _log('Handoff: CoreMIDI endpoint already connected for ${device.id}');
-          return;
-        }
         try {
-          await budget.run(
-            MidiConnectionStage.platformConnect,
-            (_) => _platform.connectToDevice(match!),
-          );
+          if (!match.connected) {
+            await budget.run(
+              MidiConnectionStage.platformConnect,
+              (_) => _platform.connectToDevice(match!),
+            );
+          }
           if (!match.connected) {
             await budget.run(
               MidiConnectionStage.connectionState,
               (_) => _awaitConnectedOrFailed(match!),
             );
           }
+          if (!_isBlePlatformHandoffCurrent(device.id, handoff)) {
+            if (match.connected) {
+              _platform.disconnectDevice(match);
+            }
+            _log('Handoff: discarded stale CoreMIDI endpoint for ${device.id}');
+            return;
+          }
+          _setActiveDeviceRoute(device, _MidiDeviceRoute.platform);
+          _setActiveDeviceRoute(match, _MidiDeviceRoute.platform);
           _log('Handoff: connected CoreMIDI endpoint for ${device.id}');
         } catch (e) {
-          _log('Handoff: platform connect failed for ${device.id}: $e');
-          if (required) {
-            throw MidiCoreMidiHandoffException(deviceId: device.id, cause: e);
+          if (_isBlePlatformHandoffCurrent(device.id, handoff) &&
+              match.connected) {
+            _platform.disconnectDevice(match);
           }
+          _log('Handoff: platform connect failed for ${device.id}: $e');
         }
         return;
       }
@@ -736,14 +782,14 @@ class MidiCommand {
   }
 
   _MidiDeviceRoute _resolveDeviceRoute(MidiDevice device) {
+    final byId = _activeDeviceRouteById[device.id];
+    if (byId != null) {
+      return byId;
+    }
+
     final byInstance = _deviceRouteByInstance[device];
     if (byInstance != null) {
       return byInstance;
-    }
-
-    final byId = _deviceRouteById[device.id];
-    if (byId != null) {
-      return byId;
     }
 
     if (device.type == MidiDeviceType.ble && _bleTransport != null) {
@@ -759,7 +805,18 @@ class MidiCommand {
   Stream<MidiPacket> _bleTransportPackets() {
     return _bleTransport!.onMidiDataReceived.where(
       (packet) =>
-          _deviceRouteById[packet.device.id] != _MidiDeviceRoute.platform,
+          _activeDeviceRouteById[packet.device.id] != _MidiDeviceRoute.platform,
+    );
+  }
+
+  /// Suppresses packets from a CoreMIDI BLE counterpart until its endpoint has
+  /// completed the handoff, avoiding duplicate input during the transition.
+  Stream<MidiPacket> _platformPackets() {
+    return _platform.onMidiDataReceived!.where(
+      (packet) =>
+          packet.device.type != MidiDeviceType.ble ||
+          _activeDeviceRouteById[packet.device.id] !=
+              _MidiDeviceRoute.bleTransport,
     );
   }
 

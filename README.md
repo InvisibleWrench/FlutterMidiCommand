@@ -125,7 +125,7 @@ class MidiSessionController {
       rethrow;
     } on MidiConnectionException catch (e) {
       // Other connection-readiness failures such as service discovery,
-      // notification subscription, or CoreMIDI handoff.
+      // pairing, or notification subscription.
       print('Connection failed at ${e.stage}: ${e.message}');
       rethrow;
     }
@@ -202,7 +202,9 @@ rather than recreating or disposing them with individual routes. Scan start and
 stop are idempotent, but on affected Android devices avoiding stop/restart
 cycles around a BLE connection is still important; see the known issue below.
 
-`connectToDevice` completes when the MIDI path is ready for use, or throws. The default `awaitConnectionTimeout` is 30 seconds and covers the full connection-readiness flow, not just the initial radio/socket connection. For BLE MIDI this includes BLE connection, service discovery, pairing/bonding through native UI when required, notification subscription, and on Apple platforms the CoreMIDI handoff for bonded BLE MIDI devices.
+`connectToDevice` completes when at least one MIDI path is ready for use, or throws. The default `awaitConnectionTimeout` is 30 seconds and covers the required connection-readiness flow, not just the initial radio/socket connection. For BLE MIDI this includes BLE connection, service discovery, pairing/bonding through native UI when required, and notification subscription.
+
+On Apple platforms, a bonded peripheral may subsequently appear through CoreMIDI. That handoff is an optional, bounded background transport upgrade: direct BLE remains active until the CoreMIDI endpoint is connected, and absence or failure of the counterpart does not turn a working connection into an error. Devices whose MIDI characteristic does not require encryption therefore remain on the direct BLE path without a delayed timeout.
 
 Connection failures are surfaced as typed `MidiConnectionException` subclasses where possible:
 
@@ -211,9 +213,8 @@ Connection failures are surfaced as typed `MidiConnectionException` subclasses w
 - `MidiPairingFailedException`: pairing failed before a clear rejection was reported.
 - `MidiServiceDiscoveryException`: the BLE MIDI service/characteristic was not found.
 - `MidiNotificationSubscriptionException`: BLE MIDI notifications could not be enabled.
-- `MidiCoreMidiHandoffException`: a paired Apple BLE MIDI device was not exposed through CoreMIDI.
 
-Pass `awaitConnectionTimeout: null` only if you explicitly want to let the readiness flow wait indefinitely.
+Pass `awaitConnectionTimeout: null` only if you explicitly want to let the required readiness flow wait indefinitely. The optional Apple CoreMIDI handoff remains bounded.
 
 ### Setup change events
 
@@ -348,9 +349,9 @@ If you still need old wire values for logging or compatibility, use `device.type
 
 ### 4) Connection semantics are stricter
 
-`await midi.connectToDevice(device)` now resolves only when the MIDI path is ready for use (or throws on failure/timeout), so completion means a real connected state. The default timeout is 30 seconds and is a full connection-readiness budget. For BLE MIDI it covers BLE connection, service discovery, native pairing/bonding UI if required, notification subscription, and Apple CoreMIDI handoff when that is the data path.
+`await midi.connectToDevice(device)` now resolves only when a MIDI path is ready for use (or throws on failure/timeout), so completion means a real connected state. The default timeout is 30 seconds and is a required connection-readiness budget. For BLE MIDI it covers BLE connection, service discovery, native pairing/bonding UI if required, and notification subscription. On Apple, a bonded device can switch transparently to CoreMIDI after completion; that optional handoff does not delay or fail the usable BLE connection.
 
-Connection failures use typed exceptions such as `MidiConnectionTimeoutException`, `MidiPairingRejectedException`, and `MidiCoreMidiHandoffException`, all deriving from `MidiConnectionException`.
+Connection failures use typed exceptions such as `MidiConnectionTimeoutException` and `MidiPairingRejectedException`, all deriving from `MidiConnectionException`.
 
 `MidiDevice` also exposes `onConnectionStateChanged` for reactive flows.
 
