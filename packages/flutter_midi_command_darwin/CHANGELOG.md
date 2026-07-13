@@ -1,3 +1,7 @@
+## 1.0.4
+
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts.
+
 ## 1.0.3
 
  - Update a dependency to the latest release.

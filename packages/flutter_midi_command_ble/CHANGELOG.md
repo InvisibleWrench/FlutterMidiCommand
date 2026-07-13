@@ -1,7 +1,12 @@
-## Unreleased
+## 1.0.4
 
- - **FEAT**(android): automatically merge the BLE MIDI permissions into consuming apps.
- - **DOCS**: document the required BLE setup for every supported platform.
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts.
+ - **FIX**(ble): hide registered devices until rediscovered.
+ - **FIX**(ble): remove stale BLE devices on disconnect.
+ - **FIX**: await BLE MIDI readiness in connectToDevice.
+ - **FIX**: bluetooth discovery with latest Universal_ble.
+ - **FIX**: subscribe to BLE MIDI notifications on platforms without a pairing.
+ - **FEAT**(ble): bundle Android permissions and document platform setup.
 
 ## 1.0.3
 

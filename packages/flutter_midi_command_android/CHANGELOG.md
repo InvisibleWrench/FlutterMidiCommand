@@ -1,3 +1,8 @@
+## 1.0.4
+
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts.
+ - **FEAT**(ble): bundle Android permissions and document platform setup.
+
 ## 1.0.3
 
  - Update a dependency to the latest release.

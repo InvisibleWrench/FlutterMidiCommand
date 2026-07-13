@@ -1,3 +1,17 @@
+## 1.0.4
+
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts.
+ - **FIX**(ble): hide registered devices until rediscovered.
+ - **FIX**(ble): remove stale BLE devices on disconnect.
+ - **FIX**: await BLE MIDI readiness in connectToDevice.
+ - **FIX**: bluetooth discovery with latest Universal_ble.
+ - **FIX**: suppress duplicate BLE packets after the CoreMIDI handoff.
+ - **FIX**: subscribe to BLE MIDI notifications on platforms without a pairing.
+ - **FIX**: update example app to iOS v14 minimum.
+ - **FIX**: port to win32 6, csv 8 and file_picker 12 APIs.
+ - **FIX**: example app dependency update.
+ - **FEAT**(ble): bundle Android permissions and document platform setup.
+
 ## 1.0.3
 
  - **FIX**(ble): hide registered devices until rediscovered.

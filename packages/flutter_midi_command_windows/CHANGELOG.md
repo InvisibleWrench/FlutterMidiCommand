@@ -1,6 +1,10 @@
+## 1.0.4
+
+ - Updated the platform interface dependency constraint to `^1.0.4`.
+
 ## 1.0.3
 
- - **FIX**: port to win32 6, csv 8 and file_picker 12 APIs.
+ - Updated the platform interface dependency constraint to `^1.0.3`.
 
 ## 1.0.2
 

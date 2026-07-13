@@ -1,3 +1,7 @@
+## 1.0.4
+
+ - Aligned the platform interface with the 1.0.4 federated workspace release.
+
 ## 1.0.3
 
  - **FIX**(ble): remove stale BLE devices on disconnect.
