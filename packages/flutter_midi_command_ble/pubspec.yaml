@@ -25,3 +25,10 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.invisiblewrench.fluttermidicommand.ble
+        pluginClass: FlutterMidiCommandBlePlugin

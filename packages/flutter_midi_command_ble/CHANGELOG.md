@@ -1,3 +1,8 @@
+## Unreleased
+
+ - **FEAT**(android): automatically merge the BLE MIDI permissions into consuming apps.
+ - **DOCS**: document the required BLE setup for every supported platform.
+
 ## 1.0.3
 
  - **FIX**(ble): hide registered devices until rediscovered.
