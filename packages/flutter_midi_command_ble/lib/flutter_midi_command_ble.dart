@@ -37,6 +37,12 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   String _bleState = "unknown";
   bool _callbacksRegistered = false;
   bool _isTornDown = false;
+  // Tracks whether an OS scan is currently running so that redundant start/stop
+  // calls from the host app become no-ops. On Android a duplicate `stopScan`
+  // desyncs the platform scanner registration ("could not find callback
+  // wrapper"), after which the scanner re-registers but delivers no results
+  // until the process is restarted.
+  bool _isScanning = false;
 
   void _registerCallbacks() {
     if (_callbacksRegistered) {
@@ -158,13 +164,30 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     if (_devices.values.any((device) => device.visible)) {
       _setupStreamController.add(MidiSetupChange.deviceAppeared);
     }
-    await UniversalBle.startScan(
-      scanFilter: ScanFilter(withServices: [midiServiceId]),
-    );
+    // Re-issuing an OS scan while one is already running desyncs the Android
+    // scanner registration, so skip a redundant start.
+    if (_isScanning) {
+      return;
+    }
+    _isScanning = true;
+    try {
+      await UniversalBle.startScan(
+        scanFilter: ScanFilter(withServices: [midiServiceId]),
+      );
+    } catch (_) {
+      _isScanning = false;
+      rethrow;
+    }
   }
 
   @override
   void stopScanningForBluetoothDevices() {
+    // Only forward a stop when we believe a scan is running. A duplicate
+    // stopScan desyncs the Android scanner registration.
+    if (!_isScanning) {
+      return;
+    }
+    _isScanning = false;
     UniversalBle.stopScan();
   }
 
@@ -266,7 +289,13 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     }
     _isTornDown = true;
     _unregisterCallbacks();
-    unawaited(UniversalBle.stopScan());
+    // Only forward a stop when a scan is actually running. A stopScan with no
+    // live scan desyncs the Android scanner registration ("could not find
+    // callback wrapper").
+    if (_isScanning) {
+      _isScanning = false;
+      unawaited(UniversalBle.stopScan());
+    }
     for (final device in _devices.values) {
       if (device.connectionState != MidiConnectionState.disconnected) {
         unawaited(device.disconnect());
@@ -700,8 +729,12 @@ class _BleMidiDevice extends MidiDevice {
           }
           break;
         case _BleHandlerState.sysex:
-        case _BleHandlerState.sysexInt:
           _sysExBuffer.add(midiByte);
+          break;
+        case _BleHandlerState.sysexInt:
+          // Entered by the BLE timestamp byte that precedes an in-SysEx
+          // system-real-time message or the closing 0xF7. It is transport
+          // framing, not payload, so it must not be appended to the SysEx.
           break;
         case _BleHandlerState.sysexEnd:
           _sysExBuffer.add(midiByte);

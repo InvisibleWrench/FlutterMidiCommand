@@ -23,6 +23,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   final List<String> readCalls = <String>[];
   final List<String> subscribeCalls = <String>[];
   int startScanCalls = 0;
+  int startScanFailures = 0;
   int stopScanCalls = 0;
 
   @override
@@ -42,6 +43,10 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     PlatformConfig? platformConfig,
   }) async {
     startScanCalls += 1;
+    if (startScanFailures > 0) {
+      startScanFailures -= 1;
+      throw StateError('scan-start-failed');
+    }
   }
 
   @override
@@ -220,6 +225,60 @@ void main() {
       expect(await transport.bluetoothState(), 'poweredOff');
       expect(emittedStates, contains('poweredOn'));
       expect(emittedStates, contains('poweredOff'));
+    },
+  );
+
+  test('startScanningForBluetoothDevices is idempotent', () async {
+    await transport.startScanningForBluetoothDevices();
+    await transport.startScanningForBluetoothDevices();
+
+    expect(fakePlatform.startScanCalls, 1);
+  });
+
+  test('stopScanningForBluetoothDevices is idempotent', () async {
+    await transport.startScanningForBluetoothDevices();
+
+    transport.stopScanningForBluetoothDevices();
+    transport.stopScanningForBluetoothDevices();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fakePlatform.stopScanCalls, 1);
+  });
+
+  test('failed scan start can be retried', () async {
+    fakePlatform.startScanFailures = 1;
+
+    await expectLater(
+      transport.startScanningForBluetoothDevices(),
+      throwsA(isA<StateError>()),
+    );
+    await transport.startScanningForBluetoothDevices();
+
+    expect(fakePlatform.startScanCalls, 2);
+  });
+
+  test('teardown does not stop an inactive scan', () async {
+    transport.teardown();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fakePlatform.stopScanCalls, 0);
+  });
+
+  test(
+    'teardown stops an active scan once and scanning can reactivate',
+    () async {
+      await transport.startScanningForBluetoothDevices();
+
+      transport.teardown();
+      transport.teardown();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakePlatform.stopScanCalls, 1);
+
+      await transport.startBluetooth();
+      await transport.startScanningForBluetoothDevices();
+
+      expect(fakePlatform.startScanCalls, 2);
     },
   );
 

@@ -1,3 +1,7 @@
+## 1.0.5
+
+ - Bump "flutter_midi_command_platform_interface" to `1.0.5`.
+
 ## 1.0.4
 
  - Aligned the platform interface with the 1.0.4 federated workspace release.

@@ -1,3 +1,7 @@
+## 1.0.5
+
+ - Bump "flutter_midi_command_web" to `1.0.5`.
+
 ## 1.0.4
 
  - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts.

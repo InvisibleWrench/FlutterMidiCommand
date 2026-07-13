@@ -80,6 +80,40 @@ final midi = MidiCommand();
 midi.configureBleTransport(UniversalBleMidiTransport());
 ```
 
+Configure the transport once per application MIDI session, before reading
+`onMidiSetupChanged` or `onMidiDataReceived`. Those getters merge the streams
+available when they are read, so a subscription created before BLE is
+configured does not later acquire BLE events.
+
+Subscribe to setup changes before starting discovery, then initialize and scan
+explicitly:
+
+```dart
+final setupSub = midi.onMidiSetupChanged?.listen((_) async {
+  final devices = await midi.devices ?? const <MidiDevice>[];
+  // Replace the application's current device snapshot.
+});
+
+await midi.startBluetooth();
+await midi.waitUntilBluetoothIsInitialized();
+if (midi.bluetoothState == BluetoothState.poweredOn) {
+  await midi.startScanningForBluetoothDevices();
+  final initialDevices = await midi.devices ?? const <MidiDevice>[];
+  // Use the initial snapshot; do not wait only for a setup event.
+}
+```
+
+`startBluetooth()` is idempotent and does not start scanning. A later call can
+complete without emitting another `onBluetoothStateChanged` event; that stream
+reports transitions and does not replay its current value. Always inspect
+`bluetoothState` after initialization.
+
+Scan start and stop are idempotent. On some Android devices, however, stopping
+and restarting a BLE scan around connect/disconnect can leave the platform
+scanner returning no advertisements until the app process restarts. Prefer an
+application/session-level scan owner and avoid route-level stop/restart cycles
+around a BLE connection.
+
 `await midi.connectToDevice(device)` completes only when the BLE MIDI path is ready for use. The public `awaitConnectionTimeout` from `MidiCommand.connectToDevice` is treated as a full readiness budget and is passed down to this transport.
 
 The BLE readiness flow includes:

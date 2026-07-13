@@ -154,11 +154,7 @@ class WindowsMidiDevice extends MidiDevice {
 
       for (int i = 0; i < _numberOfBuffers; i++) {
         if (_midiInHeaders[i] != nullptr) {
-          midiInUnprepareHeader(
-            _hMidiIn,
-            _midiInHeaders[i],
-            sizeOf<MIDIHDR>(),
-          );
+          midiInUnprepareHeader(_hMidiIn, _midiInHeaders[i], sizeOf<MIDIHDR>());
           free(_midiInHeaders[i]);
           _midiInHeaders[i] = nullptr;
         }

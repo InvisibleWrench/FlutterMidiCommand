@@ -62,9 +62,6 @@ class MidiSessionController {
   Future<void> initialize() async {
     if (enableBle) {
       midi.configureBleTransport(UniversalBleMidiTransport());
-      await midi.startBluetooth();
-      await midi.waitUntilBluetoothIsInitialized();
-      await midi.startScanningForBluetoothDevices();
     } else {
       midi.configureBleTransport(null);
       midi.configureTransportPolicy(
@@ -74,11 +71,10 @@ class MidiSessionController {
       );
     }
 
-    _setupSub = midi.onMidiSetupChanged?.listen((_) async {
-      final devices = await midi.devices ?? const <MidiDevice>[];
-      if (devices.isNotEmpty && selectedDevice == null) {
-        selectedDevice = devices.first;
-      }
+    // Obtain merged streams after configuring optional transports, but listen
+    // before scanning so an early advertisement cannot be missed.
+    _setupSub = midi.onMidiSetupChanged?.listen((_) {
+      unawaited(_refreshDevices());
     });
 
     _rxSub = midi.onMidiDataReceived?.listen((event) {
@@ -89,6 +85,25 @@ class MidiSessionController {
         event.message,
       );
     });
+
+    if (enableBle) {
+      await midi.startBluetooth();
+      await midi.waitUntilBluetoothIsInitialized();
+      if (midi.bluetoothState != BluetoothState.poweredOn) {
+        throw StateError('Bluetooth is not powered on: ${midi.bluetoothState}');
+      }
+      await midi.startScanningForBluetoothDevices();
+    }
+
+    // Setup events are invalidation signals, not the initial device snapshot.
+    await _refreshDevices();
+  }
+
+  Future<void> _refreshDevices() async {
+    final devices = await midi.devices ?? const <MidiDevice>[];
+    if (devices.isNotEmpty && selectedDevice == null) {
+      selectedDevice = devices.first;
+    }
   }
 
   Future<void> connectFirstMatching(String query) async {
@@ -162,6 +177,30 @@ class MidiSessionController {
   }
 }
 ```
+
+### BLE lifecycle
+
+Configure the optional BLE transport once per application MIDI session, before
+reading `onMidiSetupChanged` or `onMidiDataReceived`. Those getters merge the
+streams that are available when they are read; a subscription created before
+`configureBleTransport` does not later acquire the BLE stream.
+
+`startBluetooth()` initializes the Bluetooth subsystem but does not start a
+scan. It is idempotent, and a later call can complete without producing another
+`onBluetoothStateChanged` event. The state stream reports transitions and does
+not replay the current value to a new listener. After initialization, inspect
+`bluetoothState` directly and explicitly call
+`startScanningForBluetoothDevices()` when it is `BluetoothState.poweredOn`.
+
+Subscribe to setup changes before starting a scan, then fetch an initial
+`devices` snapshot after starting it. Treat every `MidiSetupChange` value as a
+signal to refresh that snapshot; do not rely on setup events to provide initial
+state or contain the changed device.
+
+Keep `MidiCommand` and its BLE transport in an application/session-level owner
+rather than recreating or disposing them with individual routes. Scan start and
+stop are idempotent, but on affected Android devices avoiding stop/restart
+cycles around a BLE connection is still important; see the known issue below.
 
 `connectToDevice` completes when the MIDI path is ready for use, or throws. The default `awaitConnectionTimeout` is 30 seconds and covers the full connection-readiness flow, not just the initial radio/socket connection. For BLE MIDI this includes BLE connection, service discovery, pairing/bonding through native UI when required, notification subscription, and on Apple platforms the CoreMIDI handoff for bonded BLE MIDI devices.
 
@@ -327,6 +366,32 @@ For help getting started with Flutter, view our online
 [documentation](https://flutter.dev/).
 
 For help on editing plugin code, view the [documentation](https://docs.flutter.dev/development/packages-and-plugins/developing-packages#edit-plugin-package).
+
+## Known issues
+
+### Android: BLE scan returns nothing after a connect/disconnect (needs app restart)
+
+On some Android devices, after connecting to and then disconnecting from a BLE
+MIDI peripheral, a subsequent `startScanningForBluetoothDevices()` registers a
+scanner successfully but delivers **no** advertisements for **any** device until
+the app process is restarted.
+
+This is an upstream bug in `universal_ble`'s Android layer / the platform BLE
+stack: the LE scanner is stopped and restarted around the GATT connection, and
+the reused `ScanCallback` gets desynced from the platform's scanner registration
+(`BluetoothLeScanner: could not find callback wrapper`). It cannot be recovered
+from Dart — the plugin already makes scan start/stop idempotent to minimise the
+trigger, but the wedge originates below the Dart layer.
+
+Workarounds until the upstream fix lands:
+
+- Keep a single continuous scan while on your device picker; avoid stopping and
+  restarting scanning around connect/disconnect.
+- Persist the device id and look for a matching `MidiDevice` in `midi.devices`
+  when the host still exposes the bonded endpoint, then pass that object to
+  `connectToDevice`. The method does not accept a raw id; if the endpoint is no
+  longer present in `devices`, rediscovery is still required.
+- As a last resort, restart the app process to clear the wedged scanner.
 
 ## Workspace and architecture
 

@@ -369,11 +369,13 @@ class MidiCommand {
             timeout: budget.remaining(MidiConnectionStage.platformHandoff),
             required: true,
           );
-        } else {
-          // No-op where no platform counterpart appears (e.g. Android), leaving
-          // the BLE transport as the data path.
-          unawaited(_handoffBleToPlatform(device));
         }
+        // On non-Apple platforms there is no CoreMIDI counterpart, so the BLE
+        // transport is already the data path and there is nothing to hand off.
+        // (This used to fire a fire-and-forget handoff that polled
+        // `_platform.devices` for ~20s; on Android those repeated native
+        // MidiManager queries are pointless and can race the LE scanner,
+        // wedging a rescan after connect/disconnect.)
       } else {
         await budget.run(
           MidiConnectionStage.platformConnect,

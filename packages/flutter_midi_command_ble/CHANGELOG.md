@@ -1,3 +1,9 @@
+## 1.0.5
+
+ - FIX(ble): strip the BLE timestamp byte from received SysEx so SysEx round-trips on Android/Linux/Windows/Web (was corrupting the payload before 0xF7).
+ - FIX(ble): make scan start/stop idempotent to avoid redundant OS scan calls that can desync the Android LE scanner. Note the known Android limitation below.
+ - KNOWN ISSUE (Android): after a BLE MIDI connect+disconnect, a further scan may return no results until the app process is restarted, due to an upstream universal_ble/Android LE-scanner registration bug (reused ScanCallback). See README.
+
 ## 1.0.4
 
  - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts.

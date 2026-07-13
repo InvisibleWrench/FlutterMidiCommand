@@ -387,6 +387,58 @@ void main() {
     expect(ble.startBluetoothCalls, 1);
   });
 
+  test('concurrent startBluetooth calls share one initialization', () async {
+    final platform = _FakePlatform();
+    final ble = _FakeBleTransport();
+    MidiCommand.setPlatformOverride(platform);
+    final midi = MidiCommand(bleTransport: ble);
+
+    await Future.wait<void>(<Future<void>>[
+      midi.startBluetooth(),
+      midi.startBluetooth(),
+    ]);
+
+    expect(ble.startBluetoothCalls, 1);
+  });
+
+  test(
+    'waitUntilBluetoothIsInitialized returns when state is already resolved',
+    () async {
+      final platform = _FakePlatform();
+      final ble = _FakeBleTransport();
+      MidiCommand.setPlatformOverride(platform);
+      final midi = MidiCommand(bleTransport: ble);
+
+      await midi.startBluetooth();
+      await midi.waitUntilBluetoothIsInitialized();
+
+      await midi.waitUntilBluetoothIsInitialized().timeout(
+        const Duration(milliseconds: 100),
+      );
+      expect(midi.bluetoothState, BluetoothState.poweredOn);
+    },
+  );
+
+  test('second startBluetooth retains state without re-emitting it', () async {
+    final platform = _FakePlatform();
+    final ble = _FakeBleTransport();
+    MidiCommand.setPlatformOverride(platform);
+    final midi = MidiCommand(bleTransport: ble);
+
+    await midi.startBluetooth();
+    await midi.waitUntilBluetoothIsInitialized();
+
+    final states = <BluetoothState>[];
+    final sub = midi.onBluetoothStateChanged.listen(states.add);
+    await midi.startBluetooth();
+    await Future<void>.delayed(Duration.zero);
+    await sub.cancel();
+
+    expect(ble.startBluetoothCalls, 1);
+    expect(midi.bluetoothState, BluetoothState.poweredOn);
+    expect(states, isEmpty);
+  });
+
   test('startBluetooth can be retried after failure', () async {
     final platform = _FakePlatform();
     final ble = _FakeBleTransport()..startBluetoothFailures = 1;

@@ -1,6 +1,6 @@
 name: flutter_midi_command_windows
 description: The Windows implementation of flutter_midi_command, using the WinMM MIDI API to send and receive MIDI messages.
-version: 1.0.4
+version: 1.0.5
 homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
 repository: https://github.com/InvisibleWrench/FlutterMidiCommand/tree/main/packages/flutter_midi_command_windows
 issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues

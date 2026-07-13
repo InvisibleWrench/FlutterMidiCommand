@@ -1,3 +1,7 @@
+## 1.0.5
+
+ - Bump "flutter_midi_command_windows" to `1.0.5`.
+
 ## 1.0.4
 
  - Updated the platform interface dependency constraint to `^1.0.4`.
