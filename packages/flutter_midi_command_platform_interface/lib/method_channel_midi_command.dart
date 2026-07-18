@@ -111,7 +111,15 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
         );
     device.name = hostDevice.name ?? '-';
     device.type = _fromHostDeviceType(hostDevice.type);
-    device.connected = hostDevice.connected ?? false;
+    // A passive device-list refresh must not collapse a transitional state. The
+    // `connected` setter can only express connected/disconnected, so applying it
+    // while a connect/disconnect is in flight would clobber the connecting/
+    // disconnecting state those explicit flows (and their native callbacks) own.
+    final state = device.connectionState;
+    if (state != MidiConnectionState.connecting &&
+        state != MidiConnectionState.disconnecting) {
+      device.connected = hostDevice.connected ?? false;
+    }
     device.inputPorts = _fromHostPorts(hostDevice.inputs, MidiPortType.IN);
     device.outputPorts = _fromHostPorts(hostDevice.outputs, MidiPortType.OUT);
     if (id.isNotEmpty) {

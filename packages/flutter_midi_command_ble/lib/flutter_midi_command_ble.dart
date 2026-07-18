@@ -12,6 +12,14 @@ const midiCharacteristicId = "7772E5DB-3868-4112-A1A9-F2669D106BF3";
 
 enum _DeviceState { none, interrogating, available, irrelevant }
 
+/// True when [error] is the universal_ble error surfaced when a peripheral has
+/// discarded its side of a previous bond (iOS `CBErrorPeerRemovedPairingInformation`,
+/// "Peer removed pairing information"). It arrives as an untyped
+/// `UniversalBleException` with `unknownError`, so match on the message.
+bool _isPairingInfoRemoved(Object error) =>
+    error is UniversalBleException &&
+    error.message.toLowerCase().contains('pairing information');
+
 enum _BleHandlerState {
   header,
   timestamp,
@@ -396,11 +404,23 @@ class _BleMidiDevice extends MidiDevice {
       }
       await _prepareMidiReadiness(timeout: timeout);
       connected = true;
-    } catch (_) {
+    } catch (error) {
       connected = false;
       try {
         await disconnect();
       } catch (_) {}
+      if (_isPairingInfoRemoved(error)) {
+        // Best-effort clear of the stale bond so a later reconnect can re-pair
+        // cleanly. Unsupported on iOS (CoreBluetooth has no unpair API), so
+        // ignore failures; the surfaced exception tells the user what to do.
+        try {
+          await UniversalBle.unpair(deviceId);
+        } catch (_) {}
+        throw MidiPairingInfoRemovedException(
+          deviceId: deviceId,
+          cause: error,
+        );
+      }
       rethrow;
     } finally {
       _readinessInProgress = false;

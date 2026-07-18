@@ -7,6 +7,18 @@ import com.invisiblewrench.fluttermidicommand.pigeon.MidiHostDevice
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiPacket
 import com.invisiblewrench.fluttermidicommand.pigeon.MidiSetupChange
 
+/**
+ * Runs each teardown [actions] in order, swallowing any error, so a failure in
+ * one step (for example an `IOException: EPIPE` from a port whose device was
+ * unplugged) cannot abort the remaining steps or the disconnection
+ * notifications that follow. Never throws.
+ */
+internal fun runTeardownQuietly(vararg actions: () -> Unit) {
+    for (action in actions) {
+        runCatching { action() }
+    }
+}
+
 class ConnectedDevice(
     device: MidiDevice,
     private val logicalDeviceId: String,
@@ -71,12 +83,20 @@ class ConnectedDevice(
     }
 
     override fun close() {
-        this.inputPort?.flush()
-        this.inputPort?.close()
-        this.outputPort?.close()
-        this.outputPort?.disconnect(this.receiver)
+        // When a device is physically removed (e.g. USB unplugged) its file
+        // descriptor is already gone, so any teardown call can throw
+        // (IOException: EPIPE). runTeardownQuietly never propagates, so one
+        // failing step cannot abort the others or escape the framework's
+        // onDeviceRemoved callback, and the disconnection notifications below
+        // always fire.
+        runTeardownQuietly(
+            { this.inputPort?.flush() },
+            { this.inputPort?.close() },
+            { this.outputPort?.close() },
+            { this.outputPort?.disconnect(this.receiver) },
+            { this.midiDevice.close() },
+        )
         this.receiver = null
-        this.midiDevice.close()
 
         onSetupChanged(MidiSetupChange.DEVICE_DISCONNECTED)
         onConnectionChanged(id, false)

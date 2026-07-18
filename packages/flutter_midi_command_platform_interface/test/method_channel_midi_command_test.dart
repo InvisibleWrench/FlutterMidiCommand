@@ -195,6 +195,34 @@ void main() {
   );
 
   test(
+    'devices does not clobber the connecting state of an in-progress device',
+    () async {
+      // The host still reports connected:false while a connect is in flight.
+      final host =
+          _FakeHostApi()
+            ..listedDevices = <pigeon.MidiHostDevice>[
+              pigeon.MidiHostDevice(
+                id: 'serial-1',
+                name: 'Serial',
+                type: pigeon.MidiDeviceType.serial,
+                connected: false,
+              ),
+            ];
+      final platform = MethodChannelMidiCommand(hostApi: host);
+
+      final device = (await platform.devices)!.single;
+      await platform.connectToDevice(device);
+      expect(device.connectionState, MidiConnectionState.connecting);
+
+      // A concurrent device-list refresh must reuse the same instance without
+      // collapsing the transitional state back to disconnected (issue #159).
+      final refreshed = (await platform.devices)!.single;
+      expect(identical(refreshed, device), isTrue);
+      expect(device.connectionState, MidiConnectionState.connecting);
+    },
+  );
+
+  test(
     'disconnect triggers host disconnect and transitions to disconnected',
     () async {
       final host = _FakeHostApi();
