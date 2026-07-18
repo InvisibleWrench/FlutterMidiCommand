@@ -1,7 +1,7 @@
 name: flutter_midi_command
 description: A Flutter plugin for sending and receiving MIDI messages between Flutter and physical and virtual MIDI devices.
 
-version: 1.0.5
+version: 1.0.6
 homepage: https://github.com/InvisibleWrench/FlutterMidiCommand
 repository: https://github.com/InvisibleWrench/FlutterMidiCommand
 issue_tracker: https://github.com/InvisibleWrench/FlutterMidiCommand/issues

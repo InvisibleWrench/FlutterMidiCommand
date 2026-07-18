@@ -1,3 +1,10 @@
+## 1.0.6
+
+ - FIX: a disconnect that races an in-flight connect no longer surfaces as an unhandled async error on `PlatformDispatcher.onError` (#160).
+ - FIX(ble): surface a typed `MidiPairingInfoRemovedException` when a peripheral has removed its pairing information (iOS `CBErrorPeerRemovedPairingInformation`), best-effort clearing the stale bond, instead of leaking a raw `UniversalBleException`.
+ - FIX(android): don't crash when a connected USB MIDI device is unplugged; `ConnectedDevice` teardown now survives the `IOException: EPIPE` from a removed device (#158).
+ - FIX(platform): don't clobber a device's transitional connecting/disconnecting state when listing devices (#159).
+
 ## 1.0.5
 
  - FIX(ios): keep usable non-bonding BLE MIDI connections alive when no CoreMIDI counterpart appears, and perform bonded-device handoff as an optional atomic background upgrade (#157).

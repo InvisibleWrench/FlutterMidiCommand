@@ -1,3 +1,8 @@
+## 1.0.6
+
+ - FIX: don't clobber a device's transitional connecting/disconnecting state when listing devices; a passive `devices` refresh no longer collapses an in-progress connect to disconnected (#159).
+ - FEAT: add `MidiPairingInfoRemovedException` for BLE peripherals that have removed their pairing information.
+
 ## 1.0.5
 
  - Bump "flutter_midi_command_platform_interface" to `1.0.5`.

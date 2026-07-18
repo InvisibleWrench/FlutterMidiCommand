@@ -1,3 +1,7 @@
+## 1.0.6
+
+ - FIX(ble): map the universal_ble "Peer removed pairing information" error (iOS `CBErrorPeerRemovedPairingInformation`) to a typed `MidiPairingInfoRemovedException`, best-effort clearing the stale bond so a later reconnect can re-pair, instead of leaking a raw `UniversalBleException`.
+
 ## 1.0.5
 
  - FIX(ble): strip the BLE timestamp byte from received SysEx so SysEx round-trips on Android/Linux/Windows/Web (was corrupting the payload before 0xF7).

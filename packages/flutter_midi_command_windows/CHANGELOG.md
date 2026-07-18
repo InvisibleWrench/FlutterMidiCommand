@@ -1,3 +1,7 @@
+## 1.0.6
+
+ - Bump "flutter_midi_command_windows" to `1.0.6`.
+
 ## 1.0.5
 
  - Bump "flutter_midi_command_windows" to `1.0.5`.
