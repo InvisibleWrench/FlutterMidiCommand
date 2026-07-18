@@ -368,6 +368,13 @@ class MidiCommand {
       timeout: awaitConnectionTimeout,
     );
     final connectionEstablished = _awaitConnectedOrFailed(device);
+    // A disconnection can complete this future with an error before the real
+    // handler below is attached (e.g. a disconnect racing an in-flight connect).
+    // Guard it eagerly so the race never surfaces as an unhandled async error
+    // to PlatformDispatcher.onError (issue #160). Dart futures allow multiple
+    // independent listeners, so the `await` below still observes and handles
+    // the same error inside its try/catch.
+    unawaited(connectionEstablished.catchError((_) {}));
 
     try {
       final route = _resolveDeviceRoute(device);
@@ -399,7 +406,6 @@ class MidiCommand {
         );
       }
     } catch (_) {
-      unawaited(connectionEstablished.catchError((_) {}));
       _cancelBlePlatformHandoff(device.id);
       _activeDeviceRouteById.remove(device.id);
       if (device.connectionState != MidiConnectionState.disconnected) {

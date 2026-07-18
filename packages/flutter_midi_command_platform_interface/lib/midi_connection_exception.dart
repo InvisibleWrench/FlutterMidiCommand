@@ -58,6 +58,16 @@ class MidiPairingFailedException extends MidiConnectionException {
     : super(stage: MidiConnectionStage.pairing, message: 'Pairing failed.');
 }
 
+class MidiPairingInfoRemovedException extends MidiConnectionException {
+  MidiPairingInfoRemovedException({required super.deviceId, super.cause})
+    : super(
+        stage: MidiConnectionStage.pairing,
+        message:
+            'The device removed its pairing information. Forget the device in '
+            'the system Bluetooth settings, then pair again.',
+      );
+}
+
 class MidiServiceDiscoveryException extends MidiConnectionException {
   MidiServiceDiscoveryException({required super.deviceId, super.cause})
     : super(

@@ -8,6 +8,7 @@ import 'package:universal_ble/universal_ble.dart';
 class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   AvailabilityState availabilityState = AvailabilityState.poweredOn;
   final Set<String> failingConnectIds = <String>{};
+  final Set<String> pairingRemovedConnectIds = <String>{};
   final Set<String> failingReadIds = <String>{};
   final Set<String> failingSubscribeIds = <String>{};
   final Set<String> rejectedPairIds = <String>{};
@@ -20,6 +21,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   final List<String> connectCalls = <String>[];
   final List<String> disconnectCalls = <String>[];
   final List<String> pairCalls = <String>[];
+  final List<String> unpairCalls = <String>[];
   final List<String> readCalls = <String>[];
   final List<String> subscribeCalls = <String>[];
   int startScanCalls = 0;
@@ -65,6 +67,14 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   }) async {
     connectCalls.add(deviceId);
     await Future<void>.delayed(const Duration(milliseconds: 1));
+    if (pairingRemovedConnectIds.contains(deviceId)) {
+      updateConnection(deviceId, false, 'Peer removed pairing information');
+      _connectionByDevice[deviceId] = BleConnectionState.disconnected;
+      throw UniversalBleException(
+        code: UniversalBleErrorCode.unknownError,
+        message: 'Peer removed pairing information',
+      );
+    }
     if (failingConnectIds.contains(deviceId)) {
       updateConnection(deviceId, false, 'connection-failed');
       _connectionByDevice[deviceId] = BleConnectionState.disconnected;
@@ -159,6 +169,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
 
   @override
   Future<void> unpair(String deviceId) async {
+    unpairCalls.add(deviceId);
     _pairedByDevice[deviceId] = false;
     updatePairingState(deviceId, false);
   }
@@ -318,6 +329,30 @@ void main() {
     );
     expect(await transport.devices, isEmpty);
   });
+
+  test(
+    'connectToDevice maps removed pairing information to a typed exception',
+    () async {
+      fakePlatform.servicesByDevice['ble-stale-bond'] = midiServices();
+      fakePlatform.pairingRemovedConnectIds.add('ble-stale-bond');
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-stale-bond',
+          name: 'Stale Bond Device',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      await expectLater(
+        transport.connectToDevice(device),
+        throwsA(isA<MidiPairingInfoRemovedException>()),
+      );
+      expect(device.connected, isFalse);
+      // The stale bond is cleared best-effort so a later reconnect re-pairs.
+      expect(fakePlatform.unpairCalls, contains('ble-stale-bond'));
+    },
+  );
 
   test('disconnectDevice forwards to BLE backend', () async {
     fakePlatform.servicesByDevice['ble-3'] = midiServices();

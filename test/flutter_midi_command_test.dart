@@ -166,6 +166,19 @@ class _FailedConnectPlatform extends _FakePlatform {
   }
 }
 
+class _HangingConnectPlatform extends _FakePlatform {
+  @override
+  Future<void> connectToDevice(
+    MidiDevice device, {
+    List<MidiPort>? ports,
+  }) async {
+    connected.add(device.id);
+    // Stay in flight without ever marking the device connected, so a
+    // disconnection can race the connect while it is still pending.
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
+
 class _FakePlatformWithBleHost extends _FakePlatform {
   @override
   Future<List<MidiDevice>?> get devices async => [
@@ -500,6 +513,50 @@ void main() {
       throwsA(isA<StateError>()),
     );
   });
+
+  test(
+    'disconnecting while connecting does not raise an unhandled async error',
+    () async {
+      final uncaught = <Object>[];
+      await runZonedGuarded(
+        () async {
+          final platform = _HangingConnectPlatform();
+          MidiCommand.setPlatformOverride(platform);
+          final midi = MidiCommand();
+
+          final device = (await midi.devices)!.first;
+
+          Object? callerError;
+          final future = midi
+              .connectToDevice(
+                device,
+                awaitConnectionTimeout: const Duration(seconds: 1),
+              )
+              .catchError((Object error) {
+                callerError = error;
+              });
+
+          // Race a disconnection against the still-in-flight connect.
+          device.setConnectionState(MidiConnectionState.disconnected);
+
+          await future;
+
+          // The caller's handler receives the failure...
+          expect(callerError, isA<StateError>());
+        },
+        (error, _) {
+          uncaught.add(error);
+        },
+      );
+
+      // ...and nothing leaks to the zone's uncaught-error handler (issue #160).
+      expect(
+        uncaught,
+        isEmpty,
+        reason: 'connect/disconnect race must not surface an unhandled error',
+      );
+    },
+  );
 
   test('dispose releases singleton and allows creating a new instance', () {
     final platform = _FakePlatform();
