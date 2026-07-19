@@ -18,6 +18,7 @@ export 'package:flutter_midi_command_platform_interface/flutter_midi_command_pla
         MidiNotificationSubscriptionException,
         MidiPacket,
         MidiPairingFailedException,
+        MidiPairingInfoRemovedException,
         MidiPairingRejectedException,
         MidiPort,
         MidiServiceDiscoveryException,
