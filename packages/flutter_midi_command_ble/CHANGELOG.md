@@ -1,3 +1,7 @@
+## 1.0.7
+
+ - Bump "flutter_midi_command_ble" to `1.0.7` and update the platform interface dependency constraint.
+
 ## 1.0.6
 
  - FIX(ble): map the universal_ble "Peer removed pairing information" error (iOS `CBErrorPeerRemovedPairingInformation`) to a typed `MidiPairingInfoRemovedException`, best-effort clearing the stale bond so a later reconnect can re-pair, instead of leaking a raw `UniversalBleException`.

@@ -1,3 +1,7 @@
+## 1.0.7
+
+ - Bump "flutter_midi_command_android" to `1.0.7` and update the platform interface dependency constraint.
+
 ## 1.0.6
 
  - FIX(android): survive an `IOException: EPIPE` from a removed device during `ConnectedDevice` teardown, so unplugging a connected USB MIDI device no longer crashes the app; disconnection notifications still fire (#158).

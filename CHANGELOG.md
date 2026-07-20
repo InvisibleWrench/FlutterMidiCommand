@@ -1,3 +1,8 @@
+## 1.0.7
+
+ - FIX: export `MidiPairingInfoRemovedException` from `package:flutter_midi_command/flutter_midi_command.dart`.
+ - Update federated package constraints to `^1.0.7`.
+
 ## 1.0.6
 
  - FIX: a disconnect that races an in-flight connect no longer surfaces as an unhandled async error on `PlatformDispatcher.onError` (#160).

@@ -10,6 +10,7 @@ packages/**/pubspec_overrides.yaml
 *.iml
 .idea/
 .vscode/
+tasks/
 
 # Generated API docs are published separately.
 doc/api/
