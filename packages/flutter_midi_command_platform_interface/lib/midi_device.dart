@@ -51,7 +51,11 @@ class MidiDevice {
   String name;
   String id;
   MidiDeviceType type;
+
+  /// Ports that receive MIDI data into this device.
   List<MidiPort> inputPorts = [];
+
+  /// Ports that send MIDI data out of this device.
   List<MidiPort> outputPorts = [];
   final StreamController<MidiConnectionState> _connectionStateController =
       StreamController<MidiConnectionState>.broadcast();

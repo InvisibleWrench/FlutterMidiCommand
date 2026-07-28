@@ -1,3 +1,7 @@
+## 1.0.8
+
+ - FIX(darwin): report CoreMIDI destinations as `inputPorts` and sources as `outputPorts` so port direction matches Android and the public device-owned API contract (#164).
+
 ## 1.0.7
 
  - FIX: export `MidiPairingInfoRemovedException` from `package:flutter_midi_command/flutter_midi_command.dart`.

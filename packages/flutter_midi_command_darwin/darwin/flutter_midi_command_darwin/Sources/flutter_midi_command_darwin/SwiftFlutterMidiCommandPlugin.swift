@@ -498,8 +498,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                             name: displayName,
                             type: isNetwork ? .network : (isBluetooth ? .ble : .serial),
                             connected: connectedDevices.keys.contains(deviceId),
-                            inputs: portIndex < sourceCount ? [MidiPort(id: Int64(portIndex), connected: false, isInput: true) as MidiPort?] : nil,
-                            outputs: portIndex < destinationCount ? [MidiPort(id: Int64(portIndex), connected: false, isInput: false) as MidiPort?] : nil
+                            // Public port direction is from the MIDI device's
+                            // perspective. A CoreMIDI destination is where the
+                            // app sends data, so it is a device input; a
+                            // CoreMIDI source is where the device emits data,
+                            // so it is a device output.
+                            inputs: portIndex < destinationCount ? [MidiPort(id: Int64(portIndex), connected: false, isInput: true) as MidiPort?] : nil,
+                            outputs: portIndex < sourceCount ? [MidiPort(id: Int64(portIndex), connected: false, isInput: false) as MidiPort?] : nil
                         )
                     )
                 }
@@ -535,8 +540,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 name: displayName,
                 type: .virtualDevice,
                 connected: connectedDevices.keys.contains(deviceId),
-                inputs: nil,
-                outputs: createPorts(count: 1, isInput: false)
+                inputs: createPorts(count: 1, isInput: true),
+                outputs: nil
             )
             let nextIndex = virtualDevices.count
             virtualDevices.append(hostDevice)
@@ -562,7 +567,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                 destinationIndicesByName[displayName] = matchedDestinationIndices
 
                 var hostDevice = virtualDevices[index]
-                hostDevice.inputs = createPorts(count: 1, isInput: true)
+                hostDevice.outputs = createPorts(count: 1, isInput: false)
                 let destination = hostDevice.id ?? ""
                 let id2 = "\(destination):\(source)"
                 hostDevice.id = id2
@@ -576,8 +581,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                     name: displayName,
                     type: .virtualDevice,
                     connected: connectedDevices.keys.contains(id2),
-                    inputs: createPorts(count: 1, isInput: true),
-                    outputs: nil
+                    inputs: nil,
+                    outputs: createPorts(count: 1, isInput: false)
                 )
                 )
             }
@@ -1121,13 +1126,17 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
                 for port in ps {
                     switch port.type {
                     case "MidiPortType.IN":
-                        inSource = MIDIEntityGetSource(e, port.id)
-                        let status = MIDIPortConnectSource(inputPort, inSource!, ref)
-                        midiDebugLog("port open status \(status)")
-                    case "MidiPortType.OUT":
+                        // Public IN means a CoreMIDI destination: data flows
+                        // into the external MIDI device from this app.
                         outEndpoint = MIDIEntityGetDestination(e, port.id)
                         //                    midiDebugLog("port endpoint \(endpoint)")
                         break
+                    case "MidiPortType.OUT":
+                        // Public OUT means a CoreMIDI source: data flows out of
+                        // the external MIDI device into this app.
+                        inSource = MIDIEntityGetSource(e, port.id)
+                        let status = MIDIPortConnectSource(inputPort, inSource!, ref)
+                        midiDebugLog("port open status \(status)")
                     default:
                         midiDebugLog("unknown port type \(port.type)")
                     }

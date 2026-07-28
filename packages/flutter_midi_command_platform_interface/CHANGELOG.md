@@ -1,3 +1,7 @@
+## 1.0.8
+
+ - DOCS: clarify that `MidiDevice.inputPorts` and `outputPorts` are described from the MIDI device's perspective.
+
 ## 1.0.7
 
  - Bump "flutter_midi_command_platform_interface" to `1.0.7` for the synchronized workspace release.
