@@ -28,6 +28,7 @@ class _FakePlatform extends UniversalBlePlatform {
     String deviceId, {
     Duration? connectionTimeout,
     bool autoConnect = false,
+    ConnectionPlatformConfig? platformConfig,
   }) async {
     updateConnection(deviceId, true);
   }

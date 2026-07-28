@@ -64,6 +64,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     String deviceId, {
     Duration? connectionTimeout,
     bool autoConnect = false,
+    ConnectionPlatformConfig? platformConfig,
   }) async {
     connectCalls.add(deviceId);
     await Future<void>.delayed(const Duration(milliseconds: 1));
@@ -399,10 +400,11 @@ void main() {
 
   test('connectToDevice makes registered known BLE device visible', () async {
     fakePlatform.servicesByDevice['ble-known-connect'] = midiServices();
-    final registered = transport.registerKnownDevice(
-      'ble-known-connect',
-      'Known Connect Device',
-    )!;
+    final registered =
+        transport.registerKnownDevice(
+          'ble-known-connect',
+          'Known Connect Device',
+        )!;
 
     expect(await transport.devices, isEmpty);
 
