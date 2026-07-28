@@ -1,3 +1,7 @@
+## NEXT
+
+ - FIX(android): disable Kotlin incremental compilation for the Android implementation so Windows builds do not fail when the app project and Pub cache are on different drives (#163).
+
 ## 1.0.7
 
  - FIX: export `MidiPairingInfoRemovedException` from `package:flutter_midi_command/flutter_midi_command.dart`.

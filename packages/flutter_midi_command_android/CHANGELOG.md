@@ -1,3 +1,7 @@
+## NEXT
+
+ - FIX(android): disable Kotlin incremental compilation for the Android plugin on Windows hosts to avoid Kotlin cache failures when the app project and Pub cache are on different drives (#163).
+
 ## 1.0.7
 
  - Bump "flutter_midi_command_android" to `1.0.7` and update the platform interface dependency constraint.
