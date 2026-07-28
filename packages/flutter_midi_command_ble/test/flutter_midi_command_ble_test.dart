@@ -64,6 +64,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     String deviceId, {
     Duration? connectionTimeout,
     bool autoConnect = false,
+    ConnectionPlatformConfig? platformConfig,
   }) async {
     connectCalls.add(deviceId);
     await Future<void>.delayed(const Duration(milliseconds: 1));
