@@ -400,10 +400,11 @@ void main() {
 
   test('connectToDevice makes registered known BLE device visible', () async {
     fakePlatform.servicesByDevice['ble-known-connect'] = midiServices();
-    final registered = transport.registerKnownDevice(
-      'ble-known-connect',
-      'Known Connect Device',
-    )!;
+    final registered =
+        transport.registerKnownDevice(
+          'ble-known-connect',
+          'Known Connect Device',
+        )!;
 
     expect(await transport.devices, isEmpty);
 
