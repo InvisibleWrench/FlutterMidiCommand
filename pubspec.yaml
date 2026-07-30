@@ -32,7 +32,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  melos: ^8.2.2
+  melos: ^6.3.2
   pigeon: ^22.6.0
 
 # For information on the generic Dart part of this file, see the
