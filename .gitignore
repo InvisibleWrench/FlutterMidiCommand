@@ -4,11 +4,10 @@
 .packages
 .pub/
 pubspec.lock
-# pubspec_overrides.yaml is intentionally tracked: none of the federated
-# packages are published to pub.dev yet, so their `^1.0.x` inter-package
-# constraints only resolve via these local path overrides. On a clean checkout
-# `melos bootstrap` cannot regenerate them (its initial root `pub get` fails
-# before any override is written), so CI needs them committed.
+# Under Dart pub workspaces (Melos 7+), local packages are linked via the
+# root `workspace:` list, not per-package overrides. Melos no longer generates
+# these, and `dependency_overrides` are only legal in the workspace root.
+pubspec_overrides.yaml
 
 build/
 local.properties

@@ -10,7 +10,7 @@ on:
 
 env:
   FLUTTER_VERSION: '3.44.2'
-  MELOS_VERSION: '6.3.3'
+  MELOS_VERSION: '8.2.2'
 
 jobs:
   pigeon_contracts:
