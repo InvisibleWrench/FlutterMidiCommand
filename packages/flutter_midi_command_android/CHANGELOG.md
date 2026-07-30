@@ -1,6 +1,7 @@
-## NEXT
+## 1.0.8
 
  - FIX(android): disable Kotlin incremental compilation for the Android plugin on Windows hosts to avoid Kotlin cache failures when the app project and Pub cache are on different drives (#163).
+ - Update the platform interface dependency constraint to `^1.0.8`.
 
 ## 1.0.7
 

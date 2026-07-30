@@ -416,10 +416,7 @@ class _BleMidiDevice extends MidiDevice {
         try {
           await UniversalBle.unpair(deviceId);
         } catch (_) {}
-        throw MidiPairingInfoRemovedException(
-          deviceId: deviceId,
-          cause: error,
-        );
+        throw MidiPairingInfoRemovedException(deviceId: deviceId, cause: error);
       }
       rethrow;
     } finally {

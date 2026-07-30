@@ -1,6 +1,7 @@
 ## 1.0.8
 
  - FIX: report CoreMIDI destinations as `inputPorts` and sources as `outputPorts` so port direction matches the public device-owned API contract (#164).
+ - Update the platform interface dependency constraint to `^1.0.8`.
 
 ## 1.0.7
 

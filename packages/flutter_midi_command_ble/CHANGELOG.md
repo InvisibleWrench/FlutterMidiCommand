@@ -1,3 +1,8 @@
+## 1.0.8
+
+ - Update `universal_ble` to `^2.1.1` for `ConnectionPlatformConfig` API compatibility.
+ - Update the platform interface dependency constraint to `^1.0.8`.
+
 ## 1.0.7
 
  - Bump "flutter_midi_command_ble" to `1.0.7` and update the platform interface dependency constraint.

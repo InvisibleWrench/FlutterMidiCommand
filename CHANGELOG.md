@@ -1,7 +1,8 @@
-## NEXT
+## 1.0.8
 
  - FIX(darwin): report CoreMIDI destinations as `inputPorts` and sources as `outputPorts` so port direction matches Android and the public device-owned API contract (#164).
  - FIX(android): disable Kotlin incremental compilation for the Android implementation so Windows builds do not fail when the app project and Pub cache are on different drives (#163).
+ - Update federated package constraints to `^1.0.8`.
 
 ## 1.0.7
 
