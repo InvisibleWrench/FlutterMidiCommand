@@ -87,8 +87,6 @@ melos:
       workspaceChangelog: false
 
   scripts:
-    bootstrap:
-      run: dart run melos bootstrap
     analyze:
       run: dart run melos exec --concurrency=1 --ignore=flutter_midi_command_example -- "flutter analyze"
     analyze:example:
