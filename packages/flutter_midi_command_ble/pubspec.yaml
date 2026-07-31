@@ -16,6 +16,9 @@ environment:
   sdk: ">=3.11.4 <4.0.0"
   flutter: ">=3.24.0"
 
+# Part of the flutter_midi_command pub workspace (see root pubspec `workspace:`).
+resolution: workspace
+
 dependencies:
   flutter:
     sdk: flutter
