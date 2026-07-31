@@ -107,6 +107,9 @@ void main() {
     expect(devices.first.outputPorts.first.id, 1);
     expect(devices.first.outputPorts.first.type, MidiPortType.OUT);
     expect(devices.first.outputPorts.first.connected, isFalse);
+    // Service UUIDs come from the Dart BLE transport only; the host device
+    // channel carries none.
+    expect(devices.first.serviceUUIDs, isEmpty);
   });
 
   test('devices prunes stale cached devices when host list changes', () async {

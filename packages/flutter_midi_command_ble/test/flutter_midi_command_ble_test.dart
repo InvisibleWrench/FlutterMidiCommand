@@ -543,6 +543,85 @@ void main() {
     expect(device.connected, isFalse);
   });
 
+  group('advertised service UUIDs', () {
+    const vendorService = '0000fe59-0000-1000-8000-00805f9b34fb';
+
+    test('are exposed on the discovered device', () async {
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-uuid',
+          name: 'UUID Device',
+          services: <String>[midiServiceId, vendorService],
+        ),
+      );
+
+      final device = (await transport.devices).single;
+
+      expect(device.serviceUUIDs, <String>[
+        midiServiceId.toLowerCase(),
+        vendorService,
+      ]);
+    });
+
+    test('are normalized to lowercase 128-bit form', () async {
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-short-uuid',
+          name: 'Short UUID Device',
+          services: <String>['180D', 'not-a-uuid'],
+        ),
+      );
+
+      final device = (await transport.devices).single;
+
+      expect(device.serviceUUIDs, <String>[
+        '0000180d-0000-1000-8000-00805f9b34fb',
+      ]);
+    });
+
+    test('survive an advertisement that carries no service list', () async {
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-uuid',
+          name: 'UUID Device',
+          services: <String>[vendorService],
+        ),
+      );
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-uuid',
+          name: 'UUID Device',
+          services: <String>[],
+        ),
+      );
+
+      final device = (await transport.devices).single;
+
+      expect(device.serviceUUIDs, <String>[vendorService]);
+    });
+
+    test('are replaced when a later advertisement lists others', () async {
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-uuid',
+          name: 'UUID Device',
+          services: <String>[vendorService],
+        ),
+      );
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-uuid',
+          name: 'UUID Device',
+          services: <String>[midiServiceId],
+        ),
+      );
+
+      final device = (await transport.devices).single;
+
+      expect(device.serviceUUIDs, <String>[midiServiceId.toLowerCase()]);
+    });
+  });
+
   test('teardown unregisters callbacks and can be reactivated', () async {
     expect(fakePlatform.onScanResultUpdate, isNotNull);
     expect(fakePlatform.onConnectionChange, isNotNull);
