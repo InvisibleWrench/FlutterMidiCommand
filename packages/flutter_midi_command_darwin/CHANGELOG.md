@@ -1,3 +1,7 @@
+## 1.0.9
+
+ - Bump "flutter_midi_command_darwin" to `1.0.9` and update the platform interface dependency constraint.
+
 ## 1.0.8
 
  - FIX: report CoreMIDI destinations as `inputPorts` and sources as `outputPorts` so port direction matches the public device-owned API contract (#164).

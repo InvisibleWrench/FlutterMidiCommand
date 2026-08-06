@@ -1,3 +1,7 @@
+## 1.0.9
+
+ - Bump "flutter_midi_command_web" to `1.0.9` and update the platform interface dependency constraint.
+
 ## 1.0.8
 
  - Bump "flutter_midi_command_web" to `1.0.8` and update the platform interface dependency constraint.

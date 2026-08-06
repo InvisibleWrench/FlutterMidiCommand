@@ -1,3 +1,9 @@
+## 1.0.9
+
+ - FIX(ble): stop the opportunistic MTU request from stalling Android connections. It was issued from the connection callback and, because universal_ble runs every GATT command through one queue, it sat in front of service discovery long enough for Android to drop the link with `GATT_ERROR` 133 (surfaced as `Unknown Error 133`).
+ - FIX(ble): retry the BLE link once through a transient Android `GATT_ERROR` 133, and keep the device in the transport cache across that retry so received data still resolves to it.
+ - Update federated package constraints to `^1.0.9`.
+
 ## 1.0.8
 
  - FIX(darwin): report CoreMIDI destinations as `inputPorts` and sources as `outputPorts` so port direction matches Android and the public device-owned API contract (#164).

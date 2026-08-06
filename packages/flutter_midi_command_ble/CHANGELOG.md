@@ -1,3 +1,10 @@
+## 1.0.9
+
+ - FIX: move MTU negotiation to the end of the connection sequence, after service discovery, pairing and notification subscription, with its own 2 s cap. It previously ran from the connection callback and, since universal_ble shares one command queue, blocked service discovery for up to the 10 s global timeout — long enough for Android to drop the link with `GATT_ERROR` 133 (`Unknown Error 133`). The MTU exchange is opportunistic: writes stay at the 20-byte BLE MIDI packet size and Apple manages the MTU itself.
+ - FIX: retry the BLE link once, after a short settle, when a connection fails with a transient Android `GATT_ERROR` 133.
+ - FIX: keep a device in the transport cache when a connection attempt is retried, so the disconnect reported by the failed attempt cannot leave incoming notifications with nothing to resolve to.
+ - Update the platform interface dependency constraint to `^1.0.9`.
+
 ## 1.0.8
 
  - Update `universal_ble` to `^2.1.1` for `ConnectionPlatformConfig` API compatibility.
