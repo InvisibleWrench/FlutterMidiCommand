@@ -20,6 +20,25 @@ bool _isPairingInfoRemoved(Object error) =>
     error is UniversalBleException &&
     error.message.toLowerCase().contains('pairing information');
 
+/// True when [error] is Android's generic `GATT_ERROR` (0x85 / 133). The
+/// Android stack returns it for almost any connection that failed or was
+/// dropped during the handshake, and universal_ble has no HCI name for it, so
+/// it arrives as `UniversalBleException(unknownError, "Unknown Error 133")`.
+/// It is usually transient: the stack has torn the GATT client down and a
+/// second attempt, after a short settle, succeeds.
+bool _isTransientGattError(Object error) =>
+    error is UniversalBleException &&
+    error.message.contains('Unknown Error 133');
+
+/// How long to let the Android stack settle before retrying through a
+/// [_isTransientGattError] failure.
+const _gattRetryDelay = Duration(milliseconds: 500);
+
+/// Cap on the opportunistic MTU exchange. Well under the 10 s global
+/// universal_ble timeout so a peripheral that never answers cannot hold the
+/// shared command queue.
+const _mtuTimeout = Duration(seconds: 2);
+
 enum _BleHandlerState {
   header,
   timestamp,
@@ -240,6 +259,11 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         );
     try {
       await bleDevice.connect(timeout: timeout);
+      // A connection attempt that dropped before succeeding (an Android GATT
+      // 133 we retried through) reports a disconnect, which evicts the device
+      // from the cache. Put it back, or incoming data and by-id sends would
+      // have nothing to resolve to.
+      _devices[bleDevice.deviceId] = bleDevice;
       bleDevice.visible = true;
       if (!identical(bleDevice, device)) {
         device.connected = bleDevice.connected;
@@ -352,7 +376,6 @@ class _BleMidiDevice extends MidiDevice {
       return;
     }
 
-    unawaited(_requestMtu());
     if (!_readinessInProgress &&
         _devState.index < _DeviceState.interrogating.index) {
       unawaited(
@@ -382,11 +405,7 @@ class _BleMidiDevice extends MidiDevice {
     }
     _readinessInProgress = true;
     try {
-      await _runStage(
-        MidiConnectionStage.bluetoothConnect,
-        () => UniversalBle.connect(deviceId, timeout: timeout),
-        timeout,
-      );
+      await _connectLink(timeout: timeout);
       if (!_bleLinkConnected) {
         final connectionState = await _runStage(
           MidiConnectionStage.bluetoothConnect,
@@ -421,6 +440,32 @@ class _BleMidiDevice extends MidiDevice {
       rethrow;
     } finally {
       _readinessInProgress = false;
+    }
+  }
+
+  /// Brings up the BLE link, retrying once through a transient Android
+  /// `GATT_ERROR`. Android reports that failure only after it has already torn
+  /// its GATT client down, so the retry asks for a fresh one; the disconnect
+  /// covers the rarer case where the error arrived on a link the stack still
+  /// believes is up.
+  Future<void> _connectLink({Duration? timeout}) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        await _runStage(
+          MidiConnectionStage.bluetoothConnect,
+          () => UniversalBle.connect(deviceId, timeout: timeout),
+          timeout,
+        );
+        return;
+      } catch (error) {
+        if (attempt > 0 || !_isTransientGattError(error)) {
+          rethrow;
+        }
+      }
+      try {
+        await UniversalBle.disconnect(deviceId);
+      } catch (_) {}
+      await Future<void>.delayed(_gattRetryDelay);
     }
   }
 
@@ -518,9 +563,14 @@ class _BleMidiDevice extends MidiDevice {
     } catch (_) {}
   }
 
+  /// Asks for a larger ATT MTU so the peripheral can pack more of a SysEx dump
+  /// into each notification. Purely opportunistic: writes stay at the 20-byte
+  /// BLE MIDI packet size regardless, peripherals may refuse or ignore the
+  /// request, and Apple manages the MTU itself. It therefore runs last and
+  /// swallows failures — an MTU exchange must never cost us a working link.
   Future<void> _requestMtu() async {
     try {
-      await UniversalBle.requestMtu(deviceId, 247);
+      await UniversalBle.requestMtu(deviceId, 247, timeout: _mtuTimeout);
     } catch (_) {}
   }
 
@@ -528,6 +578,12 @@ class _BleMidiDevice extends MidiDevice {
     await _discoverServices(timeout: timeout);
     await _ensurePaired(timeout: timeout);
     await _startNotify(timeout: timeout);
+    // Deliberately after the MIDI path is live: universal_ble runs GATT
+    // commands through one queue, so an MTU request issued on the connection
+    // callback sits in front of service discovery and can stall it — long
+    // enough on Android that the peripheral drops the link with GATT_ERROR
+    // 133 before the MIDI service is ever discovered.
+    await _requestMtu();
     _devState = _DeviceState.available;
   }
 

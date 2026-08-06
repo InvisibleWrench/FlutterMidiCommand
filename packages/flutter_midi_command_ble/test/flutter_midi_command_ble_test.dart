@@ -18,6 +18,13 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   final Map<String, BleConnectionState> _connectionByDevice =
       <String, BleConnectionState>{};
 
+  /// Number of remaining `connect` attempts that fail with Android's generic
+  /// GATT_ERROR, keyed by device id.
+  final Map<String, int> transientGattFailures = <String, int>{};
+
+  /// GATT operations in the order the transport issued them.
+  final List<String> gattCalls = <String>[];
+
   final List<String> connectCalls = <String>[];
   final List<String> disconnectCalls = <String>[];
   final List<String> pairCalls = <String>[];
@@ -68,6 +75,13 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   }) async {
     connectCalls.add(deviceId);
     await Future<void>.delayed(const Duration(milliseconds: 1));
+    final remainingGattFailures = transientGattFailures[deviceId] ?? 0;
+    if (remainingGattFailures > 0) {
+      transientGattFailures[deviceId] = remainingGattFailures - 1;
+      updateConnection(deviceId, false, 'Unknown Error 133');
+      _connectionByDevice[deviceId] = BleConnectionState.disconnected;
+      throw ConnectionException('Unknown Error 133');
+    }
     if (pairingRemovedConnectIds.contains(deviceId)) {
       updateConnection(deviceId, false, 'Peer removed pairing information');
       _connectionByDevice[deviceId] = BleConnectionState.disconnected;
@@ -97,6 +111,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     String deviceId,
     bool withDescriptors,
   ) async {
+    gattCalls.add('discover');
     return servicesByDevice[deviceId] ?? <BleService>[];
   }
 
@@ -107,6 +122,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     String characteristic,
     BleInputProperty bleInputProperty,
   ) async {
+    gattCalls.add('subscribe');
     subscribeCalls.add(deviceId);
     if (failingSubscribeIds.contains(deviceId)) {
       throw StateError('subscribe-failed');
@@ -138,6 +154,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
 
   @override
   Future<int> requestMtu(String deviceId, int expectedMtu) async {
+    gattCalls.add('mtu');
     return expectedMtu;
   }
 
@@ -311,6 +328,61 @@ void main() {
     expect(fakePlatform.pairCalls, <String>['ble-1']);
     expect(fakePlatform.subscribeCalls, <String>['ble-1']);
     expect(device.connected, isTrue);
+  });
+
+  test('MTU negotiation runs after the MIDI path is live', () async {
+    fakePlatform.servicesByDevice['ble-mtu'] = midiServices();
+    fakePlatform.emitScanDevice(
+      BleDevice(deviceId: 'ble-mtu', name: 'MTU Device', services: <String>[]),
+    );
+
+    await transport.connectToDevice((await transport.devices).single);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.gattCalls, <String>['discover', 'subscribe', 'mtu']);
+  });
+
+  test('connectToDevice retries once through a transient GATT 133', () async {
+    fakePlatform.servicesByDevice['ble-133'] = midiServices();
+    fakePlatform.transientGattFailures['ble-133'] = 1;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-133',
+        name: 'Flaky Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.connectToDevice(device);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.connectCalls, <String>['ble-133', 'ble-133']);
+    expect(device.connected, isTrue);
+    // The failed attempt reported a disconnect; the device must survive it so
+    // received data still resolves to it.
+    expect((await transport.devices).single.id, 'ble-133');
+  });
+
+  test('connectToDevice gives up after one GATT 133 retry', () async {
+    fakePlatform.servicesByDevice['ble-133-hard'] = midiServices();
+    fakePlatform.transientGattFailures['ble-133-hard'] = 5;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-133-hard',
+        name: 'Dead Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<ConnectionException>()),
+    );
+
+    expect(fakePlatform.connectCalls, <String>['ble-133-hard', 'ble-133-hard']);
+    expect(device.connected, isFalse);
   });
 
   test('connectToDevice surfaces BLE connection failures', () async {
