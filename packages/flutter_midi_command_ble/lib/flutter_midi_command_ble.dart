@@ -105,6 +105,15 @@ const _gattRetryDelay = Duration(milliseconds: 500);
 /// shared command queue.
 const _mtuTimeout = Duration(seconds: 2);
 
+/// Advertised service UUIDs as lowercase 128-bit strings, dropping any entry
+/// that is not a valid UUID. The pigeon-backed platforms already normalize, but
+/// the Linux and Web implementations pass advertisement UUIDs through untouched,
+/// so do it here to keep [MidiDevice.serviceUUIDs] comparable everywhere.
+List<String> _normalizeServiceUuids(List<String> uuids) => uuids
+    .map(BleUuidParser.stringOrNull)
+    .whereType<String>()
+    .toList(growable: false);
+
 enum _BleHandlerState {
   header,
   timestamp,
@@ -216,9 +225,16 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       if (result.name == null) {
         return;
       }
+      final advertisedServices = _normalizeServiceUuids(result.services);
       final existing = _devices[result.deviceId];
       if (existing != null) {
         existing.name = result.name!;
+        // Advertisement and scan-response packets arrive separately and only one
+        // of them carries the service list, so an empty list means "not in this
+        // packet" rather than "no longer advertised". Keep what we already saw.
+        if (advertisedServices.isNotEmpty) {
+          existing.serviceUUIDs = advertisedServices;
+        }
         if (!existing.visible) {
           existing.visible = true;
           _setupStreamController.add(MidiSetupChange.deviceAppeared);
@@ -229,7 +245,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         deviceId: result.deviceId,
         name: result.name!,
         visible: true,
-      );
+      )..serviceUUIDs = advertisedServices;
       _setupStreamController.add(MidiSetupChange.deviceAppeared);
     };
 

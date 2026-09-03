@@ -216,6 +216,29 @@ Connection failures are surfaced as typed `MidiConnectionException` subclasses w
 
 Pass `awaitConnectionTimeout: null` only if you explicitly want to let the required readiness flow wait indefinitely. The optional Apple CoreMIDI handoff remains bounded.
 
+### Filtering discovered BLE devices
+
+BLE scanning is already constrained to the BLE MIDI service, so non-MIDI
+peripherals never reach `devices`. To narrow discovery further — for example to
+one vendor's hardware — use the UUIDs the peripheral advertised alongside the
+MIDI service:
+
+```dart
+const vendorService = '0000fe59-0000-1000-8000-00805f9b34fb';
+
+final devices = await midi.devices ?? const <MidiDevice>[];
+final vendorDevices =
+    devices.where((d) => d.serviceUUIDs.contains(vendorService));
+```
+
+`MidiDevice.serviceUUIDs` holds lowercase 128-bit UUID strings. It is populated
+only for devices discovered over the Dart BLE transport, and is empty for
+host-native devices — including Bluetooth devices routed through host MIDI APIs
+such as CoreMIDI (see "Host-paired Bluetooth MIDI devices may be native-routed").
+Some peripherals split their advertisement and scan response, so a device may be
+reported before its full UUID list is known; treat the value as best-effort and
+re-read it on `MidiSetupChange` events.
+
 ### Setup change events
 
 Listen to `onMidiSetupChanged` to refresh your device list when the host MIDI topology changes. Native desktop/mobile transports monitor platform setup notifications and emit `MidiSetupChange` values:

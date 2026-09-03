@@ -57,6 +57,14 @@ class MidiDevice {
 
   /// Ports that send MIDI data out of this device.
   List<MidiPort> outputPorts = [];
+
+  /// Service UUIDs advertised by this device, as lowercase 128-bit strings.
+  ///
+  /// Populated for devices discovered over the Dart BLE transport, where it can
+  /// be used to narrow discovery to specific hardware. Empty for host-native
+  /// devices, including Bluetooth devices routed through host MIDI APIs such as
+  /// CoreMIDI.
+  List<String> serviceUUIDs = const <String>[];
   final StreamController<MidiConnectionState> _connectionStateController =
       StreamController<MidiConnectionState>.broadcast();
   MidiConnectionState _connectionState;
