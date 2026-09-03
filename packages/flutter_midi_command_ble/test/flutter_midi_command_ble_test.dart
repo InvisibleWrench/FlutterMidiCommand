@@ -28,7 +28,8 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
 
   /// Payloads passed to `writeValue`, in order.
   final List<List<int>> writtenPackets = <List<int>>[];
-  final List<BleConnectionPriority> priorityRequests = <BleConnectionPriority>[];
+  final List<BleConnectionPriority> priorityRequests =
+      <BleConnectionPriority>[];
   final Set<String> rejectedPairIds = <String>{};
   final Map<String, List<BleService>> servicesByDevice =
       <String, List<BleService>>{};
@@ -168,8 +169,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   ) async {
     gattCalls.add('subscribe');
     subscribeCalls.add(deviceId);
-    final remainingGattFailures =
-        transientGattSubscribeFailures[deviceId] ?? 0;
+    final remainingGattFailures = transientGattSubscribeFailures[deviceId] ?? 0;
     if (remainingGattFailures > 0) {
       transientGattSubscribeFailures[deviceId] = remainingGattFailures - 1;
       updateConnection(deviceId, false);
@@ -473,10 +473,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 5));
 
     expect(fakePlatform.connectCalls, <String>['ble-sub-133', 'ble-sub-133']);
-    expect(fakePlatform.subscribeCalls, <String>[
-      'ble-sub-133',
-      'ble-sub-133',
-    ]);
+    expect(fakePlatform.subscribeCalls, <String>['ble-sub-133', 'ble-sub-133']);
     expect(device.connected, isTrue);
     expect((await transport.devices).single.id, 'ble-sub-133');
   });
@@ -503,7 +500,10 @@ void main() {
     await transport.connectToDevice(device);
     await Future<void>.delayed(const Duration(milliseconds: 5));
 
-    expect(fakePlatform.connectCalls, <String>['ble-disc-drop', 'ble-disc-drop']);
+    expect(fakePlatform.connectCalls, <String>[
+      'ble-disc-drop',
+      'ble-disc-drop',
+    ]);
     expect(device.connected, isTrue);
     expect((await transport.devices).single.id, 'ble-disc-drop');
   });
@@ -868,7 +868,13 @@ void main() {
   // long a firmware transfer takes.
   Uint8List firmwareSysEx([int marker = 0x00]) {
     return Uint8List.fromList(<int>[
-      0xF0, 0x7E, 0x10, 0x07, 0x02, 0x00, 0x7F,
+      0xF0,
+      0x7E,
+      0x10,
+      0x07,
+      0x02,
+      0x00,
+      0x7F,
       ...List<int>.filled(128, marker),
       0x2A,
       0xF7,
@@ -976,17 +982,20 @@ void main() {
     ]);
   });
 
-  test('requestHighPerformanceConnection: false requests no priority', () async {
-    final relaxed = UniversalBleMidiTransport(
-      requestHighPerformanceConnection: false,
-    );
-    final device = await connectDevice(relaxed, 'ble-priority-opt-out');
-    relaxed.disconnectDevice(device);
-    await Future<void>.delayed(const Duration(milliseconds: 5));
+  test(
+    'requestHighPerformanceConnection: false requests no priority',
+    () async {
+      final relaxed = UniversalBleMidiTransport(
+        requestHighPerformanceConnection: false,
+      );
+      final device = await connectDevice(relaxed, 'ble-priority-opt-out');
+      relaxed.disconnectDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
 
-    expect(fakePlatform.priorityRequests, isEmpty);
-    relaxed.teardown();
-  });
+      expect(fakePlatform.priorityRequests, isEmpty);
+      relaxed.teardown();
+    },
+  );
 
   test('overlapping sends do not interleave their SysEx packets', () async {
     fakePlatform.negotiatedMtu = 23; // Force multi-packet SysEx.
@@ -1009,29 +1018,40 @@ void main() {
         .toList();
     final firstTwo = markers.indexOf(2);
     expect(firstTwo, greaterThan(0), reason: 'no packets for message 1');
-    expect(markers.sublist(0, firstTwo).every((m) => m == 1), isTrue,
-        reason: 'interleaved packet ordering: $markers');
-    expect(markers.sublist(firstTwo).every((m) => m == 2), isTrue,
-        reason: 'interleaved packet ordering: $markers');
-  });
-
-  test('sendDataAwaitingDelivery completes only after the writes land',
-      () async {
-    fakePlatform.negotiatedMtu = 23;
-    fakePlatform.writeDelay = const Duration(milliseconds: 2);
-    await connectDevice(transport, 'ble-awaited');
-    fakePlatform.writtenPackets.clear();
-
-    final delivered = transport.sendDataAwaitingDelivery(
-      firmwareSysEx(0x01),
-      deviceId: 'ble-awaited',
+    expect(
+      markers.sublist(0, firstTwo).every((m) => m == 1),
+      isTrue,
+      reason: 'interleaved packet ordering: $markers',
     );
-    expect(fakePlatform.writtenPackets.length, lessThan(8),
-        reason: 'writes should still be in flight immediately after the call');
-
-    await delivered;
-    expect(fakePlatform.writtenPackets, hasLength(8));
+    expect(
+      markers.sublist(firstTwo).every((m) => m == 2),
+      isTrue,
+      reason: 'interleaved packet ordering: $markers',
+    );
   });
+
+  test(
+    'sendDataAwaitingDelivery completes only after the writes land',
+    () async {
+      fakePlatform.negotiatedMtu = 23;
+      fakePlatform.writeDelay = const Duration(milliseconds: 2);
+      await connectDevice(transport, 'ble-awaited');
+      fakePlatform.writtenPackets.clear();
+
+      final delivered = transport.sendDataAwaitingDelivery(
+        firmwareSysEx(0x01),
+        deviceId: 'ble-awaited',
+      );
+      expect(
+        fakePlatform.writtenPackets.length,
+        lessThan(8),
+        reason: 'writes should still be in flight immediately after the call',
+      );
+
+      await delivered;
+      expect(fakePlatform.writtenPackets, hasLength(8));
+    },
+  );
 
   test('a failed write is reported and the SysEx still completes', () async {
     fakePlatform.negotiatedMtu = 23;

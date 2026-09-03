@@ -47,8 +47,7 @@ abstract class MidiBleTransport {
     Uint8List data, {
     int? timestamp,
     String? deviceId,
-  }) async =>
-      sendData(data, timestamp: timestamp, deviceId: deviceId);
+  }) async => sendData(data, timestamp: timestamp, deviceId: deviceId);
   Stream<MidiPacket> get onMidiDataReceived;
   Stream<MidiSetupChange> get onMidiSetupChanged;
 

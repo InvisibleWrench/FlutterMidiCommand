@@ -704,9 +704,7 @@ class _BleMidiDevice extends MidiDevice {
           if (attempt > 0 || !_isTransientLinkFailure(cause)) {
             rethrow;
           }
-          _log(
-            '$deviceId: link dropped during setup ($error); retrying once',
-          );
+          _log('$deviceId: link dropped during setup ($error); retrying once');
         }
         await Future<void>.delayed(_gattRetryDelay);
       }
@@ -909,7 +907,9 @@ class _BleMidiDevice extends MidiDevice {
   /// ~30-50 ms default), which is the floor on MIDI latency.
   ///
   /// Best-effort: only Android implements it, and a peripheral can decline.
-  Future<void> _requestConnectionPriority(BleConnectionPriority priority) async {
+  Future<void> _requestConnectionPriority(
+    BleConnectionPriority priority,
+  ) async {
     if (!requestHighPerformanceConnection) {
       return;
     }
