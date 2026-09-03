@@ -98,7 +98,7 @@ melos:
     test:native:android:
       run: bash ./example/android/gradlew -p example/android :flutter_midi_command_android:testDebugUnitTest
     test:native:darwin:
-      run: swift package --package-path packages/flutter_midi_command_darwin/darwin/flutter_midi_command_darwin describe
+      run: bash tool/darwin_native_checks.sh
     test:native:linux:
       run: dart run melos exec --scope=flutter_midi_command_linux -- "flutter test"
     test:native:windows:
