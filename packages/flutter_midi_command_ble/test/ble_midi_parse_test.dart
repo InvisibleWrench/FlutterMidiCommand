@@ -201,46 +201,49 @@ void main() {
     }
   });
 
-  test('BLE MIDI SysEx survives a chunk/parse round-trip at any size', () async {
-    BleCapabilities.hasSystemPairingApi = true;
-    final fake = _FakePlatform();
-    UniversalBle.setInstance(fake);
-    final transport = UniversalBleMidiTransport();
+  test(
+    'BLE MIDI SysEx survives a chunk/parse round-trip at any size',
+    () async {
+      BleCapabilities.hasSystemPairingApi = true;
+      final fake = _FakePlatform();
+      UniversalBle.setInstance(fake);
+      final transport = UniversalBleMidiTransport();
 
-    fake.servicesByDevice['dev'] = midiServices();
-    fake.emitScan('dev', 'GEWA');
-    final device = (await transport.devices).single;
-    await transport.connectToDevice(device);
-    await Future<void>.delayed(const Duration(milliseconds: 5));
+      fake.servicesByDevice['dev'] = midiServices();
+      fake.emitScan('dev', 'GEWA');
+      final device = (await transport.devices).single;
+      await transport.connectToDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
 
-    final received = <List<int>>[];
-    final sub = transport.onMidiDataReceived.listen(
-      (p) => received.add(p.data.toList()),
-    );
+      final received = <List<int>>[];
+      final sub = transport.onMidiDataReceived.listen(
+        (p) => received.add(p.data.toList()),
+      );
 
-    // Sweep every body length across the packet boundaries of several write
-    // sizes, feeding the chunker's own output back through the parser.
-    final expected = <List<int>>[];
-    for (final writeSize in <int>[20, 23, 100, 244]) {
-      for (var bodyLength = 0; bodyLength <= 200; bodyLength++) {
-        final sysEx = <int>[
-          0xF0,
-          ...List<int>.generate(bodyLength, (i) => i % 0x80),
-          0xF7,
-        ];
-        expected.add(sysEx);
-        for (final packet in buildBleMidiSysExPackets(sysEx, writeSize)) {
-          fake.emitValue('dev', packet);
+      // Sweep every body length across the packet boundaries of several write
+      // sizes, feeding the chunker's own output back through the parser.
+      final expected = <List<int>>[];
+      for (final writeSize in <int>[20, 23, 100, 244]) {
+        for (var bodyLength = 0; bodyLength <= 200; bodyLength++) {
+          final sysEx = <int>[
+            0xF0,
+            ...List<int>.generate(bodyLength, (i) => i % 0x80),
+            0xF7,
+          ];
+          expected.add(sysEx);
+          for (final packet in buildBleMidiSysExPackets(sysEx, writeSize)) {
+            fake.emitValue('dev', packet);
+          }
         }
       }
-    }
 
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    await sub.cancel();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await sub.cancel();
 
-    expect(received, hasLength(expected.length));
-    for (var i = 0; i < expected.length; i++) {
-      expect(received[i], expected[i], reason: 'round-trip mismatch at $i');
-    }
-  });
+      expect(received, hasLength(expected.length));
+      for (var i = 0; i < expected.length; i++) {
+        expect(received[i], expected[i], reason: 'round-trip mismatch at $i');
+      }
+    },
+  );
 }

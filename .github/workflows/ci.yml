@@ -6,7 +6,12 @@ on:
     branches:
       - main
       - master
-      - codex/restructure-repo-into-mono-repo-with-melon
+
+# A new push supersedes the run it interrupted; the macOS and emulator jobs are
+# too expensive to leave racing against themselves.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FLUTTER_VERSION: '3.44.2'
@@ -47,10 +52,12 @@ jobs:
           dart pub global activate melos ${{ env.MELOS_VERSION }}
           echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
       - run: melos bootstrap
+      - run: melos run format:check
       - run: melos run analyze
       - run: melos run analyze:example
       - run: melos run test
       - run: melos run test:web:chrome
+      - run: melos run publish:dry-run
 
   native_android_checks:
     runs-on: ubuntu-latest
@@ -85,23 +92,6 @@ jobs:
       - run: melos bootstrap
       - name: Darwin native tests
         run: melos run test:native:darwin
-
-  native_linux_checks:
-    runs-on: ubuntu-latest
-    needs: pigeon_contracts
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-      - name: Install Melos
-        shell: bash
-        run: |
-          dart pub global activate melos ${{ env.MELOS_VERSION }}
-          echo "$PUB_CACHE/bin" >> "$GITHUB_PATH"
-      - run: melos bootstrap
-      - name: Linux backend tests
-        run: melos run test:native:linux
 
   native_windows_checks:
     runs-on: windows-latest
@@ -160,7 +150,9 @@ jobs:
 
   example_linux:
     runs-on: ubuntu-latest
-    needs: [dart_checks, native_linux_checks]
+    # The linux backend is pure Dart, so `melos run test` in dart_checks already
+    # covers it; the build below is what exercises it on a Linux host.
+    needs: dart_checks
     steps:
       - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2

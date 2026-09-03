@@ -92,15 +92,15 @@ melos:
     analyze:example:
       run: dart run melos exec --scope=flutter_midi_command_example -- "flutter analyze"
     test:
-      run: dart run melos exec --dir-exists=test --concurrency=1 --ignore=flutter_midi_command_example --ignore=flutter_midi_command_web -- "flutter test"
+      # The example is included: its widget tests cover the app-facing wiring
+      # (transport toggles, connection error mapping) that no package test does.
+      run: dart run melos exec --dir-exists=test --concurrency=1 --ignore=flutter_midi_command_web -- "flutter test"
     test:web:chrome:
       run: dart run melos exec --scope=flutter_midi_command_web -- "flutter test --platform chrome"
     test:native:android:
       run: bash ./example/android/gradlew -p example/android :flutter_midi_command_android:testDebugUnitTest
     test:native:darwin:
       run: bash tool/darwin_native_checks.sh
-    test:native:linux:
-      run: dart run melos exec --scope=flutter_midi_command_linux -- "flutter test"
     test:native:windows:
       run: dart run melos exec --scope=flutter_midi_command_windows -- "flutter test"
     test:example:integration:android:
@@ -129,3 +129,10 @@ melos:
       run: dart run melos exec --scope=flutter_midi_command_example -- "flutter build web --debug"
     format:
       run: dart run melos exec -- "dart format --set-exit-if-changed ."
+    format:check:
+      # Same check without rewriting, for CI.
+      run: dart run melos exec -- "dart format --output=none --set-exit-if-changed ."
+    publish:dry-run:
+      # Catches packaging regressions (missing LICENSE/README, unresolvable
+      # constraints) on the PR that introduces them rather than at release.
+      run: dart run melos exec --no-private --concurrency=1 -- "flutter pub publish --dry-run"
