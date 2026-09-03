@@ -210,7 +210,7 @@ class MyAppState extends State<MyApp> {
 
     if (enabled) {
       try {
-        _midiCommand.setNetworkSessionEnabled(true);
+        await _midiCommand.setNetworkSessionEnabled(true);
       } catch (_) {}
     }
 
@@ -224,7 +224,7 @@ class MyAppState extends State<MyApp> {
 
     if (!enabled) {
       try {
-        _midiCommand.removeVirtualDevice(name: "Flutter MIDI Command");
+        await _midiCommand.removeVirtualDevice(name: "Flutter MIDI Command");
       } catch (_) {}
     }
 
@@ -235,8 +235,20 @@ class MyAppState extends State<MyApp> {
 
     if (enabled) {
       try {
-        _midiCommand.addVirtualDevice(name: "Flutter MIDI Command");
-      } catch (_) {}
+        await _midiCommand.addVirtualDevice(name: "Flutter MIDI Command");
+      } catch (err) {
+        // Creating the virtual source can fail on the platform side; the
+        // toggle must not keep claiming a source that does not exist.
+        if (kDebugMode) {
+          print("Could not create virtual device $err");
+        }
+        if (mounted) {
+          setState(() {
+            _virtualDeviceActivated = false;
+          });
+          _applyTransportPolicy();
+        }
+      }
     }
 
     await _refreshDevices(showLoading: false);

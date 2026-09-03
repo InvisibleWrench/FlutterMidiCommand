@@ -80,12 +80,18 @@ abstract class MidiCommandPlatform extends PlatformInterface {
   }
 
   /// Creates a virtual MIDI source.
-  void addVirtualDevice({String? name}) {
+  ///
+  /// The returned future completes with the platform error when creation
+  /// fails, so implementations must not discard the underlying call.
+  Future<void> addVirtualDevice({String? name}) {
     throw UnimplementedError('addVirtualDevice() has not been implemented.');
   }
 
   /// Removes a previously created virtual MIDI source.
-  void removeVirtualDevice({String? name}) {
+  ///
+  /// The returned future completes with the platform error when removal
+  /// fails, so implementations must not discard the underlying call.
+  Future<void> removeVirtualDevice({String? name}) {
     throw UnimplementedError('removeVirtualDevice() has not been implemented.');
   }
 
@@ -97,7 +103,11 @@ abstract class MidiCommandPlatform extends PlatformInterface {
   }
 
   /// Sets the enabled state of the network session (iOS only)
-  void setNetworkSessionEnabled(bool enabled) {
+  ///
+  /// The returned future completes with the platform error when the state
+  /// could not be applied, so implementations must not discard the underlying
+  /// call.
+  Future<void> setNetworkSessionEnabled(bool enabled) {
     throw UnimplementedError(
       'setNetworkSessionEnabled has not been implemented.',
     );

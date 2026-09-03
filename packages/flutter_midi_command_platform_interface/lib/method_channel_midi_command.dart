@@ -303,14 +303,14 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
   /// The virtual MIDI source appears as a virtual port in other apps.
   /// Currently only supported on iOS.
   @override
-  void addVirtualDevice({String? name}) {
-    unawaited(_hostApi.addVirtualDevice(name));
+  Future<void> addVirtualDevice({String? name}) {
+    return _hostApi.addVirtualDevice(name);
   }
 
-  /// Removes a previously addd virtual MIDI source.
+  /// Removes a previously added virtual MIDI source.
   @override
-  void removeVirtualDevice({String? name}) {
-    unawaited(_hostApi.removeVirtualDevice(name));
+  Future<void> removeVirtualDevice({String? name}) {
+    return _hostApi.removeVirtualDevice(name);
   }
 
   /// Returns the current state of the network session
@@ -325,8 +325,8 @@ class MethodChannelMidiCommand extends MidiCommandPlatform
   ///
   /// This is functional on iOS only
   @override
-  void setNetworkSessionEnabled(bool enabled) {
-    unawaited(_hostApi.setNetworkSessionEnabled(enabled));
+  Future<void> setNetworkSessionEnabled(bool enabled) {
+    return _hostApi.setNetworkSessionEnabled(enabled);
   }
 }
 

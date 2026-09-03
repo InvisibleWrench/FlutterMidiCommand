@@ -439,12 +439,12 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
   }
 
   @override
-  void addVirtualDevice({String? name}) {
+  Future<void> addVirtualDevice({String? name}) async {
     throw _unsupported('virtual MIDI devices are not supported on web.');
   }
 
   @override
-  void removeVirtualDevice({String? name}) {
+  Future<void> removeVirtualDevice({String? name}) async {
     throw _unsupported('virtual MIDI devices are not supported on web.');
   }
 
@@ -452,7 +452,7 @@ class FlutterMidiCommandWeb extends MidiCommandPlatform {
   Future<bool?> get isNetworkSessionEnabled async => false;
 
   @override
-  void setNetworkSessionEnabled(bool enabled) {
+  Future<void> setNetworkSessionEnabled(bool enabled) async {
     // No-op on web.
   }
 

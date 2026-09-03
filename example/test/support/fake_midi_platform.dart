@@ -88,12 +88,12 @@ class FakeMidiPlatform extends MidiCommandPlatform {
       _setupStreamController.stream;
 
   @override
-  void addVirtualDevice({String? name}) {
+  Future<void> addVirtualDevice({String? name}) async {
     addedVirtualDeviceNames.add(name);
   }
 
   @override
-  void removeVirtualDevice({String? name}) {
+  Future<void> removeVirtualDevice({String? name}) async {
     removedVirtualDeviceNames.add(name);
   }
 
@@ -101,7 +101,7 @@ class FakeMidiPlatform extends MidiCommandPlatform {
   Future<bool?> get isNetworkSessionEnabled async => networkEnabled;
 
   @override
-  void setNetworkSessionEnabled(bool enabled) {
+  Future<void> setNetworkSessionEnabled(bool enabled) async {
     networkEnabled = enabled;
     networkEnabledChanges.add(enabled);
   }

@@ -371,6 +371,22 @@ Use `MidiTransportPolicy` to enable/disable transports at runtime. Transport-spe
 
 A host-native device can report `MidiDeviceType.ble` while still communicating through host MIDI APIs (for example paired CoreMIDI/Android host devices). Do not assume `type == ble` always means Dart BLE transport is used internally.
 
+### 7) Virtual device and network session APIs return futures
+
+`addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` return `Future<void>` instead of `void`. They previously discarded the platform call, so a failure such as `PlatformException(AUDIOERROR, Error -2 while create MIDI virtual source)` surfaced as an unhandled asynchronous error that no `try`/`catch` around the call could see.
+
+Await them to handle failures:
+
+```dart
+try {
+  await midi.addVirtualDevice(name: 'My App');
+} on PlatformException catch (err) {
+  // The virtual source was not created.
+}
+```
+
+Existing calls that ignore the result keep compiling. Custom `MidiCommandPlatform` implementations must widen these three overrides from `void` to `Future<void>`.
+
 For help getting started with Flutter, view our online
 [documentation](https://flutter.dev/).
 

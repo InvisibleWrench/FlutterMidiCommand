@@ -621,16 +621,22 @@ class MidiCommand {
   /// The virtual MIDI source appears as a virtual port in other apps.
   /// Other apps can receive MIDI from this source.
   /// Currently only supported on iOS.
-  void addVirtualDevice({String? name}) {
+  ///
+  /// Completes once the platform has created the source, and completes with
+  /// the platform error when it could not.
+  Future<void> addVirtualDevice({String? name}) async {
     _requireTransport(MidiTransport.virtual, 'addVirtualDevice');
-    _platform.addVirtualDevice(name: name);
+    await _platform.addVirtualDevice(name: name);
   }
 
   /// Removes a previously created virtual MIDI source.
   /// Currently only supported on iOS.
-  void removeVirtualDevice({String? name}) {
+  ///
+  /// Completes once the platform has removed the source, and completes with
+  /// the platform error when it could not.
+  Future<void> removeVirtualDevice({String? name}) async {
     _requireTransport(MidiTransport.virtual, 'removeVirtualDevice');
-    _platform.removeVirtualDevice(name: name);
+    await _platform.removeVirtualDevice(name: name);
   }
 
   /// Returns the current state of the network session
@@ -644,9 +650,12 @@ class MidiCommand {
   /// Sets the enabled state of the network session
   ///
   /// This is functional on iOS only
-  void setNetworkSessionEnabled(bool enabled) {
+  ///
+  /// Completes once the platform has applied the state, and completes with the
+  /// platform error when it could not.
+  Future<void> setNetworkSessionEnabled(bool enabled) async {
     _requireTransport(MidiTransport.network, 'setNetworkSessionEnabled');
-    _platform.setNetworkSessionEnabled(enabled);
+    await _platform.setNetworkSessionEnabled(enabled);
   }
 
   Future<void> _awaitConnectedOrFailed(MidiDevice device) {

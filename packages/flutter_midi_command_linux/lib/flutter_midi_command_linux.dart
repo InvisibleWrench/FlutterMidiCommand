@@ -227,16 +227,16 @@ class FlutterMidiCommandLinux extends MidiCommandPlatform {
   Stream<MidiSetupChange>? get onMidiSetupChanged => _setupStream;
 
   @override
-  void addVirtualDevice({String? name}) {}
+  Future<void> addVirtualDevice({String? name}) async {}
 
   @override
-  void removeVirtualDevice({String? name}) {}
+  Future<void> removeVirtualDevice({String? name}) async {}
 
   @override
   Future<bool?> get isNetworkSessionEnabled async => null;
 
   @override
-  void setNetworkSessionEnabled(bool enabled) {}
+  Future<void> setNetworkSessionEnabled(bool enabled) async {}
 
   void _addSetupEvent(MidiSetupChange event) {
     if (!_setupStreamController.isClosed) {

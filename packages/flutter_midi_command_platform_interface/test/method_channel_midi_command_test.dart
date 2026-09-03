@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/services.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_midi_command_platform_interface/method_channel_midi_command.dart';
 import 'package:flutter_midi_command_platform_interface/src/pigeon/midi_api.g.dart'
@@ -18,6 +17,7 @@ class _FakeHostApi extends pigeon.MidiHostApi {
   String? lastVirtualName;
   bool? networkEnabled = false;
   bool? setNetworkEnabledArg;
+  Object? virtualDeviceError;
 
   @override
   Future<List<pigeon.MidiHostDevice>> listDevices() async => listedDevices;
@@ -50,12 +50,18 @@ class _FakeHostApi extends pigeon.MidiHostApi {
   Future<void> addVirtualDevice(String? name) async {
     addVirtualCalls += 1;
     lastVirtualName = name;
+    if (virtualDeviceError != null) {
+      throw virtualDeviceError!;
+    }
   }
 
   @override
   Future<void> removeVirtualDevice(String? name) async {
     removeVirtualCalls += 1;
     lastVirtualName = name;
+    if (virtualDeviceError != null) {
+      throw virtualDeviceError!;
+    }
   }
 
   @override
@@ -319,6 +325,25 @@ void main() {
     expect(packets.first.device.type, MidiDeviceType.serial);
   });
 
+  test('virtual device failures reach the caller', () async {
+    final host =
+        _FakeHostApi()
+          ..virtualDeviceError = PlatformException(
+            code: 'AUDIOERROR',
+            message: 'Error -2 while create MIDI virtual source',
+          );
+    final platform = MethodChannelMidiCommand(hostApi: host);
+
+    await expectLater(
+      platform.addVirtualDevice(name: 'Virtual'),
+      throwsA(isA<PlatformException>()),
+    );
+    await expectLater(
+      platform.removeVirtualDevice(name: 'Virtual'),
+      throwsA(isA<PlatformException>()),
+    );
+  });
+
   test('virtual/network/teardown methods delegate to host api', () async {
     final host = _FakeHostApi()..networkEnabled = true;
     final platform = MethodChannelMidiCommand(hostApi: host);
@@ -330,10 +355,10 @@ void main() {
     );
 
     await platform.connectToDevice(connected);
-    platform.addVirtualDevice(name: 'Virtual');
-    platform.removeVirtualDevice(name: 'Virtual');
+    await platform.addVirtualDevice(name: 'Virtual');
+    await platform.removeVirtualDevice(name: 'Virtual');
     final networkEnabled = await platform.isNetworkSessionEnabled;
-    platform.setNetworkSessionEnabled(false);
+    await platform.setNetworkSessionEnabled(false);
     platform.teardown();
     await Future<void>.delayed(Duration.zero);
 

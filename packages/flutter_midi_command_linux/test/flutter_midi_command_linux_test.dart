@@ -16,16 +16,13 @@ void main() {
 
     expect(plugin.onMidiDataReceived, isNotNull);
     expect(plugin.onMidiSetupChanged, isNotNull);
-    expect(
-      () => plugin.addVirtualDevice(name: 'Test Virtual'),
-      returnsNormally,
-    );
-    expect(
-      () => plugin.removeVirtualDevice(name: 'Test Virtual'),
-      returnsNormally,
+    await expectLater(plugin.addVirtualDevice(name: 'Test Virtual'), completes);
+    await expectLater(
+      plugin.removeVirtualDevice(name: 'Test Virtual'),
+      completes,
     );
     expect(await plugin.isNetworkSessionEnabled, isNull);
-    expect(() => plugin.setNetworkSessionEnabled(true), returnsNormally);
+    await expectLater(plugin.setNetworkSessionEnabled(true), completes);
   });
 
   test('devices refreshes discovery on each call', () async {

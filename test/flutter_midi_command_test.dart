@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import 'package:flutter_midi_command/flutter_midi_command_messages.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
@@ -50,6 +51,26 @@ class _FakePlatform extends MidiCommandPlatform {
 
   @override
   Stream<MidiSetupChange>? get onMidiSetupChanged => _setup.stream;
+
+  Object? virtualDeviceError;
+  final addedVirtualDevices = <String?>[];
+  final removedVirtualDevices = <String?>[];
+
+  @override
+  Future<void> addVirtualDevice({String? name}) async {
+    addedVirtualDevices.add(name);
+    if (virtualDeviceError != null) {
+      throw virtualDeviceError!;
+    }
+  }
+
+  @override
+  Future<void> removeVirtualDevice({String? name}) async {
+    removedVirtualDevices.add(name);
+    if (virtualDeviceError != null) {
+      throw virtualDeviceError!;
+    }
+  }
 
   void emitPacket(MidiPacket packet) {
     _rx.add(packet);
@@ -260,6 +281,38 @@ void main() {
 
   tearDown(() {
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  test('addVirtualDevice reports platform failures to the caller', () async {
+    final platform =
+        _FakePlatform()
+          ..virtualDeviceError = PlatformException(
+            code: 'AUDIOERROR',
+            message: 'Error -2 while create MIDI virtual source',
+          );
+    MidiCommand.setPlatformOverride(platform);
+    final midi = MidiCommand();
+
+    await expectLater(
+      midi.addVirtualDevice(name: 'Virtual'),
+      throwsA(isA<PlatformException>()),
+    );
+    await expectLater(
+      midi.removeVirtualDevice(name: 'Virtual'),
+      throwsA(isA<PlatformException>()),
+    );
+    expect(platform.addedVirtualDevices, <String?>['Virtual']);
+    expect(platform.removedVirtualDevices, <String?>['Virtual']);
+  });
+
+  test('addVirtualDevice completes when the platform succeeds', () async {
+    final platform = _FakePlatform();
+    MidiCommand.setPlatformOverride(platform);
+    final midi = MidiCommand();
+
+    await midi.addVirtualDevice(name: 'Virtual');
+
+    expect(platform.addedVirtualDevices, <String?>['Virtual']);
   });
 
   test('BLE APIs require BLE transport implementation', () async {
