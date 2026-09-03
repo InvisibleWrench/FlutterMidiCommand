@@ -115,11 +115,6 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
             self.handleMIDINotification(notification)
         }
         knownDeviceSnapshots = currentDeviceSnapshots()
-
-#if os(iOS)
-        session = MIDINetworkSession.default()
-        session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
-#endif
     }
 
     func updateSetupState(data: MidiSetupChange) {
@@ -215,6 +210,13 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
     func setNetworkSessionEnabled(enabled: Bool) throws {
 #if os(iOS)
+        // Created lazily, never at plugin init: touching MIDINetworkSession.default()
+        // makes iOS 14+ show the system "Allow [app] to find devices on local
+        // networks" prompt, and network MIDI is opt-in.
+        if enabled && session == nil {
+            session = MIDINetworkSession.default()
+            session?.connectionPolicy = MIDINetworkConnectionPolicy.anyone
+        }
         session?.isEnabled = enabled
 #endif
     }

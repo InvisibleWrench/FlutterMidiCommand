@@ -34,7 +34,7 @@ Supports
   - Android: plugin package minimum is `minSdkVersion(21)` (`packages/flutter_midi_command_android/android/build.gradle.kts`), while the example app currently uses `minSdkVersion(24)` (`example/android/app/build.gradle.kts`).
 - Android BLE permissions are merged automatically when `flutter_midi_command_ble` is installed.
 - Apple usage descriptions/capabilities and packaged Windows/Linux permissions remain application-owned. See the [BLE platform setup guide](https://pub.dev/packages/flutter_midi_command_ble#platform-setup).
-- If using network MIDI on iOS, add `NSLocalNetworkUsageDescription`.
+- If using network MIDI on iOS, add `NSLocalNetworkUsageDescription`. The system local-network prompt appears the first time you call `setNetworkSessionEnabled(true)`, not at app launch.
 - On Linux, make sure ALSA is installed.
 - On Web, use HTTPS and a browser with Web MIDI enabled (for example Chrome/Edge).
 
