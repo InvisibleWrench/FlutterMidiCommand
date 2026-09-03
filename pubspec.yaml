@@ -98,7 +98,9 @@ melos:
     test:web:chrome:
       run: dart run melos exec --scope=flutter_midi_command_web -- "flutter test --platform chrome"
     test:native:android:
-      run: bash ./example/android/gradlew -p example/android :flutter_midi_command_android:testDebugUnitTest
+      # `assembleDebug` on the BLE package compiles its Android plugin, which
+      # otherwise only builds as a side effect of the example app job.
+      run: bash ./example/android/gradlew -p example/android :flutter_midi_command_android:testDebugUnitTest :flutter_midi_command_ble:assembleDebug
     test:native:darwin:
       run: bash tool/darwin_native_checks.sh
     test:native:windows:
