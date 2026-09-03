@@ -1,3 +1,9 @@
+## 1.2.0
+
+ - FIX: `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` return `Future<void>` instead of `void`. The platform call was previously discarded, so a failure such as `PlatformException(AUDIOERROR, Error -2 while create MIDI virtual source)` escaped as an unhandled asynchronous error that no `try`/`catch` around the call could see. Await them to handle failures. Existing calls that ignore the result keep compiling; custom `MidiCommandPlatform` implementations must widen these three overrides from `void`.
+ - FIX(ios): the system "Allow [app] to find devices on local networks" prompt no longer appears at app startup. The MIDI network session is created on the first `setNetworkSessionEnabled(true)` rather than at plugin init, so apps using only Bluetooth, USB or virtual MIDI never trigger it. Thanks to @aleksei-svezhevskii for the fix.
+ - Update federated package constraints to `^1.2.0`.
+
 ## 1.1.2
 
  - FIX(ble): retry a connection sequence whose link was torn down mid-handshake. universal_ble reports that as `deviceDisconnected` rather than a GATT status, so the retry shipped in 1.1.1 did not apply. Unlike a GATT status the code cannot arise from a peripheral that was never reachable, so it is honoured on every platform.

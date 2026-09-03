@@ -1,3 +1,7 @@
+## 1.2.0
+
+ - FIX: `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` return `Future<void>` instead of `void` on both `MidiCommandPlatform` and `MethodChannelMidiCommand`, which no longer discards the host API call. Platform implementations must widen these three overrides from `void`.
+
 ## 1.1.2
 
  - Bump "flutter_midi_command_platform_interface" to `1.1.2` for the synchronized workspace release.
