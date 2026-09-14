@@ -1,3 +1,8 @@
+## 1.2.0
+
+ - FIX: widen `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` to `Future<void>`, matching the platform interface.
+ - Bump "flutter_midi_command_linux" to `1.2.0` and update the platform interface dependency constraint to `^1.2.0`.
+
 ## 1.1.2
 
  - Bump "flutter_midi_command_linux" to `1.1.2` and update the platform interface dependency constraint to `^1.1.2`.

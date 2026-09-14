@@ -18,8 +18,12 @@ build/
 **/build/
 pubspec.lock
 
-# Darwin build products.
-ios/.build/
+# Darwin build products. `tool/darwin_native_checks.sh` writes these; the path
+# moved with the federation, and the stale `ios/.build/` rule left the published
+# archive at ~270 MB instead of ~18 KB. A parent .gitignore does not apply to a
+# package in a subdirectory, so they have to be listed here.
+darwin/flutter_midi_command_darwin/.build/
+darwin/flutter_midi_command_darwin/.build-ios/
 
 # OS-specific metadata.
 .DS_Store

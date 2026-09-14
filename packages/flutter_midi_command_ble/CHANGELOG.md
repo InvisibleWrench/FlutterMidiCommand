@@ -1,3 +1,7 @@
+## 1.2.0
+
+ - Bump "flutter_midi_command_ble" to `1.2.0` and update the platform interface dependency constraint to `^1.2.0`.
+
 ## 1.1.2
 
  - FIX: treat `deviceDisconnected` during the connection sequence as a transient link failure and retry it. universal_ble fails every in-flight GATT operation with this code when an established connection is torn down, so a link that dropped with service discovery or subscription pending reported it rather than a GATT status and was never retried — 1.1.1 covered the same failure only where Android named it as a GATT status. Unlike a GATT status it cannot arise from a peripheral that was never reachable — there has to have been a connection to lose — so it is the least ambiguous of the three signals, and it applies on every platform rather than only Android.
