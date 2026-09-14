@@ -13,7 +13,7 @@ class VirtualDeviceService() : MidiDeviceService() {
     override fun onGetInputPortReceivers(): Array<MidiReceiver> {
         MidiLogger.debug("Create receiver $this")
         if (receiver == null) {
-            receiver = VirtualRXReceiver(onDataReceived)
+            receiver = VirtualRXReceiver()
         }
         return  arrayOf(receiver!!)
     }
@@ -29,7 +29,7 @@ class VirtualDeviceService() : MidiDeviceService() {
         super.onDestroy()
     }
 
-    class VirtualRXReceiver(private val onDataReceived: ((MidiPacket) -> Unit)?) : MidiReceiver() {
+    class VirtualRXReceiver() : MidiReceiver() {
         private val deviceInfo = MidiHostDevice(
             id = "FlutterMidiCommand_Virtual",
             name = "FlutterMidiCommand_Virtual",
@@ -39,17 +39,17 @@ class VirtualDeviceService() : MidiDeviceService() {
             outputs = null,
         )
 
+        // The virtual path used to forward the raw slice, so a device sending running
+        // status reached apps unparsed while the hardware path resolved it. Both now go
+        // through the same parser.
+        private val parser = midiPacketParserFor(deviceInfo) { packet ->
+            // Read the callback at send time: the service builds its receiver in
+            // onGetInputPortReceivers, which can run before the plugin installs one.
+            VirtualDeviceService.onDataReceived?.invoke(packet)
+        }
+
         override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
-            msg?.also {
-                val data = it.slice(IntRange(offset, offset + count - 1)).toByteArray()
-                onDataReceived?.invoke(
-                    MidiPacket(
-                        device = deviceInfo,
-                        data = data,
-                        timestamp = timestamp,
-                    )
-                )
-            }
+            msg?.also { parser.parse(it, offset, count, timestamp) }
         }
 
         override fun send(msg: ByteArray?, offset: Int, count: Int) {

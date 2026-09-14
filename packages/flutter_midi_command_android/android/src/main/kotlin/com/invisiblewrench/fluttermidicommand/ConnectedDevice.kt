@@ -106,15 +106,7 @@ class ConnectedDevice(
         private val deviceInfo: MidiHostDevice,
         private val onDataReceived: (MidiPacket) -> Unit,
     ) : MidiReceiver() {
-        private val parser = MidiPacketParser { bytes, timestamp ->
-            onDataReceived(
-                MidiPacket(
-                    device = deviceInfo,
-                    data = bytes,
-                    timestamp = timestamp,
-                ),
-            )
-        }
+        private val parser = midiPacketParserFor(deviceInfo, onDataReceived)
 
         override fun onSend(msg: ByteArray?, offset: Int, count: Int, timestamp: Long) {
             msg?.also { parser.parse(it, offset, count, timestamp) }
