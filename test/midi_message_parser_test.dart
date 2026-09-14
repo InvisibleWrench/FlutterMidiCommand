@@ -416,6 +416,89 @@ void main() {
       expect(messages[2], isA<SysExMessage>());
     });
 
+    test('a status byte inside a SysEx aborts it and is re-dispatched', () {
+      final messages = MidiMessage.parse(
+        Uint8List.fromList([
+          0xF0, 0x7D, 0x01, // SysEx the device never terminates
+          0x90, 60, 100, // a Note On instead of the expected 0xF7
+        ]),
+      );
+
+      expect(messages, hasLength(2));
+      expect(
+        (messages[0] as SysExMessage).rawData,
+        [0xF0, 0x7D, 0x01, 0xF7],
+        reason: 'the abandoned SysEx is terminated with a synthesised 0xF7',
+      );
+      expect(
+        messages[1],
+        isA<NoteOnMessage>(),
+        reason:
+            'the status byte that aborted it used to be buried in the '
+            'SysEx payload, losing the note',
+      );
+    });
+
+    test('a second SysEx start aborts the first', () {
+      final messages = MidiMessage.parse(
+        Uint8List.fromList([0xF0, 0x7D, 0x01, 0xF0, 0x7D, 0x02, 0xF7]),
+      );
+
+      expect(messages, hasLength(2));
+      expect((messages[0] as SysExMessage).rawData, [0xF0, 0x7D, 0x01, 0xF7]);
+      expect((messages[1] as SysExMessage).rawData, [0xF0, 0x7D, 0x02, 0xF7]);
+    });
+
+    test('an unterminated SysEx is capped and the stream recovers', () {
+      final messages = MidiMessage.parse(
+        Uint8List.fromList([
+          0xF0,
+          ...List<int>.filled(70000, 0x01),
+          0x90,
+          60,
+          100,
+        ]),
+      );
+
+      final sysEx = messages.first as SysExMessage;
+      expect(sysEx.rawData, hasLength(65536));
+      expect(sysEx.rawData!.last, 0xF7);
+      expect(
+        messages.last,
+        isA<NoteOnMessage>(),
+        reason: 'the buffer used to grow without bound and swallow the note',
+      );
+    });
+
+    test('a realtime byte between two data bytes is not taken as data', () {
+      final messages = MidiMessage.parse(
+        Uint8List.fromList([0x90, 60, 0xF8, 100]),
+      );
+
+      expect(messages, hasLength(2));
+      expect(messages[0], isA<ClockMessage>());
+      final note = messages[1] as NoteOnMessage;
+      expect(note.note, 60);
+      expect(
+        note.velocity,
+        100,
+        reason: 'the clock must not become the velocity',
+      );
+    });
+
+    test('system common clears running status', () {
+      final messages = MidiMessage.parse(
+        Uint8List.fromList([
+          0x90, 60, 100, // Note On
+          0xF1, 0x25, // MIDI Time Code quarter frame
+          61, 110, // no status to revive - must not emit a Note On
+        ]),
+      );
+
+      expect(messages, hasLength(1));
+      expect(messages.single, isA<NoteOnMessage>());
+    });
+
     test('reset clears pending parser state', () {
       final parser = MidiMessageParser();
 

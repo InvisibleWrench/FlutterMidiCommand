@@ -438,8 +438,6 @@ const int mHdrDone = 0x00000001;
 const int mHdrPrepared = 0x00000002;
 const int mHdrInQueue = 0x00000004;
 
-final List<int> partialSysExBuffer = [];
-
 void _onMidiData(
   int hMidiIn,
   int wMsg,
@@ -466,25 +464,18 @@ void _onMidiData(
       break;
     case MM_MIM_LONGDATA:
       if (activeDevice == null || dwParam1 == 0) {
-        partialSysExBuffer.clear();
         break;
       }
       final midiHdrPointer = Pointer<MIDIHDR>.fromAddress(dwParam1);
       final midiHdr = midiHdrPointer.ref;
       if ((midiHdr.dwFlags & mHdrDone) != 0) {
         final dataPointer = midiHdr.lpData.cast<Uint8>();
-        final messageData = dataPointer.asTypedList(midiHdr.dwBytesRecorded);
-
-        if (messageData.isNotEmpty && messageData.first == 0xF0) {
-          partialSysExBuffer.clear();
-        }
-
-        partialSysExBuffer.addAll(messageData);
-
-        if (partialSysExBuffer.isNotEmpty && partialSysExBuffer.last == 0xF7) {
-          activeDevice.handleSysexData(messageData, midiHdrPointer);
-          partialSysExBuffer.clear();
-        }
+        // Copy before handing the bytes on. `asTypedList` is a live view of the
+        // MIDIHDR buffer, which handleLongData re-queues with the driver.
+        final messageData = Uint8List.fromList(
+          dataPointer.asTypedList(midiHdr.dwBytesRecorded),
+        );
+        activeDevice.handleLongData(messageData, midiHdrPointer);
       } else {
         if ((midiHdr.dwFlags & mHdrPrepared) != 0) {
           debugPrint('MHDR_PREPARED is set');

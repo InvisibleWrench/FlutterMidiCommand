@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_midi_command_linux/flutter_midi_command_linux.dart';
 
 import 'alsa_seq_bindings.dart';
@@ -51,6 +51,21 @@ class AlsaSeqLinuxDevice implements LinuxMidiPortDevice {
 
   @override
   Stream<LinuxMidiPacket> get receivedMessages => _receivedMessages.stream;
+
+  /// Builds a device with an inert context, for tests that exercise only the
+  /// delivery path. The shared context opens libasound lazily, so nothing here
+  /// touches ALSA.
+  @visibleForTesting
+  static AlsaSeqLinuxDevice forTesting({int client = 1, int port = 0}) =>
+      AlsaSeqLinuxDevice._(
+        _AlsaSeqContext._(),
+        client: client,
+        port: port,
+        id: stableId(client, port),
+        name: 'test',
+        hasInput: true,
+        hasOutput: true,
+      );
 
   static String stableId(int client, int port) => 'aseq:$client:$port';
 
@@ -131,7 +146,13 @@ class AlsaSeqLinuxDevice implements LinuxMidiPortDevice {
 
   void emit(Uint8List data, int timestamp) {
     if (!_receivedMessages.isClosed) {
-      _receivedMessages.add(LinuxMidiPacket(data, timestamp));
+      // Copy: several logical devices can share one ALSA endpoint, and the
+      // fan-out hands them all the same instance. Copying here rather than at
+      // the fan-out protects every caller, including a listener that mutates
+      // what it receives.
+      _receivedMessages.add(
+        LinuxMidiPacket(Uint8List.fromList(data), timestamp),
+      );
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_midi_command_linux/flutter_midi_command_linux.dart';
+import 'package:flutter_midi_command_linux/src/alsa_seq_linux_device.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -327,6 +328,41 @@ void main() {
       await dataDone;
     },
   );
+
+  group('AlsaSeqLinuxDevice.emit', () {
+    test('gives each device on one endpoint an independent copy', () async {
+      // Several logical devices can share one ALSA endpoint, and the receive
+      // fan-out hands them all the same byte list. The fan-out is intentional,
+      // so emit copies.
+      final first = AlsaSeqLinuxDevice.forTesting(client: 1, port: 0);
+      final second = AlsaSeqLinuxDevice.forTesting(client: 1, port: 1);
+      final shared = Uint8List.fromList([0x90, 0x3C, 0x64]);
+
+      final a = first.receivedMessages.first;
+      final b = second.receivedMessages.first;
+      first.emit(shared, 1);
+      second.emit(shared, 1);
+
+      final packetA = await a;
+      final packetB = await b;
+
+      expect(packetA.data, [0x90, 0x3C, 0x64]);
+      expect(packetB.data, [0x90, 0x3C, 0x64]);
+      expect(identical(packetA.data, packetB.data), isFalse);
+      expect(identical(packetA.data, shared), isFalse);
+    });
+
+    test('a listener mutating its packet cannot affect the source', () async {
+      final device = AlsaSeqLinuxDevice.forTesting();
+      final shared = Uint8List.fromList([0x90, 0x3C, 0x64]);
+
+      final received = device.receivedMessages.first;
+      device.emit(shared, 0);
+      (await received).data[1] = 0x00;
+
+      expect(shared, [0x90, 0x3C, 0x64]);
+    });
+  });
 }
 
 class _FakeLinuxMidiPortDevice implements LinuxMidiPortDevice {

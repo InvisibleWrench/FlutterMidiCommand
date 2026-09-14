@@ -7,6 +7,7 @@ import 'package:flutter_midi_command_platform_interface/flutter_midi_command_pla
 import 'package:win32/win32.dart';
 
 import 'flutter_midi_command_windows.dart';
+import 'src/windows_sysex_assembler.dart';
 
 const _numberOfBuffers = 4;
 
@@ -213,6 +214,10 @@ class WindowsMidiDevice extends MidiDevice {
 
   containsMidiIn(int input) => _midiInHandle != 0 && _midiInHandle == input;
 
+  /// Reassembles SysEx across `MM_MIM_LONGDATA` chunks. Per device: the buffer
+  /// used to be a file-global shared by every open device.
+  final WindowsSysExAssembler _sysExAssembler = WindowsSysExAssembler();
+
   _resetHeader(Pointer<MIDIHDR> midiHdrPointer) {
     if (_disconnecting || _midiInHandle == 0) {
       return;
@@ -225,9 +230,18 @@ class WindowsMidiDevice extends MidiDevice {
     _rxStreamCtrl.add(MidiPacket(data, timestamp, this));
   }
 
-  handleSysexData(Uint8List data, Pointer<MIDIHDR> midiHdrPointer) {
-    // print('handle SysEX: $data');
-    _rxStreamCtrl.add(MidiPacket(data, 0, this));
+  /// Handles one `MM_MIM_LONGDATA` chunk.
+  ///
+  /// [data] must already be a copy: the pointer it came from is re-queued by
+  /// [_resetHeader] below, after which the driver may overwrite it.
+  ///
+  /// The header is re-queued whatever the chunk contained. It used to be
+  /// re-queued only once a message completed, so a SysEx the device never
+  /// terminated permanently consumed one of the input buffers.
+  handleLongData(Uint8List data, Pointer<MIDIHDR> midiHdrPointer) {
+    for (final message in _sysExAssembler.add(data)) {
+      _rxStreamCtrl.add(MidiPacket(message, 0, this));
+    }
     _resetHeader(midiHdrPointer);
   }
 
