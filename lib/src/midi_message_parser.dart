@@ -18,6 +18,10 @@ class MidiMessageParser {
   bool _insideSysEx = false;
   final List<int> _sysexBuffer = <int>[];
 
+  /// Largest SysEx assembled before it is force-terminated, counting the
+  /// opening `0xF0` and the synthesised `0xF7`.
+  static const int _maxSysExLength = 65536;
+
   /// Parse [bytes] into typed messages.
   ///
   /// Set [flushPendingNrpn] to `false` to preserve partial NRPN/RPN state
@@ -49,6 +53,20 @@ class MidiMessageParser {
     }
   }
 
+  void _emitSysEx(List<MidiMessage> messages) {
+    final message = SysExMessage(rawData: List<int>.from(_sysexBuffer));
+    message.data = Uint8List.fromList(_sysexBuffer);
+    messages.add(message);
+    _sysexBuffer.clear();
+    _insideSysEx = false;
+  }
+
+  /// Terminates an unfinished SysEx with a synthesised `0xF7` and emits it.
+  void _closeSysEx(List<MidiMessage> messages) {
+    _sysexBuffer.add(0xF7);
+    _emitSysEx(messages);
+  }
+
   void _consumeByte(int byte, List<MidiMessage> messages) {
     // Real-time single-byte messages are valid even while inside SysEx.
     if (byte >= 0xF8) {
@@ -60,15 +78,23 @@ class MidiMessageParser {
     }
 
     if (_insideSysEx) {
-      _sysexBuffer.add(byte);
-      if (byte == 0xF7) {
-        final message = SysExMessage(rawData: List<int>.from(_sysexBuffer));
-        message.data = Uint8List.fromList(_sysexBuffer);
-        messages.add(message);
-        _sysexBuffer.clear();
-        _insideSysEx = false;
+      if ((byte & 0x80) != 0 && byte != 0xF7) {
+        // A non-real-time status byte aborts the message: it is terminated with
+        // a synthesised 0xF7 and the offending byte is re-dispatched below.
+        // Appending it instead used to bury a 0xF0 or a channel status inside
+        // the SysEx payload.
+        _closeSysEx(messages);
+      } else {
+        _sysexBuffer.add(byte);
+        if (byte == 0xF7) {
+          _emitSysEx(messages);
+        } else if (_sysexBuffer.length >= _maxSysExLength - 1) {
+          // Bound the buffer, so a device that never sends 0xF7 cannot make it
+          // grow without limit.
+          _closeSysEx(messages);
+        }
+        return;
       }
-      return;
     }
 
     if (byte == 0xF0) {
