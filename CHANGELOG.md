@@ -1,3 +1,16 @@
+## 1.3.0
+
+ - FIX: resolve MIDI running status correctly on every transport. A device that sends a status byte once and then only data bytes — an M-VAVE SMK-25 Mini pressing two keys at once, for example — produced duplicated and lost messages on BLE, and silently dropped notes on Android and macOS/iOS after any clock byte. A missed Note Off left notes sounding. Reported in [#179](https://github.com/InvisibleWrench/FlutterMidiCommand/issues/179).
+ - FEAT: `MidiMessageSplitter` in `flutter_midi_command_platform_interface` is the shared MIDI-assembly stage every transport now feeds, and `MidiPacket` documents the contract they all satisfy: `data` is exactly one complete MIDI message with all transport framing removed.
+ - FIX: System Real-Time bytes no longer corrupt the message around them. A clock arriving between two data bytes used to become the velocity, and one arriving between messages used to clobber the running status.
+ - FIX: a SysEx a device never terminates no longer wedges the stream or grows without bound. It is force-terminated at 64 KiB, and any non-real-time status byte aborts it and is re-dispatched.
+ - FIX(windows): a SysEx spanning more than one input buffer arrives whole instead of truncated to its last chunk, is no longer interleaved with another device's, and is no longer a live view of a buffer the driver may overwrite.
+ - FIX(linux): devices sharing an ALSA endpoint each receive their own copy, so one listener mutating a packet cannot corrupt another's.
+ - FIX(android): virtual devices parse incoming MIDI like hardware devices do, rather than forwarding raw byte slices.
+ - FIX: `MidiMessageParser` aborts an open SysEx on a status byte rather than burying it in the payload, and bounds its buffer.
+ - BREAKING BEHAVIOUR(ble): a System Real-Time byte arriving inside a SysEx is now delivered as its own packet rather than dropped, converging BLE with the Android and Darwin transports.
+ - Update federated package constraints to `^1.3.0`.
+
 ## 1.2.0
 
  - FIX: `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` return `Future<void>` instead of `void`. The platform call was previously discarded, so a failure such as `PlatformException(AUDIOERROR, Error -2 while create MIDI virtual source)` escaped as an unhandled asynchronous error that no `try`/`catch` around the call could see. Await them to handle failures. Existing calls that ignore the result keep compiling; custom `MidiCommandPlatform` implementations must widen these three overrides from `void`.
