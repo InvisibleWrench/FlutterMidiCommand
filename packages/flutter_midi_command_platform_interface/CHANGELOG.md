@@ -1,3 +1,8 @@
+## 1.3.0
+
+ - FEAT: `MidiMessageSplitter`, the shared MIDI-assembly stage every transport feeds once it has stripped its own framing. It resolves running status, keeps partial messages across calls, reassembles and bounds SysEx, and emits System Real-Time bytes without disturbing the message around them. Its eight numbered rules are the one specification the Dart, Kotlin and Swift implementations answer to.
+ - DOCS: `MidiPacket` documents the contract every transport is now made to satisfy — `data` is exactly one complete MIDI message with all transport framing removed, and the buffer belongs to the listener.
+
 ## 1.2.0
 
  - FIX: `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` return `Future<void>` instead of `void` on both `MidiCommandPlatform` and `MethodChannelMidiCommand`, which no longer discards the host API call. Platform implementations must widen these three overrides from `void`.

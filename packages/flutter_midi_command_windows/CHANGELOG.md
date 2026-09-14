@@ -1,3 +1,11 @@
+## 1.3.0
+
+ - FIX: a SysEx spanning more than one input buffer arrives whole. The parser accumulated the chunks but then delivered only the last one, so a long SysEx was truncated to its tail.
+ - FIX: two devices receiving SysEx at the same time no longer interleave into each other's message. The assembly buffer was a file-global shared by every open device; each device now has its own.
+ - FIX: delivered bytes are a copy. They used to be a live view of the `MIDIHDR` buffer that was immediately re-queued with the driver, so they could be overwritten under the listener.
+ - FIX: a SysEx the device never terminates no longer permanently consumes one of the four input buffers. The header is re-queued whatever the chunk contained, and an unterminated message is force-terminated at 64 KiB.
+ - Update the platform interface dependency constraint to `^1.3.0`.
+
 ## 1.2.0
 
  - FIX: widen `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` to `Future<void>`, matching the platform interface.

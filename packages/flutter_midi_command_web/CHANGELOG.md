@@ -1,3 +1,7 @@
+## 1.3.0
+
+ - Bump "flutter_midi_command_web" to `1.3.0` and update the platform interface dependency constraint to `^1.3.0`. The Web MIDI API already delivers one complete message per event, so no parsing change was needed.
+
 ## 1.2.0
 
  - FIX: widen `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` to `Future<void>`, matching the platform interface. The unsupported-operation errors for virtual devices now arrive through the returned future.

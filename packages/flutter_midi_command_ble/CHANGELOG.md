@@ -1,3 +1,14 @@
+## 1.3.0
+
+ - FIX: resolve running status, so a device that sends a status byte once and then only data bytes no longer produces duplicated and lost messages. A keyboard sending `90 3C 64 40 7F` now delivers two Note Ons rather than repeating the first and dropping the second, and the missed Note Off that left notes sounding is gone. The BLE parser was a single nine-state machine that conflated BLE framing with MIDI assembly and never cleared its assembly buffer, so every further data byte re-emitted a longer packet. It is now two stages: `BleMidiFramer` for the transport's framing and `MidiMessageSplitter` for MIDI assembly. Reported in [#179](https://github.com/InvisibleWrench/FlutterMidiCommand/issues/179).
+ - FIX: running status survives a notification boundary. A run continued in the next BLE packet used to arrive as `[0x00, data]`.
+ - FIX: a System Real-Time byte arriving mid-message no longer destroys the note being assembled.
+ - FIX: `F1`, `F2` and `F3` are sized correctly, instead of all being treated as single-byte messages.
+ - FIX: a SysEx the device never terminates no longer latches the parser shut and swallows every later message.
+ - FIX: parser state is cleared on disconnect, so a partial message cannot bleed into the next connection.
+ - BREAKING BEHAVIOUR: a System Real-Time byte arriving inside a SysEx is now delivered as its own packet rather than dropped, converging BLE with the Android and Darwin transports.
+ - Update the platform interface dependency constraint to `^1.3.0`.
+
 ## 1.2.0
 
  - Bump "flutter_midi_command_ble" to `1.2.0` and update the platform interface dependency constraint to `^1.2.0`.

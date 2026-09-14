@@ -1,3 +1,12 @@
+## 1.3.0
+
+ - FIX: resolve running status correctly. `MidiPacketParser` latched a byte into `statusByte` before checking its length, so a clock (`0xF8`) clobbered the running status and every subsequent running-status note was **silently dropped** — the same user-visible symptom as [#179](https://github.com/InvisibleWrench/FlutterMidiCommand/issues/179) on a different transport.
+ - FIX: a System Real-Time byte between two data bytes is emitted on its own instead of being appended as data, where a clock became the velocity.
+ - FIX: System Common and SysEx clear the running status, and undefined status bytes no longer poison it.
+ - FIX: a SysEx is bounded at 64 KiB and aborted by any non-real-time status byte, which is then re-dispatched — generalising the back-to-back-`F0` repair so a device that never sends `F7` cannot wedge the stream.
+ - FIX: virtual devices parse incoming MIDI like hardware devices do. `VirtualRXReceiver` forwarded raw byte slices, so running status reached apps unresolved on the virtual path. Both receivers now share one parser, and the receiver reads its callback at send time rather than at construction.
+ - Update the platform interface dependency constraint to `^1.3.0`.
+
 ## 1.2.0
 
  - Bump "flutter_midi_command_android" to `1.2.0` and update the platform interface dependency constraint to `^1.2.0`.

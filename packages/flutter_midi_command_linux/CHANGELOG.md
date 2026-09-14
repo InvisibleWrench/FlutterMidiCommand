@@ -1,3 +1,8 @@
+## 1.3.0
+
+ - FIX: devices sharing an ALSA endpoint each receive their own copy of the incoming bytes. The receive fan-out handed every device the same instance, so one listener mutating its packet corrupted another's.
+ - Update the platform interface dependency constraint to `^1.3.0`.
+
 ## 1.2.0
 
  - FIX: widen `addVirtualDevice`, `removeVirtualDevice` and `setNetworkSessionEnabled` to `Future<void>`, matching the platform interface.
