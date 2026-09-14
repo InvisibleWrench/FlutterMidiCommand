@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_midi_command_ble/flutter_midi_command_ble.dart';
+import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_ble/universal_ble.dart';
 
@@ -107,6 +109,47 @@ List<BleService> midiServices() => [
   ]),
 ];
 
+/// A connected transport with its RX stream captured, in the same fake-platform
+/// style as the tests above.
+class _Rig {
+  _Rig(this.fake, this.transport, this.device, this.received, this._sub);
+
+  final _FakePlatform fake;
+  final UniversalBleMidiTransport transport;
+  final MidiDevice device;
+  final List<List<int>> received;
+  final StreamSubscription<MidiPacket> _sub;
+
+  void emit(List<int> packet) => fake.emitValue('dev', packet);
+
+  /// Lets the RX stream deliver, then stops listening.
+  Future<List<List<int>>> settle() async {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    await _sub.cancel();
+    return received;
+  }
+}
+
+// ignore: library_private_types_in_public_api
+Future<_Rig> connectRig() async {
+  BleCapabilities.hasSystemPairingApi = true;
+  final fake = _FakePlatform();
+  UniversalBle.setInstance(fake);
+  final transport = UniversalBleMidiTransport();
+
+  fake.servicesByDevice['dev'] = midiServices();
+  fake.emitScan('dev', 'GEWA');
+  final device = (await transport.devices).single;
+  await transport.connectToDevice(device);
+  await Future<void>.delayed(const Duration(milliseconds: 5));
+
+  final received = <List<int>>[];
+  final sub = transport.onMidiDataReceived.listen(
+    (p) => received.add(p.data.toList()),
+  );
+  return _Rig(fake, transport, device, received, sub);
+}
+
 void main() {
   test('BLE MIDI parse: channel message and short SysEx round-trip', () async {
     BleCapabilities.hasSystemPairingApi = true;
@@ -159,9 +202,17 @@ void main() {
     );
     expect(
       received[2],
+      [0xFE],
+      reason:
+          'a System Real-Time byte inside a SysEx is delivered on its own, '
+          'rather than being dropped as it was before the two-stage rewrite',
+    );
+    expect(
+      received[3],
       [0xF0, 0x01, 0x02, 0x03, 0x04, 0xF7],
       reason: 'Multi-packet SysEx must reassemble without framing/RT bytes',
     );
+    expect(received, hasLength(4));
   });
 
   test('buildBleMidiSysExPackets respects the write size and framing', () {
@@ -246,4 +297,203 @@ void main() {
       }
     },
   );
+
+  group('BleMidiFramer', () {
+    test('decodes a timestamp, including the header high bits', () {
+      // header 0xBF -> high 0x3F, timestamp byte 0xFF -> low 0x7F.
+      final runs = BleMidiFramer().parse([0xBF, 0xFF, 0x90, 0x3C, 0x64]);
+
+      expect(runs, hasLength(1));
+      expect(runs.single.timestamp, 0x3F << 7 | 0x7F);
+      expect(runs.single.bytes, [0x90, 0x3C, 0x64]);
+    });
+
+    test('splits two timestamped runs in one packet', () {
+      final runs = BleMidiFramer().parse([
+        0x80, 0x80, 0x90, 0x3C, 0x64, //
+        0x81, 0x90, 0x40, 0x7F,
+      ]);
+
+      expect(runs.map((r) => r.timestamp), [0, 1]);
+      expect(runs.map((r) => r.bytes), [
+        [0x90, 0x3C, 0x64],
+        [0x90, 0x40, 0x7F],
+      ]);
+    });
+
+    test('keeps a running-status run, which carries no timestamp, whole', () {
+      final runs = BleMidiFramer().parse([
+        0x80, 0x80, 0x90, 0x3C, 0x64, 0x40, 0x7F, //
+      ]);
+
+      expect(runs, hasLength(1));
+      expect(runs.single.bytes, [0x90, 0x3C, 0x64, 0x40, 0x7F]);
+    });
+
+    test(
+      'does not mistake a status byte after a timestamp for a timestamp',
+      () {
+        // 0xF0 and 0xF7 are both valid timestamp-byte values numerically.
+        final runs = BleMidiFramer().parse([
+          0x80,
+          0x80,
+          0xF0,
+          0x01,
+          0x80,
+          0xF7,
+        ]);
+
+        expect(
+          runs.map((r) => r.bytes),
+          [
+            [0xF0, 0x01],
+            [0xF7],
+          ],
+          reason: 'the in-SysEx timestamp byte is framing, not payload',
+        );
+      },
+    );
+
+    test('carries a SysEx across a continuation packet with no timestamp', () {
+      final framer = BleMidiFramer();
+
+      expect(framer.parse([0x80, 0x80, 0xF0, 0x01, 0x02]).single.bytes, [
+        0xF0,
+        0x01,
+        0x02,
+      ]);
+      expect(framer.parse([0x80, 0x03, 0x04]).single.bytes, [0x03, 0x04]);
+      expect(framer.parse([0x80, 0x80, 0xF7]).single.bytes, [0xF7]);
+    });
+
+    test('passes a real-time byte inside a SysEx through', () {
+      final framer = BleMidiFramer();
+      framer.parse([0x80, 0x80, 0xF0, 0x01]);
+
+      final runs = framer.parse([0x80, 0x02, 0x81, 0xFE, 0x03]);
+
+      expect(runs.map((r) => r.bytes), [
+        [0x02],
+        [0xFE, 0x03],
+      ]);
+    });
+
+    test('drops leading data bytes when no SysEx is open', () {
+      expect(BleMidiFramer().parse([0x80, 0x40, 0x7F]), isEmpty);
+    });
+
+    test('ignores a packet too short to carry anything', () {
+      expect(BleMidiFramer().parse([]), isEmpty);
+      expect(BleMidiFramer().parse([0x80]), isEmpty);
+    });
+
+    test('reset clears the SysEx latch', () {
+      final framer = BleMidiFramer();
+      framer.parse([0x80, 0x80, 0xF0, 0x01]);
+      framer.reset();
+
+      expect(
+        framer.parse([0x80, 0x02, 0x03]),
+        isEmpty,
+        reason: 'with no SysEx open these are stray data bytes',
+      );
+    });
+  });
+
+  group('BLE end-to-end', () {
+    test('splits a running-status run into one message per note', () async {
+      final rig = await connectRig();
+
+      // Issue #179: an M-VAVE SMK-25 Mini sends two simultaneous notes as one
+      // run under a single 0x90. Before the two-stage rewrite this produced
+      // messages of 3, 4 and 5 bytes, each re-emitting the first note.
+      rig.emit([0x80, 0x80, 0x90, 0x3C, 0x64, 0x40, 0x7F, 0x42, 0x50]);
+
+      expect(
+        await rig.settle(),
+        [
+          [0x90, 0x3C, 0x64],
+          [0x90, 0x40, 0x7F],
+          [0x90, 0x42, 0x50],
+        ],
+        reason:
+            'https://github.com/InvisibleWrench/FlutterMidiCommand/issues/179',
+      );
+    });
+
+    test('carries running status across two notifications', () async {
+      final rig = await connectRig();
+
+      rig.emit([0x80, 0x80, 0x90, 0x3C, 0x64]);
+      rig.emit([0x80, 0x80, 0x40, 0x7F]);
+
+      expect(
+        await rig.settle(),
+        [
+          [0x90, 0x3C, 0x64],
+          [0x90, 0x40, 0x7F],
+        ],
+        reason: 'the second notification used to arrive as [0x00, 0x40]',
+      );
+    });
+
+    test('a real-time byte mid-message leaves the note intact', () async {
+      final rig = await connectRig();
+
+      // header, ts, 90 3C, ts, FE, 64 — the velocity arrives after the
+      // interruption. The pending note used to be discarded by the 0xFE.
+      rig.emit([0x80, 0x80, 0x90, 0x3C, 0x81, 0xFE, 0x64]);
+
+      expect(await rig.settle(), [
+        [0xFE],
+        [0x90, 0x3C, 0x64],
+      ]);
+    });
+
+    test('System Common clears running status', () async {
+      final rig = await connectRig();
+
+      rig.emit([
+        0x80, 0x80, 0x90, 0x3C, 0x64, //
+        0x81, 0xF1, 0x25, 0x40, 0x7F,
+      ]);
+
+      expect(await rig.settle(), [
+        [0x90, 0x3C, 0x64],
+        [0xF1, 0x25],
+      ], reason: 'the trailing 40 7F has no status to revive');
+    });
+
+    test('an unterminated SysEx does not swallow later traffic', () async {
+      final rig = await connectRig();
+
+      rig.emit([0x80, 0x80, 0xF0, 0x01, 0x02]);
+      rig.emit([0x80, 0x80, 0x90, 0x3C, 0x64]);
+
+      expect(
+        await rig.settle(),
+        [
+          [0xF0, 0x01, 0x02, 0xF7],
+          [0x90, 0x3C, 0x64],
+        ],
+        reason: 'everything after an unterminated SysEx used to be lost',
+      );
+    });
+
+    test('a partial message does not survive a disconnect', () async {
+      final rig = await connectRig();
+
+      rig.emit([0x80, 0x80, 0x90, 0x3C]);
+      rig.transport.disconnectDevice(rig.device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      rig.fake.emitScan('dev', 'GEWA');
+      final device = (await rig.transport.devices).single;
+      await rig.transport.connectToDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      rig.emit([0x80, 0x80, 0x64, 0x7F]);
+
+      expect(await rig.settle(), isEmpty);
+    });
+  });
 }

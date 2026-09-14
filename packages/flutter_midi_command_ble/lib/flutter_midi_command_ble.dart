@@ -105,18 +105,6 @@ const _gattRetryDelay = Duration(milliseconds: 500);
 /// shared command queue.
 const _mtuTimeout = Duration(seconds: 2);
 
-enum _BleHandlerState {
-  header,
-  timestamp,
-  status,
-  statusRunning,
-  params,
-  systemRt,
-  sysex,
-  sysexEnd,
-  sysexInt,
-}
-
 class UniversalBleMidiTransport implements MidiBleTransport {
   /// Creates the transport.
   ///
@@ -512,8 +500,8 @@ class UniversalBleMidiTransport implements MidiBleTransport {
 /// [maxWriteSize] bytes.
 ///
 /// [bytes] must be a full message, `0xF0 ... 0xF7`. The framing follows the
-/// MMA BLE MIDI specification, which is what [_BleMidiDevice._parseBlePacket]
-/// expects on the way back in:
+/// MMA BLE MIDI specification, which is what [BleMidiFramer] expects on the
+/// way back in:
 ///
 /// - every packet opens with a header byte;
 /// - the first packet also carries a timestamp byte before the `0xF0`;
@@ -584,6 +572,126 @@ List<List<int>> buildBleMidiSysExPackets(List<int> bytes, int maxWriteSize) {
   return packets;
 }
 
+/// A slice of MIDI bytes carved out of a BLE MIDI packet, with the transport's
+/// framing removed.
+///
+/// [bytes] are pure MIDI — they still have to be assembled into messages, which
+/// is [MidiMessageSplitter]'s job. [timestamp] is the 13-bit millisecond value
+/// of the BLE MIDI timestamp byte that introduced the run.
+@visibleForTesting
+class BleMidiRun {
+  const BleMidiRun(this.timestamp, this.bytes);
+
+  final int timestamp;
+  final List<int> bytes;
+
+  @override
+  String toString() => 'BleMidiRun($timestamp, $bytes)';
+}
+
+/// Strips BLE MIDI framing from an incoming packet, leaving runs of MIDI bytes.
+///
+/// This is the inverse of [buildBleMidiSysExPackets] and the first of the two
+/// receive stages; [MidiMessageSplitter] is the second. Splitting them keeps
+/// the transport's framing rules out of the MIDI-assembly rules, which is what
+/// the single nine-state machine this replaced got wrong.
+///
+/// The framing, per the MMA BLE MIDI specification:
+///
+/// - a packet opens with a header byte carrying the timestamp's high 6 bits;
+/// - a timestamp byte (high bit set) carries the low 7 bits and introduces a
+///   MIDI message, whose first byte follows unconditionally — that byte may be
+///   a status byte, and must not be mistaken for another timestamp;
+/// - further bytes with the high bit clear continue the run, which is how a
+///   device sends several running-status messages under one timestamp;
+/// - inside a SysEx a timestamp byte introduces either the closing `0xF7` or a
+///   System Real-Time message, and is itself payload-free framing;
+/// - a SysEx continuation packet carries raw data with no timestamp at all.
+///
+/// Whether a SysEx is open is the only state that has to survive a packet
+/// boundary, and it is kept in step with the splitter's own view by the same
+/// rules ([_trackSysEx]).
+@visibleForTesting
+class BleMidiFramer {
+  /// Whether a SysEx is open, which is what tells a continuation packet's
+  /// leading data bytes apart from stray junk.
+  bool _inSysEx = false;
+
+  /// Timestamp carried over for a continuation packet, which has none of its
+  /// own.
+  int _lastTimestamp = 0;
+
+  /// Carves [packet] into runs of MIDI bytes. Returns an empty list for a
+  /// packet too short to hold anything (header only, or empty).
+  List<BleMidiRun> parse(List<int> packet) {
+    if (packet.length <= 1) {
+      return const [];
+    }
+
+    final runs = <BleMidiRun>[];
+    final timestampHigh = packet[0] & 0x3F;
+    var current = <int>[];
+    var currentTimestamp = _lastTimestamp;
+
+    void flush() {
+      if (current.isNotEmpty) {
+        runs.add(BleMidiRun(currentTimestamp, current));
+        current = <int>[];
+      }
+    }
+
+    var i = 1;
+    while (i < packet.length) {
+      final byte = packet[i];
+
+      if ((byte & 0x80) == 0) {
+        // A data byte continues the run in progress. With no run and no SysEx
+        // open it is framing junk — a packet may not start with payload.
+        if (current.isNotEmpty || _inSysEx) {
+          current.add(byte);
+        }
+        i++;
+        continue;
+      }
+
+      // A timestamp byte. The byte after it belongs to the message it
+      // introduces, whatever its high bit says.
+      _lastTimestamp = timestampHigh << 7 | byte & 0x7F;
+      i++;
+      if (i >= packet.length) {
+        break;
+      }
+      flush();
+      currentTimestamp = _lastTimestamp;
+      final first = packet[i];
+      current.add(first);
+      _trackSysEx(first);
+      i++;
+    }
+
+    flush();
+    return runs;
+  }
+
+  /// Forgets any SysEx in progress. Called when the link drops, so a partial
+  /// message cannot bleed into the next connection.
+  void reset() {
+    _inSysEx = false;
+    _lastTimestamp = 0;
+  }
+
+  /// Mirrors [MidiMessageSplitter]'s rules 1, 4 and 5 for the one bit of state
+  /// the two stages share.
+  void _trackSysEx(int byte) {
+    if (byte >= 0xF8 || (byte & 0x80) == 0) {
+      // System Real-Time and data bytes leave a SysEx open.
+      return;
+    }
+    // 0xF0 opens one; 0xF7 closes it, and any other status byte aborts it.
+    _inSysEx = byte == 0xF0;
+  }
+}
+
 class _BleMidiDevice extends MidiDevice {
   _BleMidiDevice({
     required this.deviceId,
@@ -636,6 +744,8 @@ class _BleMidiDevice extends MidiDevice {
       _midiCharacteristic = null;
       _maxWriteSize = _minBleMidiPacketSize;
       _loggedSysExLength = null;
+      _framer.reset();
+      _splitter.reset();
       return;
     }
 
@@ -779,6 +889,8 @@ class _BleMidiDevice extends MidiDevice {
     _midiCharacteristic = null;
     _maxWriteSize = _minBleMidiPacketSize;
     _loggedSysExLength = null;
+    _framer.reset();
+    _splitter.reset();
   }
 
   Future<void> _sendChain = Future<void>.value();
@@ -1055,147 +1167,21 @@ class _BleMidiDevice extends MidiDevice {
     }
   }
 
+  /// The two receive stages: [BleMidiFramer] removes the BLE framing, and
+  /// [MidiMessageSplitter] turns the resulting bytes into complete MIDI
+  /// messages. Both are per-device and both are reset when the link drops.
+  final BleMidiFramer _framer = BleMidiFramer();
+  late final MidiMessageSplitter _splitter = MidiMessageSplitter(
+    onMessage: _emit,
+  );
+
   void handleData(Uint8List data) {
-    _parseBlePacket(data);
-  }
-
-  _BleHandlerState bleHandlerState = _BleHandlerState.header;
-  final List<int> _sysExBuffer = [];
-  int _timestamp = 0;
-  final List<int> _bleMidiBuffer = [];
-  int _bleMidiPacketLength = 0;
-  bool _bleSysExHasFinished = true;
-
-  void _parseBlePacket(Uint8List packet) {
-    if (packet.length <= 1) {
-      return;
-    }
-    bleHandlerState = _BleHandlerState.header;
-    final header = packet[0];
-    var statusByte = 0;
-
-    for (var i = 1; i < packet.length; i++) {
-      final midiByte = packet[i];
-      if (((midiByte & 0x80) == 0x80) &&
-          bleHandlerState != _BleHandlerState.timestamp &&
-          bleHandlerState != _BleHandlerState.sysexInt) {
-        bleHandlerState = _bleSysExHasFinished
-            ? _BleHandlerState.timestamp
-            : _BleHandlerState.sysexInt;
-      } else {
-        switch (bleHandlerState) {
-          case _BleHandlerState.header:
-            if (!_bleSysExHasFinished) {
-              bleHandlerState = (midiByte & 0x80) == 0x80
-                  ? _BleHandlerState.sysexInt
-                  : _BleHandlerState.sysex;
-            }
-            break;
-          case _BleHandlerState.timestamp:
-            if ((midiByte & 0xFF) == 0xF0) {
-              _bleSysExHasFinished = false;
-              _sysExBuffer.clear();
-              bleHandlerState = _BleHandlerState.sysex;
-            } else if ((midiByte & 0x80) == 0x80) {
-              bleHandlerState = _BleHandlerState.status;
-            } else {
-              bleHandlerState = _BleHandlerState.statusRunning;
-            }
-            break;
-          case _BleHandlerState.status:
-          case _BleHandlerState.statusRunning:
-            bleHandlerState = _BleHandlerState.params;
-            break;
-          case _BleHandlerState.sysexInt:
-            if ((midiByte & 0xFF) == 0xF7) {
-              _bleSysExHasFinished = true;
-              bleHandlerState = _BleHandlerState.sysexEnd;
-            } else {
-              bleHandlerState = _BleHandlerState.systemRt;
-            }
-            break;
-          case _BleHandlerState.systemRt:
-            if (!_bleSysExHasFinished) {
-              bleHandlerState = _BleHandlerState.sysex;
-            }
-            break;
-          case _BleHandlerState.params:
-          case _BleHandlerState.sysex:
-          case _BleHandlerState.sysexEnd:
-            break;
-        }
-      }
-
-      switch (bleHandlerState) {
-        case _BleHandlerState.timestamp:
-          final tsHigh = header & 0x3F;
-          final tsLow = midiByte & 0x7F;
-          _timestamp = tsHigh << 7 | tsLow;
-          break;
-        case _BleHandlerState.status:
-          _bleMidiPacketLength = _lengthOfMessageType(midiByte);
-          _bleMidiBuffer
-            ..clear()
-            ..add(midiByte);
-          if (_bleMidiPacketLength == 1) {
-            _emit(_bleMidiBuffer, _timestamp);
-          }
-          statusByte = midiByte;
-          break;
-        case _BleHandlerState.statusRunning:
-          _bleMidiPacketLength = _lengthOfMessageType(statusByte);
-          _bleMidiBuffer
-            ..clear()
-            ..add(statusByte)
-            ..add(midiByte);
-          if (_bleMidiBuffer.length >= _bleMidiPacketLength) {
-            _emit(_bleMidiBuffer, _timestamp);
-          }
-          break;
-        case _BleHandlerState.params:
-          _bleMidiBuffer.add(midiByte);
-          if (_bleMidiBuffer.length >= _bleMidiPacketLength) {
-            _emit(_bleMidiBuffer, _timestamp);
-          }
-          break;
-        case _BleHandlerState.sysex:
-          _sysExBuffer.add(midiByte);
-          break;
-        case _BleHandlerState.sysexInt:
-          // Entered by the BLE timestamp byte that precedes an in-SysEx
-          // system-real-time message or the closing 0xF7. It is transport
-          // framing, not payload, so it must not be appended to the SysEx.
-          break;
-        case _BleHandlerState.sysexEnd:
-          _sysExBuffer.add(midiByte);
-          _emit(_sysExBuffer, _timestamp);
-          _sysExBuffer.clear();
-          break;
-        case _BleHandlerState.header:
-        case _BleHandlerState.systemRt:
-          break;
-      }
+    for (final run in _framer.parse(data)) {
+      _splitter.parse(run.bytes, run.timestamp);
     }
   }
 
-  void _emit(List<int> bytes, int timestamp) {
-    _rxStreamCtrl.add(
-      MidiPacket(Uint8List.fromList(List<int>.from(bytes)), timestamp, this),
-    );
-  }
-
-  int _lengthOfMessageType(int status) {
-    final high = status & 0xF0;
-    if (high == 0xC0 || high == 0xD0) {
-      return 2;
-    }
-    if (high == 0x80 ||
-        high == 0x90 ||
-        high == 0xA0 ||
-        high == 0xB0 ||
-        high == 0xE0) {
-      return 3;
-    }
-    return 1;
+  void _emit(Uint8List message, int timestamp) {
+    _rxStreamCtrl.add(MidiPacket(message, timestamp, this));
   }
 }
