@@ -222,3 +222,54 @@ The BLE readiness flow includes:
 - notification subscription
 
 On platforms without an explicit pairing API, such as iOS and macOS, pairing is triggered by accessing the encrypted MIDI characteristic and failures are surfaced as typed `MidiConnectionException` subclasses from `flutter_midi_command_platform_interface`.
+
+## Sharing universal_ble with the rest of your app
+
+`universal_ble` has one app-wide scan and one app-wide set of event callbacks:
+`UniversalBle.onScanResult`, `onConnectionChange`, `onValueChange`,
+`onPairingStateChange`, `onAvailabilityChange` and `onQueueUpdate` are single
+slots with no getter, so the last assignment wins and whoever was there before
+stops receiving events.
+
+This transport reads scan results from `UniversalBle.scanStream` instead, which
+fans out to every listener. Assigning `UniversalBle.onScanResult` in your own
+code is therefore safe and does not stop BLE MIDI discovery. The remaining
+callbacks above are still assigned by the transport while it is active; an app
+that needs them for its own peripherals should use the per-device streams
+(`connectionStream`, `characteristicValueStream`, `pairingStateStream`) rather
+than the callback slots. The transport also sets `UniversalBle.timeout` to 10
+seconds.
+
+Because scan results are app-wide, a peripheral this transport has not seen
+before must advertise the BLE MIDI service UUID to be listed — otherwise an
+unfiltered scan started elsewhere in the app would fill `MidiCommand.devices`
+with headphones and watches. Set `logHandler` to see what gets dropped:
+
+```dart
+final transport = UniversalBleMidiTransport()
+  ..logHandler = (message) => debugPrint(message);
+```
+
+A peripheral that does not advertise the service can still be used. Devices the
+transport already knows are never filtered, so either register it up front,
+keeping a reference to the transport:
+
+```dart
+final transport = UniversalBleMidiTransport();
+midi.configureBleTransport(transport);
+transport.registerKnownDevice(id, name);
+```
+
+On iOS and macOS a bonded peripheral is exposed by CoreMIDI and `MidiCommand`
+registers it with the transport for you, so a device that has been paired once
+keeps appearing whether or not it advertises the service.
+
+Otherwise, if you have good reason to accept every peripheral the app's scans
+see, turn the check off:
+
+```dart
+UniversalBleMidiTransport(requireAdvertisedMidiService: false);
+```
+
+It defaults to `false` on web, where a scan is the browser's device chooser and
+the chosen device carries no advertisement to inspect.
