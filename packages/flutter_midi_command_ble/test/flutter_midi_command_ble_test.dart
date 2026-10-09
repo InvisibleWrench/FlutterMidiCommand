@@ -54,6 +54,12 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   /// the primary path on Android for a peripheral that requires encryption.
   final Set<String> bondsDuringSubscribeIds = <String>{};
 
+  /// Peripherals where the stack's own dialog is declined during the CCCD
+  /// write: a failed bond is published, then the write fails with
+  /// [subscribeRefusalCode]. Set that to `deviceDisconnected` for the variant
+  /// where the declined bond takes the link down with it.
+  final Set<String> bondDeclinedDuringSubscribeIds = <String>{};
+
   /// Code the two refusal fixtures report. Defaults to what Android maps an
   /// ATT 0x05 Insufficient Authentication descriptor write to.
   UniversalBleErrorCode subscribeRefusalCode =
@@ -239,6 +245,27 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
         code: UniversalBleErrorCode.unknownError,
         message: 'Peer removed pairing information',
         details: 'Peer removed pairing information',
+      );
+    }
+    if (bondDeclinedDuringSubscribeIds.contains(deviceId) &&
+        bleInputProperty == BleInputProperty.notification) {
+      // The stack asked, the user said no. universal_ble publishes the failed
+      // bond from ACTION_BOND_STATE_CHANGED (BOND_BONDING -> BOND_NONE), and
+      // the held CCCD write then fails.
+      updatePairingState(deviceId, false);
+      if (subscribeRefusalCode == UniversalBleErrorCode.deviceDisconnected) {
+        updateConnection(deviceId, false);
+        _connectionByDevice[deviceId] = BleConnectionState.disconnected;
+        throw UniversalBleException(
+          code: UniversalBleErrorCode.deviceDisconnected,
+          message: 'Device Disconnected',
+          details: 'DEVICE_DISCONNECTED',
+        );
+      }
+      throw UniversalBleException(
+        code: subscribeRefusalCode,
+        message: 'Failed to update subscription state',
+        details: '5',
       );
     }
     if (bondsDuringSubscribeIds.contains(deviceId) &&
@@ -868,6 +895,63 @@ void main() {
       expect(device.connected, isTrue);
     },
   );
+
+  test('a declined bond is not asked for a second time', () async {
+    // Observed in the field: declining the stack's own dialog was followed by
+    // a second, different one, because the refused subscription looked like a
+    // peripheral asking for a bond and the escalation obliged. The user has
+    // already answered, so the answer is reported instead.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    fakePlatform.servicesByDevice['ble-declined'] = midiServices();
+    fakePlatform.bondDeclinedDuringSubscribeIds.add('ble-declined');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-declined',
+        name: 'Declined Bond',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiPairingRejectedException>()),
+    );
+    expect(fakePlatform.pairCalls, isEmpty);
+    // One connect attempt: no reconnect to provoke the stack again either.
+    expect(fakePlatform.connectCalls, <String>['ble-declined']);
+    expect(device.connected, isFalse);
+  });
+
+  test('a declined bond that drops the link is not retried', () async {
+    // The other shape of the same problem: a declined bond commonly takes the
+    // link down, which is indistinguishable from a transient fault. Retrying
+    // would reconnect and provoke the stack into asking again.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    fakePlatform.servicesByDevice['ble-declined-drop'] = midiServices();
+    fakePlatform.bondDeclinedDuringSubscribeIds.add('ble-declined-drop');
+    fakePlatform.subscribeRefusalCode =
+        UniversalBleErrorCode.deviceDisconnected;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-declined-drop',
+        name: 'Declined And Dropped',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiPairingRejectedException>()),
+    );
+    // One connect attempt, no second dialog from a reconnect.
+    expect(fakePlatform.connectCalls, <String>['ble-declined-drop']);
+    expect(fakePlatform.pairCalls, isEmpty);
+    expect(device.connected, isFalse);
+  });
 
   test('a link drop on the first subscribe still reaches the bond', () async {
     // Observed in the field on Android: the first subscribe of a never-bonded

@@ -791,6 +791,20 @@ class _BleMidiDevice extends MidiDevice {
   /// question they have already answered.
   bool _bondAttempted = false;
 
+  /// Whether a bonding attempt has been observed to end without a bond during
+  /// the current [connect] — in practice, the user declining.
+  ///
+  /// This is the only way to know that the *stack* asked and was refused.
+  /// Android bonds of its own accord when a subscription needs an encrypted
+  /// link, so the dialog the user declines is often one this transport never
+  /// requested and [_bondAttempted] therefore knows nothing about. Without
+  /// this, a decline is followed by an explicit [UniversalBle.pair] — or by a
+  /// reconnect that provokes the stack again — and the user is asked a second
+  /// time immediately after saying no.
+  ///
+  /// Reset once per [connect], like [_bondAttempted].
+  bool _bondDeclined = false;
+
   /// Largest BLE MIDI packet this link accepts, set from the negotiated MTU in
   /// [_requestMtu]. Reset on every disconnect so a large size cannot survive
   /// into a reconnect that negotiates a smaller MTU.
@@ -831,6 +845,13 @@ class _BleMidiDevice extends MidiDevice {
   /// nothing to subscribe to; it throws, and the `catchError` below leaves the
   /// device alone rather than marking it connected with no subscription.
   void updatePairingState(bool value) {
+    if (!value && _readinessInProgress) {
+      // A bond attempt that ended without a bond, while we were bringing the
+      // device up: the user declined, or the stack gave up. Either way the
+      // question has been put to them once and must not be put again.
+      _bondDeclined = true;
+      return;
+    }
     if (value && !_readinessInProgress) {
       unawaited(
         _startNotify()
@@ -858,6 +879,7 @@ class _BleMidiDevice extends MidiDevice {
     }
     _readinessInProgress = true;
     _bondAttempted = false;
+    _bondDeclined = false;
     try {
       for (var attempt = 0; ; attempt++) {
         try {
@@ -879,6 +901,16 @@ class _BleMidiDevice extends MidiDevice {
               await UniversalBle.unpair(deviceId);
             } catch (_) {}
             throw MidiPairingInfoRemovedException(
+              deviceId: deviceId,
+              cause: error,
+            );
+          }
+          if (_bondDeclined) {
+            // A declined bond commonly takes the link down with it, which is
+            // indistinguishable from a transient fault. Retrying would
+            // reconnect, re-subscribe, and provoke the stack into asking
+            // again — so stop, and report the refusal rather than the drop.
+            throw MidiPairingRejectedException(
               deviceId: deviceId,
               cause: error,
             );
@@ -1200,6 +1232,13 @@ class _BleMidiDevice extends MidiDevice {
       return;
     } catch (refusal) {
       final cause = _rootCause(refusal);
+      if (_bondDeclined) {
+        // The stack already asked during the subscription and was refused.
+        // Asking again explicitly is the same question, and the answer is the
+        // reason the subscription failed, so report that rather than the
+        // subscription error it arrived as.
+        throw MidiPairingRejectedException(deviceId: deviceId, cause: cause);
+      }
       // Order matters. A link that went away is [connect]'s business, and
       // asking for a bond would put a dialog in front of the user for a
       // peripheral that is no longer there.
