@@ -31,11 +31,53 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   final List<BleConnectionPriority> priorityRequests =
       <BleConnectionPriority>[];
   final Set<String> rejectedPairIds = <String>{};
+
+  /// Peripherals that will not serve the MIDI characteristic until the link is
+  /// encrypted: `setNotifiable` is refused with the code Android reports for a
+  /// CCCD write rejected as `GATT_INSUFFICIENT_AUTHENTICATION`, and succeeds
+  /// once a bond exists. A genuinely locked peripheral, as opposed to the
+  /// bonding-optional kind that is the common case.
+  final Set<String> bondRequiredSubscribeIds = <String>{};
+
+  /// Peripherals whose `pair` reports success without a bond ever landing —
+  /// the PP-2's failure mode, and why the bond state is re-read rather than
+  /// trusting `pair`.
+  final Set<String> pairWithoutBondingIds = <String>{};
+
+  /// Peripherals that refuse the subscription however often it is asked for,
+  /// bond or no bond.
+  final Set<String> alwaysRefusingSubscribeIds = <String>{};
+
+  /// Code the two refusal fixtures report. Defaults to what Android maps an
+  /// ATT 0x05 Insufficient Authentication descriptor write to.
+  UniversalBleErrorCode subscribeRefusalCode =
+      UniversalBleErrorCode.insufficientAuthentication;
+
+  /// Remaining `setNotifiable` attempts that fail the way Android does when
+  /// `createBond` tore the link down behind a successful bond. Only consulted
+  /// once bonded, so it composes with [bondRequiredSubscribeIds] to model the
+  /// whole locked-peripheral sequence: refuse, bond, link drop, reconnect,
+  /// subscribe.
+  final Map<String, int> postBondSubscribeLinkDrops = <String, int>{};
+
+  /// Peripherals whose `setNotifiable` never answers, for the timeout path.
+  final Set<String> hangingSubscribeIds = <String>{};
+
   final Map<String, List<BleService>> servicesByDevice =
       <String, List<BleService>>{};
   final Map<String, bool> _pairedByDevice = <String, bool>{};
   final Map<String, BleConnectionState> _connectionByDevice =
       <String, BleConnectionState>{};
+
+  /// Seeds the OS bond state, for a device paired before this connect.
+  void seedPaired(String deviceId) => _pairedByDevice[deviceId] = true;
+
+  /// Reports a bond established outside this transport, as the OS does when
+  /// the user pairs from system settings.
+  void emitPairingState(String deviceId, bool paired) {
+    _pairedByDevice[deviceId] = paired;
+    updatePairingState(deviceId, paired);
+  }
 
   /// Number of remaining `connect` attempts that fail with Android's generic
   /// GATT_ERROR, keyed by device id.
@@ -169,6 +211,10 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   ) async {
     gattCalls.add('subscribe');
     subscribeCalls.add(deviceId);
+    if (hangingSubscribeIds.contains(deviceId)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      return;
+    }
     final remainingGattFailures = transientGattSubscribeFailures[deviceId] ?? 0;
     if (remainingGattFailures > 0) {
       transientGattSubscribeFailures[deviceId] = remainingGattFailures - 1;
@@ -189,6 +235,30 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
         details: 'Peer removed pairing information',
       );
     }
+    final bonded = _pairedByDevice[deviceId] ?? false;
+    if (alwaysRefusingSubscribeIds.contains(deviceId) ||
+        (bondRequiredSubscribeIds.contains(deviceId) && !bonded)) {
+      // Android's shape for a CCCD write refused for want of encryption: named
+      // after the operation, with the ATT status in `details`. Note `details`
+      // is '5', not '133', which is what keeps it clear of the transient-link
+      // classification. The link stays up, as it does on the real stack.
+      throw UniversalBleException(
+        code: subscribeRefusalCode,
+        message: 'Failed to update subscription state',
+        details: '5',
+      );
+    }
+    final remainingPostBondDrops = postBondSubscribeLinkDrops[deviceId] ?? 0;
+    if (remainingPostBondDrops > 0 && bonded) {
+      postBondSubscribeLinkDrops[deviceId] = remainingPostBondDrops - 1;
+      updateConnection(deviceId, false);
+      _connectionByDevice[deviceId] = BleConnectionState.disconnected;
+      throw UniversalBleException(
+        code: UniversalBleErrorCode.deviceDisconnected,
+        message: 'Device Disconnected',
+        details: 'DEVICE_DISCONNECTED',
+      );
+    }
     if (failingSubscribeIds.contains(deviceId)) {
       throw StateError('subscribe-failed');
     }
@@ -204,6 +274,12 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     readCalls.add(deviceId);
     if (failingReadIds.contains(deviceId)) {
       throw StateError('read-failed');
+    }
+    // Apple and web have no pairing API: the access itself starts "Just Works"
+    // pairing and the read completes once the bond has taken.
+    if (bondRequiredSubscribeIds.contains(deviceId)) {
+      _pairedByDevice[deviceId] = true;
+      updatePairingState(deviceId, true);
     }
     return Uint8List(0);
   }
@@ -258,6 +334,10 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     pairCalls.add(deviceId);
     if (rejectedPairIds.contains(deviceId)) {
       return false;
+    }
+    if (pairWithoutBondingIds.contains(deviceId)) {
+      // Reports success, but no bond lands and no pairing state is published.
+      return true;
     }
     _pairedByDevice[deviceId] = true;
     updatePairingState(deviceId, true);
@@ -404,10 +484,268 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 5));
 
     expect(fakePlatform.connectCalls, <String>['ble-1']);
-    expect(fakePlatform.pairCalls, <String>['ble-1']);
     expect(fakePlatform.subscribeCalls, <String>['ble-1']);
+    // BLE MIDI carries no security requirement, so a peripheral that serves
+    // the characteristic is never asked to bond and the user never sees a
+    // pairing dialog they did not need.
+    expect(fakePlatform.pairCalls, isEmpty);
     expect(device.connected, isTrue);
   });
+
+  test(
+    'a peripheral that demands encryption is bonded, then connects',
+    () async {
+      fakePlatform.servicesByDevice['ble-locked'] = midiServices();
+      fakePlatform.bondRequiredSubscribeIds.add('ble-locked');
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-locked',
+          name: 'Locked Device',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      await transport.connectToDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      // Refused, bonded, and served on the second attempt — all on one link.
+      expect(fakePlatform.subscribeCalls, <String>['ble-locked', 'ble-locked']);
+      expect(fakePlatform.pairCalls, <String>['ble-locked']);
+      // Not a transient fault, so the whole sequence was never restarted.
+      expect(fakePlatform.connectCalls, <String>['ble-locked']);
+      expect(device.connected, isTrue);
+    },
+  );
+
+  test('bonding refused by a peripheral that demands it is reported', () async {
+    fakePlatform.servicesByDevice['ble-locked-reject'] = midiServices();
+    fakePlatform.bondRequiredSubscribeIds.add('ble-locked-reject');
+    fakePlatform.rejectedPairIds.add('ble-locked-reject');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-locked-reject',
+        name: 'Locked Reject',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiPairingRejectedException>()),
+    );
+    expect(device.connected, isFalse);
+    // Asked once. A refusal is not retried into a second dialog.
+    expect(fakePlatform.pairCalls, <String>['ble-locked-reject']);
+  });
+
+  test('a bond that reports success but never lands is rejected', () async {
+    // The PP-2's own failure mode: pair() resolves, the user accepts, and no
+    // bond exists afterwards.
+    fakePlatform.servicesByDevice['ble-phantom'] = midiServices();
+    fakePlatform.bondRequiredSubscribeIds.add('ble-phantom');
+    fakePlatform.pairWithoutBondingIds.add('ble-phantom');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-phantom',
+        name: 'Phantom Bond',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiPairingRejectedException>()),
+    );
+    expect(fakePlatform.pairCalls, <String>['ble-phantom']);
+    expect(device.connected, isFalse);
+  });
+
+  test('a bond is asked for once across the connection retry', () async {
+    // The central real-world path for a locked peripheral: Android brings the
+    // bond up and drops the link behind it. The re-subscribe fails as a
+    // transient fault, the whole sequence is retried — and the second pass
+    // finds the bond already there, so the user is asked exactly once.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    fakePlatform.servicesByDevice['ble-bond-drop'] = midiServices();
+    fakePlatform.bondRequiredSubscribeIds.add('ble-bond-drop');
+    fakePlatform.postBondSubscribeLinkDrops['ble-bond-drop'] = 1;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-bond-drop',
+        name: 'Bond Drops Link',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.connectToDevice(device);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.connectCalls, <String>[
+      'ble-bond-drop',
+      'ble-bond-drop',
+    ]);
+    // One dialog, not two.
+    expect(fakePlatform.pairCalls, <String>['ble-bond-drop']);
+    expect(device.connected, isTrue);
+  });
+
+  group('a refusal a bond cannot fix is not escalated', () {
+    // Why the escalation reads the code rather than treating every refusal as
+    // a bonding problem: for each of these a bond cannot help, and a pairing
+    // dialog would be noise on top of an error the application needs to see.
+    for (final code in <UniversalBleErrorCode>[
+      UniversalBleErrorCode.characteristicDoesNotSupportNotify,
+      UniversalBleErrorCode.bluetoothNotAllowed,
+      UniversalBleErrorCode.notPairable,
+      UniversalBleErrorCode.pairingNotAllowed,
+    ]) {
+      test(code.name, () async {
+        fakePlatform.servicesByDevice['ble-$code'] = midiServices();
+        fakePlatform.alwaysRefusingSubscribeIds.add('ble-$code');
+        fakePlatform.subscribeRefusalCode = code;
+        fakePlatform.emitScanDevice(
+          BleDevice(
+            deviceId: 'ble-$code',
+            name: 'Refusing Device',
+            services: <String>[],
+          ),
+        );
+        final device = (await transport.devices).single;
+
+        await expectLater(
+          transport.connectToDevice(device),
+          throwsA(isA<MidiNotificationSubscriptionException>()),
+        );
+        expect(fakePlatform.pairCalls, isEmpty);
+        expect(device.connected, isFalse);
+      });
+    }
+  });
+
+  test('an unnamed refusal is still escalated to a bond', () async {
+    // Android's catch-all. A peripheral that wants a bond but whose ATT status
+    // did not survive the trip must still reach the outcome it used to.
+    fakePlatform.servicesByDevice['ble-unnamed'] = midiServices();
+    fakePlatform.bondRequiredSubscribeIds.add('ble-unnamed');
+    fakePlatform.subscribeRefusalCode = UniversalBleErrorCode.unknownError;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-unnamed',
+        name: 'Unnamed Refusal',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.connectToDevice(device);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.pairCalls, <String>['ble-unnamed']);
+    expect(device.connected, isTrue);
+  });
+
+  test('a subscription timeout is not escalated to a bond', () async {
+    // A timeout unwraps to a TimeoutException, not a platform error, so it
+    // says nothing about encryption. Escalating would spend the caller's
+    // readiness budget twice over and put a dialog in front of a peripheral
+    // that is not answering at all.
+    fakePlatform.servicesByDevice['ble-hang'] = midiServices();
+    fakePlatform.hangingSubscribeIds.add('ble-hang');
+    fakePlatform.emitScanDevice(
+      BleDevice(deviceId: 'ble-hang', name: 'Hanging', services: <String>[]),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(
+        device,
+        timeout: const Duration(milliseconds: 20),
+      ),
+      throwsA(
+        isA<MidiConnectionTimeoutException>().having(
+          (e) => e.stage,
+          'stage',
+          MidiConnectionStage.notificationSubscription,
+        ),
+      ),
+    );
+    expect(fakePlatform.pairCalls, isEmpty);
+    expect(device.connected, isFalse);
+  });
+
+  test(
+    'an out-of-band bond cannot mark an unprepared device connected',
+    () async {
+      // onPairingStateChange fires for a bond made in system settings, before
+      // this transport has discovered anything. There is nothing to subscribe
+      // to, so the device must be left alone rather than reported connected.
+      fakePlatform.servicesByDevice['ble-oob'] = midiServices();
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-oob',
+          name: 'Out Of Band',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      fakePlatform.emitPairingState('ble-oob', true);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(device.connected, isFalse);
+      expect(fakePlatform.subscribeCalls, isEmpty);
+    },
+  );
+
+  test('an already-bonded device is not asked to bond again', () async {
+    fakePlatform.servicesByDevice['ble-bonded'] = midiServices();
+    fakePlatform.seedPaired('ble-bonded');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-bonded',
+        name: 'Bonded Device',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.connectToDevice(device);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.pairCalls, isEmpty);
+    expect(device.connected, isTrue);
+  });
+
+  test(
+    'a bonded device\'s subscribe failure is surfaced, not re-bonded',
+    () async {
+      // Nothing a bond could fix: the OS already has one, so the refusal is
+      // reported as what it is rather than provoking a pointless dialog.
+      fakePlatform.servicesByDevice['ble-bonded-fail'] = midiServices();
+      fakePlatform.seedPaired('ble-bonded-fail');
+      fakePlatform.failingSubscribeIds.add('ble-bonded-fail');
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-bonded-fail',
+          name: 'Bonded Failing',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      await expectLater(
+        transport.connectToDevice(device),
+        throwsA(isA<MidiNotificationSubscriptionException>()),
+      );
+      expect(fakePlatform.pairCalls, isEmpty);
+      expect(device.connected, isFalse);
+    },
+  );
 
   test('MTU negotiation runs after the MIDI path is live', () async {
     fakePlatform.servicesByDevice['ble-mtu'] = midiServices();
@@ -545,6 +883,9 @@ void main() {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-att-85'] = midiServices();
     fakePlatform.transientGattSubscribeFailures['ble-att-85'] = 1;
+    // Already bonded, so the refusal cannot be answered with a bond and this
+    // test is about the `details` classification alone.
+    fakePlatform.seedPaired('ble-att-85');
     fakePlatform.emitScanDevice(
       BleDevice(
         deviceId: 'ble-att-85',
@@ -562,6 +903,8 @@ void main() {
     // One attempt only: the failure was surfaced rather than retried.
     expect(fakePlatform.connectCalls, <String>['ble-att-85']);
     expect(fakePlatform.subscribeCalls, <String>['ble-att-85']);
+    expect(fakePlatform.pairCalls, isEmpty);
+    expect(fakePlatform.readCalls, isEmpty);
   });
 
   test('connectToDevice gives up after one subscribe-drop retry', () async {
@@ -762,7 +1105,10 @@ void main() {
   });
 
   test('connectToDevice surfaces explicit pairing rejection', () async {
+    // The peripheral has to actually want a bond for one to be asked for, so
+    // refusing to pair is only reachable behind a refused subscription.
     fakePlatform.servicesByDevice['ble-reject'] = midiServices();
+    fakePlatform.bondRequiredSubscribeIds.add('ble-reject');
     fakePlatform.rejectedPairIds.add('ble-reject');
     fakePlatform.emitScanDevice(
       BleDevice(
@@ -778,11 +1124,18 @@ void main() {
       throwsA(isA<MidiPairingRejectedException>()),
     );
     expect(device.connected, isFalse);
+    // Asked once. A refusal is not retried into a second dialog.
+    expect(fakePlatform.pairCalls, <String>['ble-reject']);
+    // Surfaced, not retried from scratch.
+    expect(fakePlatform.connectCalls, <String>['ble-reject']);
   });
 
   test(
-    'connectToDevice awaits native-UI pairing trigger when no pairing API',
+    'no pairing API and no refusal means no pairing trigger at all',
     () async {
+      // The Apple half of the change: a peripheral that serves the
+      // characteristic is never provoked into pairing, so no OS pairing UI
+      // appears for a device that did not need it.
       BleCapabilities.hasSystemPairingApi = false;
       fakePlatform.servicesByDevice['ble-native-ui'] = midiServices();
       fakePlatform.emitScanDevice(
@@ -796,16 +1149,46 @@ void main() {
 
       await transport.connectToDevice(device);
 
-      expect(fakePlatform.readCalls, <String>['ble-native-ui']);
+      expect(fakePlatform.readCalls, isEmpty);
       expect(fakePlatform.pairCalls, isEmpty);
       expect(fakePlatform.subscribeCalls, <String>['ble-native-ui']);
       expect(device.connected, isTrue);
     },
   );
 
+  test('no pairing API escalates a refusal to a characteristic read', () async {
+    // Where there is no pair() to call, the read is the lever: universal_ble
+    // triggers "Just Works" pairing from a read or write of an encrypted
+    // characteristic, and a CCCD write is neither — so the subscription
+    // cannot be relied on to provoke it.
+    BleCapabilities.hasSystemPairingApi = false;
+    fakePlatform.servicesByDevice['ble-native-locked'] = midiServices();
+    fakePlatform.bondRequiredSubscribeIds.add('ble-native-locked');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-native-locked',
+        name: 'Native Locked',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.connectToDevice(device);
+
+    expect(fakePlatform.readCalls, <String>['ble-native-locked']);
+    expect(fakePlatform.pairCalls, isEmpty);
+    expect(fakePlatform.subscribeCalls, <String>[
+      'ble-native-locked',
+      'ble-native-locked',
+    ]);
+    expect(device.connected, isTrue);
+  });
+
   test('connectToDevice surfaces native-UI pairing trigger failures', () async {
     BleCapabilities.hasSystemPairingApi = false;
     fakePlatform.servicesByDevice['ble-read-fail'] = midiServices();
+    // Refuse the subscription so the read trigger is actually reached.
+    fakePlatform.bondRequiredSubscribeIds.add('ble-read-fail');
     fakePlatform.failingReadIds.add('ble-read-fail');
     fakePlatform.emitScanDevice(
       BleDevice(

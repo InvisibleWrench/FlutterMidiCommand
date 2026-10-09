@@ -218,7 +218,15 @@ The BLE readiness flow includes:
 
 - BLE connection
 - MIDI service and characteristic discovery
-- pairing/bonding when required
 - notification subscription
+- pairing/bonding, and a second subscription attempt, only if the peripheral refused the first
 
-On platforms without an explicit pairing API, such as iOS and macOS, pairing is triggered by accessing the encrypted MIDI characteristic and failures are surfaced as typed `MidiConnectionException` subclasses from `flutter_midi_command_platform_interface`.
+A device is connected when its notifications are flowing, not when the OS has bonded it. BLE MIDI carries no security requirement of its own, and peripherals exist whose MIDI characteristic is notifiable with no bond at all — so the subscription is tried first and a bond is obtained only if the peripheral turns it down for want of an encrypted link. **A peripheral that does not need a bond never shows the user a system pairing dialog.** Bonding up front used to fail the whole connection for such a peripheral, which is worth knowing if you previously worked around that.
+
+A bond is asked for at most once per `connectToDevice`, including across the internal connection retry, so a question the user has already answered is not put to them twice. A refusal a bond cannot fix — an unsupported characteristic, a missing `BLUETOOTH_CONNECT` permission, a timeout — is reported as what it is rather than provoking a dialog.
+
+On platforms without an explicit pairing API, such as iOS and macOS, there is no `pair()` to call: bonding is instead provoked by reading the encrypted MIDI characteristic, which this transport now does only once a subscription has been refused. Failures are surfaced as typed `MidiConnectionException` subclasses from `flutter_midi_command_platform_interface`.
+
+Two consequences worth planning for. `MidiPairingRejectedException` becomes rare, since it is now only reached by a peripheral that both demands a bond and has one refused. And the pairing dialog, where one appears at all, appears later in the sequence than it used to, so `awaitConnectionTimeout` has to leave room for the time a user takes to answer it.
+
+An application that wants a bond regardless — to reach CoreMIDI on Apple, say — can ask for one itself with `UniversalBle.pair(device.id)`; this transport does not own the device's bond state.
