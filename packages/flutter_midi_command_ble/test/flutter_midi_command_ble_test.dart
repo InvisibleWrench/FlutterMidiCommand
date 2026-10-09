@@ -48,6 +48,12 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   /// bond or no bond.
   final Set<String> alwaysRefusingSubscribeIds = <String>{};
 
+  /// Peripherals the Android stack bonds *inside* the CCCD write: the write is
+  /// held while the system pairing dialog is up, a bond appears without anyone
+  /// calling `pair`, and then the write succeeds. Observed in the field, and
+  /// the primary path on Android for a peripheral that requires encryption.
+  final Set<String> bondsDuringSubscribeIds = <String>{};
+
   /// Code the two refusal fixtures report. Defaults to what Android maps an
   /// ATT 0x05 Insufficient Authentication descriptor write to.
   UniversalBleErrorCode subscribeRefusalCode =
@@ -234,6 +240,14 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
         message: 'Peer removed pairing information',
         details: 'Peer removed pairing information',
       );
+    }
+    if (bondsDuringSubscribeIds.contains(deviceId) &&
+        _pairedByDevice[deviceId] != true) {
+      // The stack bonds under us and the write then succeeds. The pairing
+      // state lands mid-subscription, which is the interesting part.
+      _pairedByDevice[deviceId] = true;
+      updatePairingState(deviceId, true);
+      return;
     }
     final bonded = _pairedByDevice[deviceId] ?? false;
     if (alwaysRefusingSubscribeIds.contains(deviceId) ||
@@ -818,6 +832,42 @@ void main() {
     // a pairing dialog in front of the user on its way to being retried.
     expect(fakePlatform.pairCalls, isEmpty);
   });
+
+  test(
+    'a bond the stack makes inside the subscribe needs no escalation',
+    () async {
+      // What Android actually does for a peripheral that requires encryption,
+      // confirmed in the field against a GEWA_Mid: the CCCD write is held while
+      // the system puts up its own pairing dialog, a bond appears with nobody
+      // having called pair(), and the write then completes. The escalation in
+      // this transport is the fallback for when that does not happen.
+      //
+      // The subscription count is the assertion that matters. The bond lands
+      // mid-readiness, so onPairingStateChange fires while connect() is in
+      // flight — and that must not start a second, concurrent subscribe into
+      // universal_ble's shared command queue.
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      fakePlatform.servicesByDevice['ble-stack-bond'] = midiServices();
+      fakePlatform.bondsDuringSubscribeIds.add('ble-stack-bond');
+      fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-stack-bond',
+          name: 'Stack Bonds',
+          services: <String>[],
+        ),
+      );
+      final device = (await transport.devices).single;
+
+      await transport.connectToDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(fakePlatform.subscribeCalls, <String>['ble-stack-bond']);
+      expect(fakePlatform.pairCalls, isEmpty);
+      expect(fakePlatform.connectCalls, <String>['ble-stack-bond']);
+      expect(device.connected, isTrue);
+    },
+  );
 
   test('a link drop on the first subscribe still reaches the bond', () async {
     // Observed in the field on Android: the first subscribe of a never-bonded

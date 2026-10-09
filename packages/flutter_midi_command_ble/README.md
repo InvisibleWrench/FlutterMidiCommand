@@ -227,6 +227,8 @@ A bond is asked for at most once per `connectToDevice`, including across the int
 
 On platforms without an explicit pairing API, such as iOS and macOS, there is no `pair()` to call: bonding is instead provoked by reading the encrypted MIDI characteristic, which this transport now does only once a subscription has been refused. Failures are surfaced as typed `MidiConnectionException` subclasses from `flutter_midi_command_platform_interface`.
 
-Two consequences worth planning for. `MidiPairingRejectedException` becomes rare, since it is now only reached by a peripheral that both demands a bond and has one refused. And the pairing dialog, where one appears at all, appears later in the sequence than it used to, so `awaitConnectionTimeout` has to leave room for the time a user takes to answer it.
+On Android the explicit bond is usually not needed even by a peripheral that requires encryption, because the stack bonds without being asked: the subscription is held while the system puts up its own pairing dialog, a bond appears, and the subscription then completes. Measured against one such peripheral, that took about ten seconds of human response time. The escalation above is the fallback for peripherals that answer with a security status instead.
+
+Two consequences worth planning for. `MidiPairingRejectedException` becomes rare, since it is now only reached by a peripheral that both demands a bond and has one refused. And the pairing dialog, wherever it comes from, is now waited on inside the notification-subscription stage rather than a pairing stage — so `awaitConnectionTimeout` (30 s by default) has to leave room for the time a user takes to answer it, and a shorter budget will fail there.
 
 An application that wants a bond regardless — to reach CoreMIDI on Apple, say — can ask for one itself with `UniversalBle.pair(device.id)`; this transport does not own the device's bond state.

@@ -1163,11 +1163,34 @@ class _BleMidiDevice extends MidiDevice {
   /// link that worked, which is what drove one application to fork this
   /// package and skip pairing for a hardcoded device name.
   ///
-  /// So the subscription is the test and the bond is the fallback: subscribe,
-  /// and escalate only when the peripheral turns the subscription down for
-  /// want of one ([_refusedForWantOfBond]). Android reports that refusal as a
-  /// CCCD write failed with `GATT_INSUFFICIENT_AUTHENTICATION` and leaves the
-  /// link up, so the bond and the second attempt run on the same connection.
+  /// So the subscription is the test and an explicit bond is the fallback:
+  /// subscribe, and escalate only when the peripheral turns the subscription
+  /// down for want of one ([_refusedForWantOfBond]).
+  ///
+  /// On Android the escalation is genuinely a fallback, because the stack
+  /// usually bonds without being asked. Observed against a peripheral that
+  /// requires encryption: the CCCD write is held while the system puts up its
+  /// own pairing dialog — around ten seconds of it, with the app losing and
+  /// regaining focus — a bond appears with nobody having called
+  /// [UniversalBle.pair], and the write then completes. The subscription
+  /// simply succeeds, slowly, and nothing here runs at all. That is
+  /// [BleCapabilities.triggersConfirmOnlyPairing] in action, and it turns out
+  /// to cover the CCCD write and not just a read or write of the
+  /// characteristic itself.
+  ///
+  /// The escalation exists for when that does not happen: the peripheral
+  /// answers the CCCD write with `GATT_INSUFFICIENT_AUTHENTICATION` instead,
+  /// which leaves the link up, so the bond and the second attempt run on the
+  /// same connection.
+  ///
+  /// Two consequences of the stack's own dialog landing inside the
+  /// subscription. It is spent against the caller's readiness budget under
+  /// [MidiConnectionStage.notificationSubscription] rather than
+  /// [MidiConnectionStage.pairing], so a budget that does not allow for human
+  /// response time fails there. And the bond completes mid-readiness, so
+  /// `onPairingStateChange` fires while [connect] is in flight —
+  /// [updatePairingState]'s `_readinessInProgress` guard is what keeps that
+  /// from starting a second, concurrent subscription.
   ///
   /// The invariant this establishes: a connected device is one whose
   /// notifications are flowing, not one the OS has bonded.
