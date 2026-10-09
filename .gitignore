@@ -27,3 +27,8 @@ packages/flutter_midi_command_darwin/darwin/flutter_midi_command_darwin/.build-i
 packages/flutter_midi_command_ble/.flutter-plugins-dependencies
 example/android/app/.cxx
 tasks
+
+# Xcode per-user state. Xcode rewrites xcschememanagement.plist's orderHint
+# whenever the project is opened, so a tracked copy shows up as a modified file
+# and fails `pub publish`'s clean-git-state check on every release.
+**/xcuserdata/

@@ -1,9 +1,7 @@
 ## 1.4.0
 
- - **FIX**(windows,linux): deliver complete, private MIDI messages. ([4f123831](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/4f123831a322e6c9c25c4e046bfb079f9f52df0e))
- - **FIX**: return futures from virtual device and network session APIs. ([e6bfa198](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e6bfa19827135e80d3ecea800a529a3b2b077144))
- - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts. ([e86ad3e4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e86ad3e42620a68f43a0e609ed767ddd8ac21264))
- - **FEAT**: BLE MIDI throughput, write integrity and diagnostics for 1.1.0. ([86fc04d0](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/86fc04d07e007263dc0d4592d55a82408c3e685f))
+ - No functional change. Versioned alongside the rest of the federated packages to keep the set aligned; this package is byte-for-byte unchanged since 1.3.0. The work in this release is in `flutter_midi_command_ble` 1.4.0.
+ - Update the platform interface dependency constraint to `^1.4.0`.
 
 ## 1.3.0
 

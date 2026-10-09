@@ -1,10 +1,7 @@
 ## 1.4.0
 
- - **FIX**(android,darwin): resolve running status correctly in the native parsers. ([2a972fa4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/2a972fa4a00efaca7f7bfd5b6c50743118695b00))
- - **FIX**: harden device connect/disconnect and teardown paths. ([3c28f4ee](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/3c28f4ee09a69dd2e777b28deadfc9d00d4e9d55))
- - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts. ([e86ad3e4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e86ad3e42620a68f43a0e609ed767ddd8ac21264))
- - **FEAT**: BLE MIDI throughput, write integrity and diagnostics for 1.1.0. ([86fc04d0](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/86fc04d07e007263dc0d4592d55a82408c3e685f))
- - **FEAT**(ble): bundle Android permissions and document platform setup. ([8ccbdee6](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/8ccbdee68fe65e50376cd18838833130bc861de4))
+ - No functional change. Versioned alongside the rest of the federated packages to keep the set aligned; this package is byte-for-byte unchanged since 1.3.0. The work in this release is in `flutter_midi_command_ble` 1.4.0.
+ - Update the platform interface dependency constraint to `^1.4.0`.
 
 ## 1.3.0
 

@@ -13,9 +13,13 @@ topics:
   - webmidi
   - music-tech
 
+# The floor is the highest of the implementations this package depends on.
+# flutter_midi_command_android 1.4.0 builds with AGP 9 and Flutter's built-in
+# Kotlin, so it requires Flutter 3.44; since that implementation is a hard
+# dependency on every platform, the aggregator cannot claim anything lower.
 environment:
-  sdk: ">=3.7.0 <4.0.0"
-  flutter: ">=3.24.0"
+  sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.44.0"
 
 # Dart pub workspace: local packages are linked from these paths (Melos 7+ uses
 # native pub workspaces instead of generated pubspec_overrides.yaml). Globs are
@@ -35,12 +39,12 @@ dependencies:
   flutter:
     sdk: flutter
   async: ^2.12.0
-  flutter_midi_command_platform_interface: ^1.3.0
-  flutter_midi_command_linux: ^1.3.0
-  flutter_midi_command_windows: ^1.3.0
-  flutter_midi_command_web: ^1.3.0
-  flutter_midi_command_android: ^1.3.0
-  flutter_midi_command_darwin: ^1.3.0
+  flutter_midi_command_platform_interface: ^1.4.0
+  flutter_midi_command_linux: ^1.4.0
+  flutter_midi_command_windows: ^1.4.0
+  flutter_midi_command_web: ^1.4.0
+  flutter_midi_command_android: ^1.4.0
+  flutter_midi_command_darwin: ^1.4.0
     
 dev_dependencies:
   flutter_test:

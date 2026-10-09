@@ -27,3 +27,7 @@ darwin/flutter_midi_command_darwin/.build-ios/
 
 # OS-specific metadata.
 .DS_Store
+
+# Xcode per-user state. Never belongs in the published archive, and its
+# orderHint churn otherwise dirties the tree and fails the publish check.
+**/xcuserdata/
