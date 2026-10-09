@@ -96,8 +96,21 @@ class _FakePlatform extends UniversalBlePlatform {
     );
   }
 
-  void emitScan(String id, String name) =>
-      updateScanResult(BleDevice(deviceId: id, name: name, services: const []));
+  /// Emits a BLE MIDI advertisement and lets it land.
+  ///
+  /// The service UUID is what makes the transport list the peripheral, and a
+  /// scan result arrives over a broadcast stream, so the device list is only up
+  /// to date on the next microtask.
+  Future<void> emitScan(String id, String name) async {
+    updateScanResult(
+      BleDevice(
+        deviceId: id,
+        name: name,
+        services: const <String>[midiServiceId],
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+  }
 }
 
 List<BleService> midiServices() => [
@@ -138,7 +151,7 @@ Future<_Rig> connectRig() async {
   final transport = UniversalBleMidiTransport();
 
   fake.servicesByDevice['dev'] = midiServices();
-  fake.emitScan('dev', 'GEWA');
+  await fake.emitScan('dev', 'GEWA');
   final device = (await transport.devices).single;
   await transport.connectToDevice(device);
   await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -158,7 +171,7 @@ void main() {
     final transport = UniversalBleMidiTransport();
 
     fake.servicesByDevice['dev'] = midiServices();
-    fake.emitScan('dev', 'GEWA');
+    await fake.emitScan('dev', 'GEWA');
     final device = (await transport.devices).single;
     await transport.connectToDevice(device);
     await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -261,7 +274,7 @@ void main() {
       final transport = UniversalBleMidiTransport();
 
       fake.servicesByDevice['dev'] = midiServices();
-      fake.emitScan('dev', 'GEWA');
+      await fake.emitScan('dev', 'GEWA');
       final device = (await transport.devices).single;
       await transport.connectToDevice(device);
       await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -487,7 +500,7 @@ void main() {
       rig.transport.disconnectDevice(rig.device);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      rig.fake.emitScan('dev', 'GEWA');
+      await rig.fake.emitScan('dev', 'GEWA');
       final device = (await rig.transport.devices).single;
       await rig.transport.connectToDevice(device);
       await Future<void>.delayed(const Duration(milliseconds: 5));

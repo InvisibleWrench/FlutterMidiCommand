@@ -5,12 +5,22 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, visibleForTesting;
+    show TargetPlatform, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:universal_ble/universal_ble.dart';
 
 const midiServiceId = "03B80E5A-EDE8-4B33-A751-6CE34EC4C700";
 const midiCharacteristicId = "7772E5DB-3868-4112-A1A9-F2669D106BF3";
+
+/// Whether [uuid] is the BLE MIDI service, whatever case it was reported in.
+///
+/// Every universal_ble platform reports 128-bit UUIDs lowercase and hyphenated,
+/// both from advertisements and from service discovery, while [midiServiceId] is
+/// uppercase. The MIDI service is a vendor UUID, so it is never abbreviated to a
+/// 16-bit form and a case-folded comparison is enough — no UUID parse per
+/// advertised service, which matters because Apple scans with duplicates
+/// allowed and so delivers a result per advertising packet.
+bool _isMidiServiceUuid(String uuid) => uuid.toUpperCase() == midiServiceId;
 
 /// Smallest BLE MIDI packet size every peripheral must accept, derived from the
 /// 23-byte default ATT MTU (20 = 23 - 3 bytes of ATT write overhead). Used
@@ -180,9 +190,22 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   /// Both only matter where this transport carries the data. On iOS and macOS
   /// `MidiCommand` hands a connected device to CoreMIDI, which then owns the
   /// write path.
+  ///
+  /// [requireAdvertisedMidiService] makes a peripheral this transport has not
+  /// seen before advertise the BLE MIDI service to be listed. universal_ble
+  /// delivers every scan result to every listener, whoever started the scan and
+  /// whatever filter they used, so an app that also scans for its own
+  /// peripherals would otherwise fill `MidiCommand.devices` with headphones and
+  /// watches. Defaults to `false` on web, where a scan is the browser's device
+  /// chooser and the chosen device carries no advertisement to read.
+  ///
+  /// A peripheral that does not advertise the service can still be used: pass it
+  /// to [registerKnownDevice], or connect to it by id. Devices this transport
+  /// already knows are never filtered.
   UniversalBleMidiTransport({
     this.useNegotiatedMtu = true,
     this.requestHighPerformanceConnection = true,
+    this.requireAdvertisedMidiService = !kIsWeb,
   }) {
     UniversalBle.timeout = const Duration(seconds: 10);
     _registerCallbacks();
@@ -220,6 +243,9 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   final bool useNegotiatedMtu;
 
   /// See [UniversalBleMidiTransport.new].
+  final bool requireAdvertisedMidiService;
+
+  /// See [UniversalBleMidiTransport.new].
   final bool requestHighPerformanceConnection;
 
   /// Optional sink for diagnostics (MTU negotiation, packet sizing, connection
@@ -246,6 +272,12 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   // wrapper"), after which the scanner re-registers but delivers no results
   // until the process is restarted.
   bool _isScanning = false;
+  StreamSubscription<BleDevice>? _scanSubscription;
+  // Peripherals already reported as carrying no BLE MIDI service, so the log
+  // line is written once per device rather than once per advertising packet.
+  // Deliberately not a short-circuit: a device whose MIDI service arrives in a
+  // later advertisement is still picked up.
+  final Set<String> _nonMidiDeviceIds = {};
 
   void _registerCallbacks() {
     if (_callbacksRegistered) {
@@ -258,11 +290,25 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       _bluetoothStateStreamController.add(state.name);
     };
 
-    UniversalBle.onScanResult = (result) {
+    // Deliberately the stream rather than `UniversalBle.onScanResult`: that is a
+    // single app-wide slot with no getter, so taking it would silently stop the
+    // host app's own scan handling, and the host app assigning it after this
+    // transport was constructed would silently stop MIDI discovery. The stream
+    // carries the same results, in the same order, to every listener.
+    _scanSubscription = UniversalBle.scanStream.listen((result) {
       if (result.name == null) {
         return;
       }
       final existing = _devices[result.deviceId];
+      if (existing == null && !_advertisesMidiService(result)) {
+        if (_nonMidiDeviceIds.add(result.deviceId)) {
+          _log(
+            'ignoring "${result.name}" (${result.deviceId}): no BLE MIDI '
+            'service in its advertisement',
+          );
+        }
+        return;
+      }
       if (existing != null) {
         existing.name = result.name!;
         if (!existing.visible) {
@@ -277,7 +323,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         visible: true,
       );
       _setupStreamController.add(MidiSetupChange.deviceAppeared);
-    };
+    });
 
     UniversalBle.onConnectionChange = (deviceId, isConnected, error) {
       final device = _devices[deviceId];
@@ -301,12 +347,24 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     };
   }
 
+  /// Whether a scan result looks like a BLE MIDI peripheral.
+  ///
+  /// Gates on the advertisement rather than on this transport's own
+  /// [ScanFilter], because the scan results reaching us are not necessarily from
+  /// our scan. It asks exactly what universal_ble's `withServices` filter asks
+  /// natively on Android, Apple, Windows and Linux, so a result our own scan
+  /// produced always passes.
+  bool _advertisesMidiService(BleDevice result) =>
+      !requireAdvertisedMidiService || result.services.any(_isMidiServiceUuid);
+
   void _unregisterCallbacks() {
     if (!_callbacksRegistered) {
       return;
     }
+    unawaited(_scanSubscription?.cancel());
+    _scanSubscription = null;
+    _nonMidiDeviceIds.clear();
     UniversalBle.onAvailabilityChange = null;
-    UniversalBle.onScanResult = null;
     UniversalBle.onConnectionChange = null;
     UniversalBle.onValueChange = null;
     UniversalBle.onPairingStateChange = (_, __) {};
@@ -1239,7 +1297,7 @@ class _BleMidiDevice extends MidiDevice {
       timeout,
     );
     _midiService = services
-        .where((s) => s.uuid.toUpperCase() == midiServiceId)
+        .where((s) => _isMidiServiceUuid(s.uuid))
         .firstOrNull;
     if (_midiService == null) {
       _devState = _DeviceState.irrelevant;

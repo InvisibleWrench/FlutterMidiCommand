@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, debugDefaultTargetPlatformOverride;
+    show TargetPlatform, debugDefaultTargetPlatformOverride, kIsWeb;
 import 'package:flutter_midi_command_ble/flutter_midi_command_ble.dart';
 import 'package:flutter_midi_command_platform_interface/flutter_midi_command_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -416,10 +416,26 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
     updateAvailability(state);
   }
 
-  void emitScanDevice(BleDevice device) {
+  /// Emits a scan result and lets it land.
+  ///
+  /// The transport reads scan results from `UniversalBle.scanStream` rather than
+  /// the single app-wide `onScanResult` slot, and a broadcast stream delivers
+  /// asynchronously, so the device list is only up to date on the next
+  /// microtask.
+  Future<void> emitScanDevice(BleDevice device) async {
     updateScanResult(device);
+    await Future<void>.delayed(Duration.zero);
   }
 }
+
+/// A scan result shaped like a real BLE MIDI advertisement: a named peripheral
+/// advertising the MIDI service, which is what the transport now requires
+/// before it will list a peripheral it has not seen before.
+BleDevice midiScanResult(String deviceId, String name) => BleDevice(
+  deviceId: deviceId,
+  name: name,
+  services: <String>[midiServiceId],
+);
 
 List<BleService> midiServices() {
   return <BleService>[
@@ -448,6 +464,18 @@ void main() {
   tearDown(() {
     BleCapabilities.hasSystemPairingApi = previousSystemPairingApi;
   });
+
+  /// Replaces the transport from `setUp` with one configured differently.
+  ///
+  /// `requireAdvertisedMidiService` defaults to `!kIsWeb`, so a test of the
+  /// check itself has to say which behaviour it means to exercise or it would
+  /// assert the opposite thing under `--platform chrome`.
+  void reconfigure({required bool requireAdvertisedMidiService}) {
+    transport.teardown();
+    transport = UniversalBleMidiTransport(
+      requireAdvertisedMidiService: requireAdvertisedMidiService,
+    );
+  }
 
   test(
     'startBluetooth updates and emits bluetooth availability state',
@@ -520,12 +548,152 @@ void main() {
     },
   );
 
+  // universal_ble delivers every scan result to every listener, whoever started
+  // the scan and whatever filter they used, so a host app running its own
+  // unfiltered scan used to fill the device list with headphones and watches.
+  // Reported as https://github.com/InvisibleWrench/FlutterMidiCommand/issues/184.
+  test('a peripheral advertising other services is not listed', () async {
+    reconfigure(requireAdvertisedMidiService: true);
+
+    final changes = <MidiSetupChange>[];
+    final sub = transport.onMidiSetupChanged.listen(changes.add);
+
+    await fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-headphones',
+        name: 'Fancy Headphones',
+        services: <String>['0000110b-0000-1000-8000-00805f9b34fb'],
+      ),
+    );
+    await sub.cancel();
+
+    expect(await transport.devices, isEmpty);
+    expect(changes, isEmpty);
+  });
+
+  // Watches, laptops and phones advertise manufacturer data and no service
+  // UUIDs at all, which is why the gate cannot be "reject only what positively
+  // advertises something else".
+  test('a peripheral advertising no services is not listed', () async {
+    reconfigure(requireAdvertisedMidiService: true);
+
+    await fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-watch',
+        name: 'Someone\'s Watch',
+        services: <String>[],
+      ),
+    );
+
+    expect(await transport.devices, isEmpty);
+  });
+
+  test('the advertised MIDI service is matched case-insensitively', () async {
+    reconfigure(requireAdvertisedMidiService: true);
+
+    await fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-lowercase',
+        name: 'Lowercase Keyboard',
+        services: <String>[midiServiceId.toLowerCase()],
+      ),
+    );
+
+    expect((await transport.devices).single.id, 'ble-lowercase');
+  });
+
+  test(
+    'a MIDI service in a later advertisement lists the peripheral',
+    () async {
+      reconfigure(requireAdvertisedMidiService: true);
+      await fakePlatform.emitScanDevice(
+        BleDevice(
+          deviceId: 'ble-late-uuid',
+          name: 'Late Keyboard',
+          services: <String>[],
+        ),
+      );
+      expect(await transport.devices, isEmpty);
+
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-late-uuid', 'Late Keyboard'),
+      );
+
+      expect((await transport.devices).single.id, 'ble-late-uuid');
+    },
+  );
+
+  test('a known peripheral is listed without advertising MIDI', () async {
+    reconfigure(requireAdvertisedMidiService: true);
+
+    transport.registerKnownDevice('ble-silent', 'Silent Keyboard');
+
+    await fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-silent',
+        name: 'Silent Keyboard Renamed',
+        services: <String>[],
+      ),
+    );
+
+    final device = (await transport.devices).single;
+    expect(device.id, 'ble-silent');
+    expect(device.name, 'Silent Keyboard Renamed');
+  });
+
+  test('an already listed peripheral keeps updating without MIDI', () async {
+    reconfigure(requireAdvertisedMidiService: true);
+
+    await fakePlatform.emitScanDevice(midiScanResult('ble-seen', 'Keyboard'));
+
+    // A scan response carrying the name but not the service UUID.
+    await fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-seen',
+        name: 'Keyboard Mk II',
+        services: <String>[],
+      ),
+    );
+
+    expect((await transport.devices).single.name, 'Keyboard Mk II');
+  });
+
+  test('requireAdvertisedMidiService: false lists every peripheral', () async {
+    reconfigure(requireAdvertisedMidiService: false);
+
+    await fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-anything',
+        name: 'Not A Keyboard',
+        services: <String>[],
+      ),
+    );
+
+    expect((await transport.devices).single.id, 'ble-anything');
+  });
+
+  // The other half of #184: `UniversalBle.onScanResult` is a single app-wide
+  // slot with no getter, so a host app assigning it used to leave this
+  // transport with no scan results at all.
+  test('a host app taking onScanResult does not stop discovery', () async {
+    final appResults = <String>[];
+    UniversalBle.onScanResult = (result) => appResults.add(result.deviceId);
+    addTearDown(() => UniversalBle.onScanResult = null);
+
+    await fakePlatform.emitScanDevice(midiScanResult('ble-shared', 'Keyboard'));
+
+    expect((await transport.devices).single.id, 'ble-shared');
+    expect(appResults, <String>['ble-shared']);
+  });
+
+  test('the advertised-service check is on everywhere but web', () {
+    expect(transport.requireAdvertisedMidiService, !kIsWeb);
+  });
+
   test('connectToDevice completes only when BLE connection succeeds', () async {
     fakePlatform.servicesByDevice['ble-1'] = midiServices();
 
-    fakePlatform.emitScanDevice(
-      BleDevice(deviceId: 'ble-1', name: 'BLE Device', services: <String>[]),
-    );
+    await fakePlatform.emitScanDevice(midiScanResult('ble-1', 'BLE Device'));
 
     final device = (await transport.devices).single;
     expect(device.connected, isFalse);
@@ -547,12 +715,8 @@ void main() {
     () async {
       fakePlatform.servicesByDevice['ble-locked'] = midiServices();
       fakePlatform.bondRequiredSubscribeIds.add('ble-locked');
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-locked',
-          name: 'Locked Device',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-locked', 'Locked Device'),
       );
       final device = (await transport.devices).single;
 
@@ -572,12 +736,8 @@ void main() {
     fakePlatform.servicesByDevice['ble-locked-reject'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-locked-reject');
     fakePlatform.rejectedPairIds.add('ble-locked-reject');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-locked-reject',
-        name: 'Locked Reject',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-locked-reject', 'Locked Reject'),
     );
     final device = (await transport.devices).single;
 
@@ -596,12 +756,8 @@ void main() {
     fakePlatform.servicesByDevice['ble-phantom'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-phantom');
     fakePlatform.pairWithoutBondingIds.add('ble-phantom');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-phantom',
-        name: 'Phantom Bond',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-phantom', 'Phantom Bond'),
     );
     final device = (await transport.devices).single;
 
@@ -623,12 +779,8 @@ void main() {
     fakePlatform.servicesByDevice['ble-bond-drop'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-bond-drop');
     fakePlatform.postBondSubscribeLinkDrops['ble-bond-drop'] = 1;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-bond-drop',
-        name: 'Bond Drops Link',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-bond-drop', 'Bond Drops Link'),
     );
     final device = (await transport.devices).single;
 
@@ -658,12 +810,8 @@ void main() {
         fakePlatform.servicesByDevice['ble-$code'] = midiServices();
         fakePlatform.alwaysRefusingSubscribeIds.add('ble-$code');
         fakePlatform.subscribeRefusalCode = code;
-        fakePlatform.emitScanDevice(
-          BleDevice(
-            deviceId: 'ble-$code',
-            name: 'Refusing Device',
-            services: <String>[],
-          ),
+        await fakePlatform.emitScanDevice(
+          midiScanResult('ble-$code', 'Refusing Device'),
         );
         final device = (await transport.devices).single;
 
@@ -683,12 +831,8 @@ void main() {
     fakePlatform.servicesByDevice['ble-unnamed'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-unnamed');
     fakePlatform.subscribeRefusalCode = UniversalBleErrorCode.unknownError;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-unnamed',
-        name: 'Unnamed Refusal',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-unnamed', 'Unnamed Refusal'),
     );
     final device = (await transport.devices).single;
 
@@ -706,9 +850,7 @@ void main() {
     // that is not answering at all.
     fakePlatform.servicesByDevice['ble-hang'] = midiServices();
     fakePlatform.hangingSubscribeIds.add('ble-hang');
-    fakePlatform.emitScanDevice(
-      BleDevice(deviceId: 'ble-hang', name: 'Hanging', services: <String>[]),
-    );
+    await fakePlatform.emitScanDevice(midiScanResult('ble-hang', 'Hanging'));
     final device = (await transport.devices).single;
 
     await expectLater(
@@ -735,12 +877,8 @@ void main() {
       // this transport has discovered anything. There is nothing to subscribe
       // to, so the device must be left alone rather than reported connected.
       fakePlatform.servicesByDevice['ble-oob'] = midiServices();
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-oob',
-          name: 'Out Of Band',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-oob', 'Out Of Band'),
       );
       final device = (await transport.devices).single;
 
@@ -755,12 +893,8 @@ void main() {
   test('an already-bonded device is not asked to bond again', () async {
     fakePlatform.servicesByDevice['ble-bonded'] = midiServices();
     fakePlatform.seedPaired('ble-bonded');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-bonded',
-        name: 'Bonded Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-bonded', 'Bonded Device'),
     );
     final device = (await transport.devices).single;
 
@@ -779,12 +913,8 @@ void main() {
       fakePlatform.servicesByDevice['ble-bonded-fail'] = midiServices();
       fakePlatform.seedPaired('ble-bonded-fail');
       fakePlatform.failingSubscribeIds.add('ble-bonded-fail');
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-bonded-fail',
-          name: 'Bonded Failing',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-bonded-fail', 'Bonded Failing'),
       );
       final device = (await transport.devices).single;
 
@@ -799,9 +929,7 @@ void main() {
 
   test('MTU negotiation runs after the MIDI path is live', () async {
     fakePlatform.servicesByDevice['ble-mtu'] = midiServices();
-    fakePlatform.emitScanDevice(
-      BleDevice(deviceId: 'ble-mtu', name: 'MTU Device', services: <String>[]),
-    );
+    await fakePlatform.emitScanDevice(midiScanResult('ble-mtu', 'MTU Device'));
 
     await transport.connectToDevice((await transport.devices).single);
     await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -820,12 +948,8 @@ void main() {
   test('connectToDevice retries once through a transient GATT 133', () async {
     fakePlatform.servicesByDevice['ble-133'] = midiServices();
     fakePlatform.transientGattFailures['ble-133'] = 1;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-133',
-        name: 'Flaky Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-133', 'Flaky Device'),
     );
     final device = (await transport.devices).single;
 
@@ -848,12 +972,8 @@ void main() {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-sub-133'] = midiServices();
     fakePlatform.transientGattSubscribeFailures['ble-sub-133'] = 1;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-sub-133',
-        name: 'Flaky Handshake',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-sub-133', 'Flaky Handshake'),
     );
     final device = (await transport.devices).single;
 
@@ -886,12 +1006,8 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       fakePlatform.servicesByDevice['ble-stack-bond'] = midiServices();
       fakePlatform.bondsDuringSubscribeIds.add('ble-stack-bond');
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-stack-bond',
-          name: 'Stack Bonds',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-stack-bond', 'Stack Bonds'),
       );
       final device = (await transport.devices).single;
 
@@ -914,12 +1030,8 @@ void main() {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-declined'] = midiServices();
     fakePlatform.bondDeclinedDuringSubscribeIds.add('ble-declined');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-declined',
-        name: 'Declined Bond',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-declined', 'Declined Bond'),
     );
     final device = (await transport.devices).single;
 
@@ -943,12 +1055,8 @@ void main() {
     fakePlatform.bondDeclinedDuringSubscribeIds.add('ble-declined-drop');
     fakePlatform.subscribeRefusalCode =
         UniversalBleErrorCode.deviceDisconnected;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-declined-drop',
-        name: 'Declined And Dropped',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-declined-drop', 'Declined And Dropped'),
     );
     final device = (await transport.devices).single;
 
@@ -975,12 +1083,8 @@ void main() {
     fakePlatform.subscribeRefusalCode =
         UniversalBleErrorCode.deviceDisconnected;
     fakePlatform.publishDeclinedPairingState = false;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-declined-again',
-        name: 'Declined Again',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-declined-again', 'Declined Again'),
     );
     final device = (await transport.devices).single;
 
@@ -1009,12 +1113,8 @@ void main() {
     fakePlatform.servicesByDevice['ble-133-then-bond'] = midiServices();
     fakePlatform.transientGattSubscribeFailures['ble-133-then-bond'] = 1;
     fakePlatform.bondRequiredSubscribeIds.add('ble-133-then-bond');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-133-then-bond',
-        name: 'Dropped Then Locked',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-133-then-bond', 'Dropped Then Locked'),
     );
     final device = (await transport.devices).single;
 
@@ -1040,12 +1140,8 @@ void main() {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-disc-drop'] = midiServices();
     fakePlatform.disconnectedDiscoverFailures['ble-disc-drop'] = 1;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-disc-drop',
-        name: 'Dropped Discovery',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-disc-drop', 'Dropped Discovery'),
     );
     final device = (await transport.devices).single;
 
@@ -1069,12 +1165,8 @@ void main() {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-late-bond'] = midiServices();
     fakePlatform.pairingRemovedSubscribeIds.add('ble-late-bond');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-late-bond',
-        name: 'Late Stale Bond',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-late-bond', 'Late Stale Bond'),
     );
     final device = (await transport.devices).single;
 
@@ -1100,12 +1192,8 @@ void main() {
     // Already bonded, so the refusal cannot be answered with a bond and this
     // test is about the `details` classification alone.
     fakePlatform.seedPaired('ble-att-85');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-att-85',
-        name: 'Apple Peripheral',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-att-85', 'Apple Peripheral'),
     );
     final device = (await transport.devices).single;
 
@@ -1126,12 +1214,8 @@ void main() {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-sub-hard'] = midiServices();
     fakePlatform.transientGattSubscribeFailures['ble-sub-hard'] = 5;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-sub-hard',
-        name: 'Dead Handshake',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-sub-hard', 'Dead Handshake'),
     );
     final device = (await transport.devices).single;
 
@@ -1147,12 +1231,8 @@ void main() {
   test('connectToDevice gives up after one GATT 133 retry', () async {
     fakePlatform.servicesByDevice['ble-133-hard'] = midiServices();
     fakePlatform.transientGattFailures['ble-133-hard'] = 5;
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-133-hard',
-        name: 'Dead Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-133-hard', 'Dead Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1167,12 +1247,8 @@ void main() {
 
   test('connectToDevice surfaces BLE connection failures', () async {
     fakePlatform.failingConnectIds.add('ble-2');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-2',
-        name: 'Failing Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-2', 'Failing Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1192,12 +1268,8 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       fakePlatform.servicesByDevice['ble-stale-bond'] = midiServices();
       fakePlatform.pairingRemovedConnectIds.add('ble-stale-bond');
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-stale-bond',
-          name: 'Stale Bond Device',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-stale-bond', 'Stale Bond Device'),
       );
       final device = (await transport.devices).single;
 
@@ -1213,12 +1285,8 @@ void main() {
 
   test('disconnectDevice forwards to BLE backend', () async {
     fakePlatform.servicesByDevice['ble-3'] = midiServices();
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-3',
-        name: 'Disconnect Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-3', 'Disconnect Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1241,12 +1309,8 @@ void main() {
       expect(registered, isNotNull);
       expect(await transport.devices, isEmpty);
 
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-known',
-          name: 'Known Device',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-known', 'Known Device'),
       );
 
       final devices = await transport.devices;
@@ -1274,12 +1338,8 @@ void main() {
     'disconnectDevice removes stale BLE device until rediscovered',
     () async {
       fakePlatform.servicesByDevice['ble-stale'] = midiServices();
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-stale',
-          name: 'Stale Device',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-stale', 'Stale Device'),
       );
       final device = (await transport.devices).single;
 
@@ -1289,12 +1349,8 @@ void main() {
 
       expect(await transport.devices, isEmpty);
 
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-stale',
-          name: 'Stale Device',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-stale', 'Stale Device'),
       );
 
       expect((await transport.devices).single.id, 'ble-stale');
@@ -1302,12 +1358,8 @@ void main() {
   );
 
   test('connectToDevice fails when BLE MIDI service is missing', () async {
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-no-midi',
-        name: 'No MIDI Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-no-midi', 'No MIDI Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1324,12 +1376,8 @@ void main() {
     fakePlatform.servicesByDevice['ble-reject'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-reject');
     fakePlatform.rejectedPairIds.add('ble-reject');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-reject',
-        name: 'Reject Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-reject', 'Reject Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1352,12 +1400,8 @@ void main() {
       // appears for a device that did not need it.
       BleCapabilities.hasSystemPairingApi = false;
       fakePlatform.servicesByDevice['ble-native-ui'] = midiServices();
-      fakePlatform.emitScanDevice(
-        BleDevice(
-          deviceId: 'ble-native-ui',
-          name: 'Native UI Device',
-          services: <String>[],
-        ),
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-native-ui', 'Native UI Device'),
       );
       final device = (await transport.devices).single;
 
@@ -1378,12 +1422,8 @@ void main() {
     BleCapabilities.hasSystemPairingApi = false;
     fakePlatform.servicesByDevice['ble-native-locked'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-native-locked');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-native-locked',
-        name: 'Native Locked',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-native-locked', 'Native Locked'),
     );
     final device = (await transport.devices).single;
 
@@ -1404,12 +1444,8 @@ void main() {
     // Refuse the subscription so the read trigger is actually reached.
     fakePlatform.bondRequiredSubscribeIds.add('ble-read-fail');
     fakePlatform.failingReadIds.add('ble-read-fail');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-read-fail',
-        name: 'Read Fail Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-read-fail', 'Read Fail Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1423,12 +1459,8 @@ void main() {
   test('connectToDevice surfaces notification subscription failures', () async {
     fakePlatform.servicesByDevice['ble-subscribe-fail'] = midiServices();
     fakePlatform.failingSubscribeIds.add('ble-subscribe-fail');
-    fakePlatform.emitScanDevice(
-      BleDevice(
-        deviceId: 'ble-subscribe-fail',
-        name: 'Subscribe Fail Device',
-        services: <String>[],
-      ),
+    await fakePlatform.emitScanDevice(
+      midiScanResult('ble-subscribe-fail', 'Subscribe Fail Device'),
     );
     final device = (await transport.devices).single;
 
@@ -1440,24 +1472,30 @@ void main() {
   });
 
   test('teardown unregisters callbacks and can be reactivated', () async {
-    expect(fakePlatform.onScanResultUpdate, isNotNull);
     expect(fakePlatform.onConnectionChange, isNotNull);
     expect(fakePlatform.onValueChange, isNotNull);
     expect(fakePlatform.onAvailabilityChange, isNotNull);
+    await fakePlatform.emitScanDevice(midiScanResult('ble-live', 'Live'));
+    expect((await transport.devices).single.id, 'ble-live');
 
     transport.teardown();
 
-    expect(fakePlatform.onScanResultUpdate, isNull);
     expect(fakePlatform.onConnectionChange, isNull);
     expect(fakePlatform.onValueChange, isNull);
     expect(fakePlatform.onAvailabilityChange, isNull);
+    // Scan results are read from a broadcast stream, and cancelling the last
+    // listener closes it. Nothing must arrive while torn down, and the stream
+    // has to come back on reactivation.
+    await fakePlatform.emitScanDevice(midiScanResult('ble-gone', 'Ignored'));
+    expect(await transport.devices, isEmpty);
 
     await transport.startBluetooth();
 
-    expect(fakePlatform.onScanResultUpdate, isNotNull);
     expect(fakePlatform.onConnectionChange, isNotNull);
     expect(fakePlatform.onValueChange, isNotNull);
     expect(fakePlatform.onAvailabilityChange, isNotNull);
+    await fakePlatform.emitScanDevice(midiScanResult('ble-again', 'Back'));
+    expect((await transport.devices).single.id, 'ble-again');
   });
 
   // A GEWA firmware data packet: F0 7E 10 07 02 <seq> <size> + 128 encoded
@@ -1483,9 +1521,7 @@ void main() {
     String deviceId,
   ) async {
     fakePlatform.servicesByDevice[deviceId] = midiServices();
-    fakePlatform.emitScanDevice(
-      BleDevice(deviceId: deviceId, name: deviceId, services: <String>[]),
-    );
+    await fakePlatform.emitScanDevice(midiScanResult(deviceId, deviceId));
     final device = (await target.devices).firstWhere((d) => d.id == deviceId);
     await target.connectToDevice(device);
     await Future<void>.delayed(const Duration(milliseconds: 5));
