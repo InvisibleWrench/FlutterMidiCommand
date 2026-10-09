@@ -814,6 +814,42 @@ void main() {
     expect(fakePlatform.subscribeCalls, <String>['ble-sub-133', 'ble-sub-133']);
     expect(device.connected, isTrue);
     expect((await transport.devices).single.id, 'ble-sub-133');
+    // A link that went away says nothing about encryption, so it must not put
+    // a pairing dialog in front of the user on its way to being retried.
+    expect(fakePlatform.pairCalls, isEmpty);
+  });
+
+  test('a link drop on the first subscribe still reaches the bond', () async {
+    // Observed in the field on Android: the first subscribe of a never-bonded
+    // peripheral came back as a generic GATT 133 rather than a security
+    // status. That is a transient link fault as far as this transport can
+    // tell, so it is retried — and the retry has to be able to recognise the
+    // refusal for what it is and escalate, or a peripheral that needs a bond
+    // would never be offered one.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    fakePlatform.servicesByDevice['ble-133-then-bond'] = midiServices();
+    fakePlatform.transientGattSubscribeFailures['ble-133-then-bond'] = 1;
+    fakePlatform.bondRequiredSubscribeIds.add('ble-133-then-bond');
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-133-then-bond',
+        name: 'Dropped Then Locked',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await transport.connectToDevice(device);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    expect(fakePlatform.connectCalls, <String>[
+      'ble-133-then-bond',
+      'ble-133-then-bond',
+    ]);
+    // One dialog, on the attempt that got a real answer out of the peripheral.
+    expect(fakePlatform.pairCalls, <String>['ble-133-then-bond']);
+    expect(device.connected, isTrue);
   });
 
   test('connectToDevice retries a link torn down during discovery', () async {
