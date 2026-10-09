@@ -249,7 +249,8 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   final bool requestHighPerformanceConnection;
 
   /// Optional sink for diagnostics (MTU negotiation, packet sizing, connection
-  /// priority, write backlog). Defaults to null (silent).
+  /// priority, write backlog, and incoming framing this transport could not
+  /// use). Defaults to null (silent).
   ///
   /// `transport.logHandler = (m) => debugPrint(m);`
   void Function(String message)? logHandler;
@@ -729,6 +730,15 @@ class BleMidiRun {
 /// rules ([_trackSysEx]).
 @visibleForTesting
 class BleMidiFramer {
+  BleMidiFramer({this.onFramingWarning});
+
+  /// Reports framing this parser could not use, so a peripheral that frames
+  /// its MIDI in a way the specification does not allow can be identified from
+  /// a log rather than from the absence of messages.
+  ///
+  /// Diagnostics only: nothing here changes what is parsed.
+  final void Function(String message)? onFramingWarning;
+
   /// Whether a SysEx is open, which is what tells a continuation packet's
   /// leading data bytes apart from stray junk.
   bool _inSysEx = false;
@@ -775,6 +785,20 @@ class BleMidiFramer {
       _lastTimestamp = timestampHigh << 7 | byte & 0x7F;
       i++;
       if (i >= packet.length) {
+        if (_inSysEx && byte == 0xF7) {
+          // Almost certainly a SysEx terminator sent without the timestamp
+          // byte the specification requires before it, which leaves this
+          // parser reading it as the timestamp and the message unterminated.
+          // 0xF7 is also a legal timestamp value, so this cannot be told apart
+          // with certainty and nothing is parsed differently — but a
+          // peripheral that frames this way loses every SysEx it sends, and
+          // that is worth saying out loud rather than leaving as silence.
+          onFramingWarning?.call(
+            'a SysEx ended with 0xF7 and no timestamp byte before it, so the '
+            'message was dropped; the MMA BLE MIDI specification requires a '
+            'timestamp byte ahead of the terminator',
+          );
+        }
         break;
       }
       flush();
@@ -1523,7 +1547,9 @@ class _BleMidiDevice extends MidiDevice {
   /// The two receive stages: [BleMidiFramer] removes the BLE framing, and
   /// [MidiMessageSplitter] turns the resulting bytes into complete MIDI
   /// messages. Both are per-device and both are reset when the link drops.
-  final BleMidiFramer _framer = BleMidiFramer();
+  late final BleMidiFramer _framer = BleMidiFramer(
+    onFramingWarning: (message) => _log('$deviceId: $message'),
+  );
   late final MidiMessageSplitter _splitter = MidiMessageSplitter(
     onMessage: _emit,
   );

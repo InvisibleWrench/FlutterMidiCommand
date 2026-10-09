@@ -400,6 +400,77 @@ void main() {
       expect(BleMidiFramer().parse([0x80]), isEmpty);
     });
 
+    test('warns when a SysEx terminator arrives with no timestamp', () {
+      // Non-compliant framing: the specification requires a timestamp byte
+      // ahead of the 0xF7. Without it this parser reads the terminator as the
+      // timestamp and the message is lost, which is reported rather than
+      // parsed around - 0xF7 is also a legal timestamp value, so the two
+      // cannot be told apart with certainty.
+      final warnings = <String>[];
+      final framer = BleMidiFramer(onFramingWarning: warnings.add);
+
+      final runs = framer.parse([
+        0x80,
+        0x80,
+        0xF0,
+        0x00,
+        0x21,
+        0x3C,
+        0x13,
+        0xF7,
+      ]);
+
+      expect(runs.single.bytes, [0xF0, 0x00, 0x21, 0x3C, 0x13]);
+      expect(warnings, hasLength(1));
+      expect(warnings.single, contains('no timestamp byte before it'));
+    });
+
+    test('warns when a split SysEx ends on a bare terminator packet', () {
+      final warnings = <String>[];
+      final framer = BleMidiFramer(onFramingWarning: warnings.add);
+
+      framer.parse([0x80, 0x80, 0xF0, 0x00, 0x21, 0x3C]);
+      framer.parse([0x80, 0x00, 0x10]);
+      framer.parse([0x80, 0xF7]);
+
+      expect(warnings, hasLength(1));
+    });
+
+    test('stays silent for a compliant SysEx terminator', () {
+      final warnings = <String>[];
+      final framer = BleMidiFramer(onFramingWarning: warnings.add);
+
+      final runs = framer.parse([
+        0x80,
+        0x80,
+        0xF0,
+        0x00,
+        0x21,
+        0x3C,
+        0x13,
+        0x80,
+        0xF7,
+      ]);
+
+      expect(runs.map((r) => r.bytes), [
+        [0xF0, 0x00, 0x21, 0x3C, 0x13],
+        [0xF7],
+      ]);
+      expect(warnings, isEmpty);
+    });
+
+    test('stays silent for a dangling timestamp outside a SysEx', () {
+      // A packet that ends on a timestamp byte with no SysEx open is ordinary
+      // truncation, not the terminator problem, and must not be reported as
+      // it.
+      final warnings = <String>[];
+      final framer = BleMidiFramer(onFramingWarning: warnings.add);
+
+      framer.parse([0x80, 0xF7]);
+
+      expect(warnings, isEmpty);
+    });
+
     test('reset clears the SysEx latch', () {
       final framer = BleMidiFramer();
       framer.parse([0x80, 0x80, 0xF0, 0x01]);
