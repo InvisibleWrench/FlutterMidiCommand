@@ -164,9 +164,26 @@ bool _refusedForWantOfBond(Object error) {
   }
 }
 
-/// How long to let the Android stack settle before retrying through a
-/// [_isTransientLinkFailure] failure.
-const _gattRetryDelay = Duration(milliseconds: 500);
+/// How long to let the Android stack settle before each retry through a
+/// [_isTransientLinkFailure] failure, and by its length how many retries there
+/// are.
+///
+/// Growing rather than fixed, because the two cases behind these failures
+/// settle on different timescales. A link dropped mid-handshake while
+/// reconnecting is usually ready again almost immediately, which the first
+/// delay covers. A peripheral that has only just powered on is not: it answers
+/// `connect` with a generic `GATT_ERROR` until its radio is ready, and
+/// observed against one such peripheral, two attempts half a second apart both
+/// failed where an attempt two and a half seconds in succeeded.
+///
+/// The cost is borne by a peripheral that is genuinely absent, which now takes
+/// the sum of these before it is reported — so they are kept short enough to
+/// stay inside a default `awaitConnectionTimeout` alongside the attempts
+/// themselves.
+const _gattRetryDelays = <Duration>[
+  Duration(milliseconds: 500),
+  Duration(seconds: 2),
+];
 
 /// Cap on the opportunistic MTU exchange. Well under the 10 s global
 /// universal_ble timeout so a peripheral that never answers cannot hold the
@@ -1029,15 +1046,18 @@ class _BleMidiDevice extends MidiDevice {
     }
   }
 
-  /// Brings the device to MIDI readiness, retrying the whole sequence once
-  /// through a transient Android `GATT_ERROR`.
+  /// Brings the device to MIDI readiness, retrying the whole sequence through a
+  /// transient Android `GATT_ERROR` on a growing delay ([_gattRetryDelays]).
   ///
-  /// [_connectLink] already retries a connect that fails outright, but the link
-  /// can also come up and then drop part-way through the handshake — most often
-  /// when reconnecting shortly after a disconnect, before the Android stack has
-  /// settled. That surfaces as a failed service discovery or subscription
-  /// rather than a failed connect, and needs the same treatment: tear the
-  /// half-built connection down and start over from a fresh GATT client.
+  /// Two different failures arrive this way. The link can come up and then drop
+  /// part-way through the handshake — most often when reconnecting shortly
+  /// after a disconnect, before the Android stack has settled — which surfaces
+  /// as a failed service discovery or subscription rather than a failed
+  /// connect, and needs the half-built connection torn down and a fresh GATT
+  /// client. And `connect` itself can be refused outright by a peripheral that
+  /// has only just powered on, for as long as its radio takes to become
+  /// ready, which is why the delays grow instead of being tried once and given
+  /// up on.
   Future<void> connect({Duration? timeout}) async {
     if (connected) {
       return;
@@ -1085,7 +1105,8 @@ class _BleMidiDevice extends MidiDevice {
               cause: error,
             );
           }
-          if (attempt > 0 || !_isTransientLinkFailure(cause)) {
+          if (attempt >= _gattRetryDelays.length ||
+              !_isTransientLinkFailure(cause)) {
             rethrow;
           }
           if (await _subscriptionMayHavePrompted(error, cause)) {
@@ -1109,7 +1130,7 @@ class _BleMidiDevice extends MidiDevice {
           }
           _log('$deviceId: link dropped during setup ($error); retrying once');
         }
-        await Future<void>.delayed(_gattRetryDelay);
+        await Future<void>.delayed(_gattRetryDelays[attempt]);
       }
     } finally {
       _readinessInProgress = false;

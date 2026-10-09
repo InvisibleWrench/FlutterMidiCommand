@@ -233,6 +233,18 @@ Two consequences worth planning for. `MidiPairingRejectedException` becomes rare
 
 An application that wants a bond regardless — to reach CoreMIDI on Apple, say — can ask for one itself with `UniversalBle.pair(device.id)`; this transport does not own the device's bond state.
 
+## A peripheral that has only just powered on
+
+Android refuses `connect` with a generic `GATT_ERROR` (133) while a
+peripheral's radio is still coming up, which is what a peripheral powered on
+moments earlier looks like. The connection sequence retries through that on a
+growing delay rather than once, so such a peripheral is reached without the
+user having to tap connect again.
+
+A peripheral that is genuinely absent therefore takes the sum of those delays
+before the failure is reported. They are kept short enough to stay inside a
+default `awaitConnectionTimeout` alongside the attempts themselves.
+
 ## Sharing universal_ble with the rest of your app
 
 `universal_ble` has one app-wide scan and one app-wide set of event callbacks:
