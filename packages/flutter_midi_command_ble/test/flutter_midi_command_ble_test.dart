@@ -1209,7 +1209,7 @@ void main() {
     expect(fakePlatform.readCalls, isEmpty);
   });
 
-  test('connectToDevice gives up after one subscribe-drop retry', () async {
+  test('connectToDevice gives up once the retries are exhausted', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     fakePlatform.servicesByDevice['ble-sub-hard'] = midiServices();
@@ -1224,11 +1224,42 @@ void main() {
       throwsA(isA<MidiNotificationSubscriptionException>()),
     );
 
-    expect(fakePlatform.connectCalls, <String>['ble-sub-hard', 'ble-sub-hard']);
+    // One attempt per entry in the retry schedule, plus the first.
+    expect(fakePlatform.connectCalls, <String>[
+      'ble-sub-hard',
+      'ble-sub-hard',
+      'ble-sub-hard',
+    ]);
     expect(device.connected, isFalse);
   });
 
-  test('connectToDevice gives up after one GATT 133 retry', () async {
+  test(
+    'a peripheral that is slow to answer is reached on a later try',
+    () async {
+      // The case the growing delays exist for: a peripheral that has only just
+      // powered on refuses `connect` with a generic GATT_ERROR until its radio
+      // is ready. Two failures is more than the single retry used to allow, so
+      // this connected only if the schedule went further than one attempt.
+      fakePlatform.servicesByDevice['ble-slow-radio'] = midiServices();
+      fakePlatform.transientGattFailures['ble-slow-radio'] = 2;
+      await fakePlatform.emitScanDevice(
+        midiScanResult('ble-slow-radio', 'Just Booted'),
+      );
+      final device = (await transport.devices).single;
+
+      await transport.connectToDevice(device);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      expect(fakePlatform.connectCalls, <String>[
+        'ble-slow-radio',
+        'ble-slow-radio',
+        'ble-slow-radio',
+      ]);
+      expect(device.connected, isTrue);
+    },
+  );
+
+  test('connectToDevice gives up on a peripheral that never answers', () async {
     fakePlatform.servicesByDevice['ble-133-hard'] = midiServices();
     fakePlatform.transientGattFailures['ble-133-hard'] = 5;
     await fakePlatform.emitScanDevice(
@@ -1241,7 +1272,11 @@ void main() {
       throwsA(isA<ConnectionException>()),
     );
 
-    expect(fakePlatform.connectCalls, <String>['ble-133-hard', 'ble-133-hard']);
+    expect(fakePlatform.connectCalls, <String>[
+      'ble-133-hard',
+      'ble-133-hard',
+      'ble-133-hard',
+    ]);
     expect(device.connected, isFalse);
   });
 
