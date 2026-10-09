@@ -986,7 +986,9 @@ void main() {
 
     await expectLater(
       transport.connectToDevice(device),
-      throwsA(isA<MidiNotificationSubscriptionException>()),
+      // Reported as a refusal, so that declining produces the same error
+      // whether or not the pairing callback had already been spent.
+      throwsA(isA<MidiPairingRejectedException>()),
     );
     // The point of the test: one connect, so no reconnect raised the dialog
     // a second time, even with nothing having told us the bond was declined.

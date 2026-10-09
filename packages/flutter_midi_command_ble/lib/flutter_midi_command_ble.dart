@@ -925,14 +925,22 @@ class _BleMidiDevice extends MidiDevice {
           }
           if (await _subscriptionMayHavePrompted(error, cause)) {
             // Same situation as above, reached without the pairing callback
-            // having told us so. Report the drop as it arrived rather than
-            // claiming a refusal we did not observe.
+            // having told us so. Reported as a refusal rather than as the
+            // subscription error it arrived as, because the alternative is
+            // that one user action produces two different messages depending
+            // on whether the callback had already been spent — and of the
+            // two, "pairing was rejected or did not complete" is the one that
+            // tells someone who just dismissed a pairing dialog what
+            // happened.
             _log(
               '$deviceId: the subscription took the link down and the device '
               'is still unbonded; not retrying, because retrying would ask '
               'again',
             );
-            rethrow;
+            throw MidiPairingRejectedException(
+              deviceId: deviceId,
+              cause: error,
+            );
           }
           _log('$deviceId: link dropped during setup ($error); retrying once');
         }
@@ -969,8 +977,10 @@ class _BleMidiDevice extends MidiDevice {
   ///
   /// The cost is narrow and deliberate: a peripheral that needs no bond, and
   /// whose link genuinely dies during the subscription, loses its one
-  /// automatic retry and surfaces instead. That is a worse trade than
-  /// retrying only if the alternative were not an unbounded dialog loop.
+  /// automatic retry and is reported as a refused bond rather than as the drop
+  /// it was. Both are the wrong answer for that peripheral, and both are worth
+  /// it against an unbounded dialog loop for every peripheral that does need a
+  /// bond.
   Future<bool> _subscriptionMayHavePrompted(Object error, Object cause) async {
     if (cause is! UniversalBleException ||
         cause.code != UniversalBleErrorCode.deviceDisconnected) {
