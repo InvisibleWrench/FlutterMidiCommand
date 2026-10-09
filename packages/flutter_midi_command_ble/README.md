@@ -218,10 +218,20 @@ The BLE readiness flow includes:
 
 - BLE connection
 - MIDI service and characteristic discovery
-- pairing/bonding when required
 - notification subscription
+- pairing/bonding, and a second subscription attempt, only if the peripheral refused the first
 
-On platforms without an explicit pairing API, such as iOS and macOS, pairing is triggered by accessing the encrypted MIDI characteristic and failures are surfaced as typed `MidiConnectionException` subclasses from `flutter_midi_command_platform_interface`.
+A device is connected when its notifications are flowing, not when the OS has bonded it. BLE MIDI carries no security requirement of its own, and peripherals exist whose MIDI characteristic is notifiable with no bond at all — so the subscription is tried first and a bond is obtained only if the peripheral turns it down for want of an encrypted link. **A peripheral that does not need a bond never shows the user a system pairing dialog.** Bonding up front used to fail the whole connection for such a peripheral, which is worth knowing if you previously worked around that.
+
+A bond is asked for at most once per `connectToDevice`, including across the internal connection retry, so a question the user has already answered is not put to them twice. That holds for the dialog the OS raises by itself as well as the one this transport requests: a bonding attempt that ends without a bond fails the connection with `MidiPairingRejectedException` rather than asking again or reconnecting to try its luck. On Android that is also inferred from a subscription that takes the link down while the device is still unbonded, because the platform only reports a failed bond once per process. Declining the dialog therefore fails the connection promptly, which is the behaviour to expect if you are showing the user a spinner while `connectToDevice` is outstanding. A refusal a bond cannot fix — an unsupported characteristic, a missing `BLUETOOTH_CONNECT` permission, a timeout — is reported as what it is rather than provoking a dialog.
+
+On platforms without an explicit pairing API, such as iOS and macOS, there is no `pair()` to call: bonding is instead provoked by reading the encrypted MIDI characteristic, which this transport now does only once a subscription has been refused. Failures are surfaced as typed `MidiConnectionException` subclasses from `flutter_midi_command_platform_interface`.
+
+On Android the explicit bond is usually not needed even by a peripheral that requires encryption, because the stack bonds without being asked: the subscription is held while the system puts up its own pairing dialog, a bond appears, and the subscription then completes. Measured against one such peripheral, that took about ten seconds of human response time. The escalation above is the fallback for peripherals that answer with a security status instead.
+
+Two consequences worth planning for. `MidiPairingRejectedException` becomes rare, since it is now only reached by a peripheral that both demands a bond and has one refused. And the pairing dialog, wherever it comes from, is now waited on inside the notification-subscription stage rather than a pairing stage — so `awaitConnectionTimeout` (30 s by default) has to leave room for the time a user takes to answer it, and a shorter budget will fail there.
+
+An application that wants a bond regardless — to reach CoreMIDI on Apple, say — can ask for one itself with `UniversalBle.pair(device.id)`; this transport does not own the device's bond state.
 
 ## Sharing universal_ble with the rest of your app
 

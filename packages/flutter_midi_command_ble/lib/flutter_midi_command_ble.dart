@@ -106,6 +106,64 @@ bool _isTransientLinkFailure(Object error) {
   return details == 133 || details == '133';
 }
 
+/// True when [error] is a peripheral refusing the subscription for want of an
+/// encrypted link, rather than for a reason a bond cannot fix.
+///
+/// This transport subscribes first and bonds only on demand
+/// ([_BleMidiDevice._openMidiPath]), so this predicate is what decides whether
+/// the user is shown a system pairing dialog. It therefore errs towards not
+/// escalating: a dialog for a peripheral that was never going to work is worse
+/// than a typed subscription error.
+///
+/// Two shapes qualify. The first is a security status the peripheral returned
+/// against the CCCD write — Insufficient Authentication (ATT 0x05),
+/// Authorization (0x08), Encryption Key Size (0x0C) or Encryption (0x0F),
+/// which Android maps to typed codes on the descriptor-write callback, plus
+/// the pairing-state codes other platforms use to say the same thing.
+///
+/// The second is an error whose code is itself an admission that the stack
+/// does not know what went wrong: `failed` and `unknownError`, where Android's
+/// unmapped ATT statuses land. Without these, a peripheral that refuses for
+/// want of a bond but whose status got mangled would be a regression against
+/// the bond-first sequence this replaced; with them, such a peripheral reaches
+/// exactly the outcome it used to, dialog and all.
+///
+/// Everything else is excluded deliberately, and each exclusion is a failure
+/// a bond cannot help with: `characteristicDoesNotSupportNotify` and the
+/// not-found codes (not a working BLE MIDI peripheral),
+/// `bluetoothNotAllowed` (the app is missing `BLUETOOTH_CONNECT`, and `pair`
+/// would fail the same way while hiding the real cause), `notPairable`,
+/// `pairingNotAllowed` and `alreadyPaired` (the platform has already said what
+/// is on offer), and anything that is not a [UniversalBleException] at all —
+/// in particular a [TimeoutException], where escalating would spend the
+/// caller's readiness budget twice over on a peripheral that is not answering.
+///
+/// A link that dropped is classified by [_isTransientLinkFailure] before this
+/// is consulted. A peer that discarded its side of an existing bond is
+/// excluded here explicitly: it arrives as an untyped `unknownError` that the
+/// second clause would otherwise swallow, and it needs the stale bond cleared,
+/// which [_BleMidiDevice.connect] does, rather than a new one created.
+bool _refusedForWantOfBond(Object error) {
+  if (error is! UniversalBleException || _isPairingInfoRemoved(error)) {
+    return false;
+  }
+  switch (error.code) {
+    case UniversalBleErrorCode.insufficientAuthentication:
+    case UniversalBleErrorCode.insufficientAuthorization:
+    case UniversalBleErrorCode.insufficientEncryption:
+    case UniversalBleErrorCode.insufficientKeySize:
+    case UniversalBleErrorCode.authenticationFailure:
+    case UniversalBleErrorCode.protectionLevelNotMet:
+    case UniversalBleErrorCode.accessDenied:
+    case UniversalBleErrorCode.notPaired:
+    case UniversalBleErrorCode.failed:
+    case UniversalBleErrorCode.unknownError:
+      return true;
+    default:
+      return false;
+  }
+}
+
 /// How long to let the Android stack settle before retrying through a
 /// [_isTransientLinkFailure] failure.
 const _gattRetryDelay = Duration(milliseconds: 500);
@@ -783,6 +841,28 @@ class _BleMidiDevice extends MidiDevice {
   /// interval, and so has something to hand back on teardown.
   bool _priorityRaised = false;
 
+  /// Whether a bond has already been asked for during the current [connect].
+  ///
+  /// Reset once per [connect] rather than per attempt — deliberately not in
+  /// [disconnect], which runs between those attempts — so the whole-sequence
+  /// retry cannot put a second pairing dialog in front of the user for a
+  /// question they have already answered.
+  bool _bondAttempted = false;
+
+  /// Whether a bonding attempt has been observed to end without a bond during
+  /// the current [connect] — in practice, the user declining.
+  ///
+  /// This is the only way to know that the *stack* asked and was refused.
+  /// Android bonds of its own accord when a subscription needs an encrypted
+  /// link, so the dialog the user declines is often one this transport never
+  /// requested and [_bondAttempted] therefore knows nothing about. Without
+  /// this, a decline is followed by an explicit [UniversalBle.pair] — or by a
+  /// reconnect that provokes the stack again — and the user is asked a second
+  /// time immediately after saying no.
+  ///
+  /// Reset once per [connect], like [_bondAttempted].
+  bool _bondDeclined = false;
+
   /// Largest BLE MIDI packet this link accepts, set from the negotiated MTU in
   /// [_requestMtu]. Reset on every disconnect so a large size cannot survive
   /// into a reconnect that negotiates a smaller MTU.
@@ -817,7 +897,19 @@ class _BleMidiDevice extends MidiDevice {
     }
   }
 
+  /// Finishes an out-of-band bond by bringing the MIDI path up behind it.
+  ///
+  /// A bond reported before service discovery has run leaves [_startNotify]
+  /// nothing to subscribe to; it throws, and the `catchError` below leaves the
+  /// device alone rather than marking it connected with no subscription.
   void updatePairingState(bool value) {
+    if (!value && _readinessInProgress) {
+      // A bond attempt that ended without a bond, while we were bringing the
+      // device up: the user declined, or the stack gave up. Either way the
+      // question has been put to them once and must not be put again.
+      _bondDeclined = true;
+      return;
+    }
     if (value && !_readinessInProgress) {
       unawaited(
         _startNotify()
@@ -844,6 +936,8 @@ class _BleMidiDevice extends MidiDevice {
       return;
     }
     _readinessInProgress = true;
+    _bondAttempted = false;
+    _bondDeclined = false;
     try {
       for (var attempt = 0; ; attempt++) {
         try {
@@ -869,8 +963,42 @@ class _BleMidiDevice extends MidiDevice {
               cause: error,
             );
           }
+          if (_bondDeclined) {
+            // A declined bond commonly takes the link down with it, which is
+            // indistinguishable from a transient fault. Retrying would
+            // reconnect, re-subscribe, and provoke the stack into asking
+            // again — so stop, and report the refusal rather than the drop.
+            // Already the right type if the subscription stage got there
+            // first; do not wrap it in a second copy of itself.
+            if (error is MidiPairingRejectedException) {
+              rethrow;
+            }
+            throw MidiPairingRejectedException(
+              deviceId: deviceId,
+              cause: error,
+            );
+          }
           if (attempt > 0 || !_isTransientLinkFailure(cause)) {
             rethrow;
+          }
+          if (await _subscriptionMayHavePrompted(error, cause)) {
+            // Same situation as above, reached without the pairing callback
+            // having told us so. Reported as a refusal rather than as the
+            // subscription error it arrived as, because the alternative is
+            // that one user action produces two different messages depending
+            // on whether the callback had already been spent — and of the
+            // two, "pairing was rejected or did not complete" is the one that
+            // tells someone who just dismissed a pairing dialog what
+            // happened.
+            _log(
+              '$deviceId: the subscription took the link down and the device '
+              'is still unbonded; not retrying, because retrying would ask '
+              'again',
+            );
+            throw MidiPairingRejectedException(
+              deviceId: deviceId,
+              cause: error,
+            );
           }
           _log('$deviceId: link dropped during setup ($error); retrying once');
         }
@@ -878,6 +1006,54 @@ class _BleMidiDevice extends MidiDevice {
       }
     } finally {
       _readinessInProgress = false;
+    }
+  }
+
+  /// Whether [error] is a subscription that took the link down on a device
+  /// that is still unbonded — the shape a declined pairing dialog arrives in,
+  /// and therefore one that must not be retried.
+  ///
+  /// This exists because the direct signal cannot be relied on. universal_ble
+  /// publishes a failed bond through `onPairingStateChange`, but
+  /// `updatePairingState` de-duplicates against a process-wide map that is
+  /// never cleared — so the first decline is delivered and every later one in
+  /// the same run is swallowed. [_bondDeclined] therefore catches the first
+  /// decline only, and this catches the rest.
+  ///
+  /// The discrimination is `deviceDisconnected` against a GATT status. On
+  /// Android the stack raises its own bonding prompt from the CCCD write, and
+  /// declining it tears the connection down, which universal_ble reports by
+  /// failing the in-flight subscription with `deviceDisconnected`. A
+  /// subscription that instead fails with a GATT status — the generic 133 of
+  /// a link that died mid-handshake — is a genuine transient fault and keeps
+  /// its retry.
+  ///
+  /// The bond state is what separates a declined prompt from a peripheral
+  /// that never prompts at all: a bond already in place means the drop cannot
+  /// have been a prompt, so the retry is safe and is what recovers the common
+  /// case of Android dropping the link behind a successful `createBond`.
+  ///
+  /// The cost is narrow and deliberate: a peripheral that needs no bond, and
+  /// whose link genuinely dies during the subscription, loses its one
+  /// automatic retry and is reported as a refused bond rather than as the drop
+  /// it was. Both are the wrong answer for that peripheral, and both are worth
+  /// it against an unbounded dialog loop for every peripheral that does need a
+  /// bond.
+  Future<bool> _subscriptionMayHavePrompted(Object error, Object cause) async {
+    if (cause is! UniversalBleException ||
+        cause.code != UniversalBleErrorCode.deviceDisconnected) {
+      return false;
+    }
+    if (error is! MidiConnectionException ||
+        error.stage != MidiConnectionStage.notificationSubscription) {
+      return false;
+    }
+    try {
+      final isPaired = await UniversalBle.isPaired(deviceId);
+      return !(isPaired ?? false);
+    } catch (_) {
+      // Cannot tell, so assume the cautious answer.
+      return true;
     }
   }
 
@@ -1101,8 +1277,7 @@ class _BleMidiDevice extends MidiDevice {
 
   Future<void> _prepareMidiReadiness({Duration? timeout}) async {
     await _discoverServices(timeout: timeout);
-    await _ensurePaired(timeout: timeout);
-    await _startNotify(timeout: timeout);
+    await _openMidiPath(timeout: timeout);
     // Deliberately after the MIDI path is live: universal_ble runs GATT
     // commands through one queue, so an MTU request issued on the connection
     // callback sits in front of service discovery and can stall it — long
@@ -1138,18 +1313,115 @@ class _BleMidiDevice extends MidiDevice {
     }
   }
 
-  Future<void> _ensurePaired({Duration? timeout}) async {
-    final isPaired = await _runStage(
-      MidiConnectionStage.pairing,
-      () => UniversalBle.isPaired(deviceId, timeout: timeout),
-      timeout,
-    );
-    if (isPaired ?? false) {
-      return;
-    }
-
+  /// Brings up the MIDI notification path, bonding only if the peripheral
+  /// refuses to serve it without a bond.
+  ///
+  /// BLE MIDI does not require a bond. The MMA specification puts no security
+  /// requirement on the MIDI service, and plenty of peripherals expose it
+  /// openly. Some go further and accept Android's bonding request without
+  /// ever completing the bond, while carrying MIDI and SysEx perfectly over
+  /// the unbonded link. Bonding up front therefore cost a system dialog
+  /// nobody needed and then failed the whole connection for a
+  /// link that worked, which is what drove one application to fork this
+  /// package and skip pairing for a hardcoded device name.
+  ///
+  /// So the subscription is the test and an explicit bond is the fallback:
+  /// subscribe, and escalate only when the peripheral turns the subscription
+  /// down for want of one ([_refusedForWantOfBond]).
+  ///
+  /// On Android the escalation is genuinely a fallback, because the stack
+  /// usually bonds without being asked. Observed against a peripheral that
+  /// requires encryption: the CCCD write is held while the system puts up its
+  /// own pairing dialog — around ten seconds of it, with the app losing and
+  /// regaining focus — a bond appears with nobody having called
+  /// [UniversalBle.pair], and the write then completes. The subscription
+  /// simply succeeds, slowly, and nothing here runs at all. That is
+  /// [BleCapabilities.triggersConfirmOnlyPairing] in action, and it turns out
+  /// to cover the CCCD write and not just a read or write of the
+  /// characteristic itself.
+  ///
+  /// The escalation exists for when that does not happen: the peripheral
+  /// answers the CCCD write with `GATT_INSUFFICIENT_AUTHENTICATION` instead,
+  /// which leaves the link up, so the bond and the second attempt run on the
+  /// same connection.
+  ///
+  /// Two consequences of the stack's own dialog landing inside the
+  /// subscription. It is spent against the caller's readiness budget under
+  /// [MidiConnectionStage.notificationSubscription] rather than
+  /// [MidiConnectionStage.pairing], so a budget that does not allow for human
+  /// response time fails there. And the bond completes mid-readiness, so
+  /// `onPairingStateChange` fires while [connect] is in flight —
+  /// [updatePairingState]'s `_readinessInProgress` guard is what keeps that
+  /// from starting a second, concurrent subscription.
+  ///
+  /// The invariant this establishes: a connected device is one whose
+  /// notifications are flowing, not one the OS has bonded.
+  Future<void> _openMidiPath({Duration? timeout}) async {
     try {
-      if (isPaired == null) {
+      await _startNotify(timeout: timeout);
+      return;
+    } catch (refusal) {
+      final cause = _rootCause(refusal);
+      if (_bondDeclined) {
+        // The stack already asked during the subscription and was refused.
+        // Asking again explicitly is the same question, and the answer is the
+        // reason the subscription failed, so report that rather than the
+        // subscription error it arrived as.
+        throw MidiPairingRejectedException(deviceId: deviceId, cause: cause);
+      }
+      // Order matters. A link that went away is [connect]'s business, and
+      // asking for a bond would put a dialog in front of the user for a
+      // peripheral that is no longer there.
+      if (_bondAttempted ||
+          _isTransientLinkFailure(cause) ||
+          !_refusedForWantOfBond(cause)) {
+        rethrow;
+      }
+      _log(
+        '$deviceId: subscription refused (${cause is UniversalBleException ? cause.code.name : cause}); obtaining a bond and retrying it once',
+      );
+      if (!await _establishBond(timeout: timeout)) {
+        // A bond already exists and the peripheral refused anyway, so a bond
+        // is not what it wanted. Report the refusal we actually got rather
+        // than inventing a pairing failure.
+        rethrow;
+      }
+    }
+    // Second and last attempt. If the peripheral still refuses, that is
+    // reported as the subscription failure it is. If the link dropped while
+    // bonding — which the Android stack does behind a successful
+    // `createBond` — the error reaches [connect], whose whole-sequence retry
+    // reconnects and subscribes again; by then the bond exists, so the user is
+    // not asked twice.
+    await _startNotify(timeout: timeout);
+  }
+
+  /// Gets a bond in place after the peripheral refused to subscribe without
+  /// one. Returns whether a new bond was established; `false` means one
+  /// already existed and nothing was done.
+  ///
+  /// Attempted at most once per [connect] ([_bondAttempted]): every path out of
+  /// here either produces a bond or fails terminally, so a second attempt
+  /// could only ask the user a question they have already answered.
+  ///
+  /// How a bond is requested depends on the platform, and the two ways are not
+  /// interchangeable. Android, Windows and Linux have a system pairing API, so
+  /// ask for a bond and then verify it took — [UniversalBle.pair] resolving
+  /// does not prove a bond exists, and a bond reported established can be lost
+  /// again moments later, which is how such a peripheral fails. Apple and
+  /// web have no such API, and there the lever is the access itself: reading
+  /// the MIDI characteristic makes the OS start "Just Works" pairing and
+  /// completes once the user accepts
+  /// ([BleCapabilities.triggersConfirmOnlyPairing], which universal_ble
+  /// documents for a read or write of an encrypted characteristic — a CCCD
+  /// write is neither, so the subscription cannot be relied on to trigger it).
+  /// That read is the same provocation this transport used to perform up
+  /// front; it is unchanged, only deferred to the point where the peripheral
+  /// has actually asked for it.
+  Future<bool> _establishBond({Duration? timeout}) async {
+    _bondAttempted = true;
+    try {
+      if (!BleCapabilities.hasSystemPairingApi) {
         await _runStage(
           MidiConnectionStage.pairing,
           () => UniversalBle.read(
@@ -1160,7 +1432,19 @@ class _BleMidiDevice extends MidiDevice {
           ),
           timeout,
         );
-        return;
+        return true;
+      }
+
+      final alreadyBonded = await _runStage(
+        MidiConnectionStage.pairing,
+        () => UniversalBle.isPaired(deviceId, timeout: timeout),
+        timeout,
+      );
+      if (alreadyBonded == true) {
+        // Asking to pair an already-bonded device succeeds without changing
+        // anything, so there is nothing to escalate to.
+        _log('$deviceId: already bonded and still refused; not re-pairing');
+        return false;
       }
 
       await _runStage(
@@ -1168,14 +1452,18 @@ class _BleMidiDevice extends MidiDevice {
         () => UniversalBle.pair(deviceId, timeout: timeout),
         timeout,
       );
-      final pairedAfterPair = await _runStage(
+      final bonded = await _runStage(
         MidiConnectionStage.pairing,
         () => UniversalBle.isPaired(deviceId, timeout: timeout),
         timeout,
       );
-      if (pairedAfterPair != true) {
+      if (bonded != true) {
+        // Deliberately without a cause: [connect] classifies by root cause,
+        // and a refused bond must not be able to look like a transient link
+        // fault, or the sequence would be retried and the user asked again.
         throw MidiPairingRejectedException(deviceId: deviceId);
       }
+      return true;
     } on MidiConnectionException {
       rethrow;
     } on PairingException catch (e) {
@@ -1186,16 +1474,23 @@ class _BleMidiDevice extends MidiDevice {
   }
 
   Future<void> _startNotify({Duration? timeout}) async {
-    if (_midiService == null || _midiCharacteristic == null) {
-      return;
+    final service = _midiService;
+    final characteristic = _midiCharacteristic;
+    if (service == null || characteristic == null) {
+      // Unreachable from the readiness sequence, where [_discoverServices] has
+      // already thrown if either is missing. Reachable from
+      // [updatePairingState], which fires on a bond established outside this
+      // transport and used to return silently here — and then mark the device
+      // available and connected with no subscription behind it.
+      throw MidiNotificationSubscriptionException(deviceId: deviceId);
     }
     try {
       await _runStage(
         MidiConnectionStage.notificationSubscription,
         () => UniversalBle.subscribeNotifications(
           deviceId,
-          _midiService!.uuid,
-          _midiCharacteristic!.uuid,
+          service.uuid,
+          characteristic.uuid,
           timeout: timeout,
         ),
         timeout,
