@@ -1,3 +1,31 @@
+## 1.4.0
+
+ - **FIX**(ble): retry a refused connect on a growing delay. ([63066e02](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/63066e025c278e31030834fdab82cd98ffd33e71))
+ - **FIX**(ble): report an inferred declined bond as a refusal. ([407327e2](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/407327e2891dfcce8fbe2dbc01f24005d697c21c))
+ - **FIX**(ble): do not retry a subscription that may have raised a dialog. ([c467c830](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/c467c830c058760cbffefe98be348030d2e8d2ba))
+ - **FIX**(ble): stop asking again after a declined pairing dialog. ([730c0c59](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/730c0c59e91a850cdc58fe3d70bc036b043b818e))
+ - **FIX**(ble): pair on demand instead of bonding before subscribing. ([2d4f4c1a](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/2d4f4c1a4c8155973bbadaa741ef6e0187022b02))
+ - **FIX**(ble): list only peripherals that advertise the MIDI service. ([95ad77d3](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/95ad77d35a2b07cfb97e1e737a53930ae52f97ff))
+ - **FIX**(ble): resolve running status, fixing duplicated and lost notes. ([6080faec](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/6080faeceb5a365aca3a5360df71902e887d86e6))
+ - **FIX**(ble): retry a link torn down during the connection sequence. ([9993e6ed](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/9993e6ed2a61ce06a28375359428bba72876b5ff))
+ - **FIX**(ble): read a GATT status from error details on Android only. ([61e2928d](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/61e2928dbb70372199ba9ceadb72833c9a151fce))
+ - **FIX**(ble): retry the whole connection sequence through a transient GATT 133. ([eda3802d](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/eda3802d6913f53f0b45af7dbce4800405681456))
+ - **FIX**(ble): do not drop the stopScan future. ([52f04e04](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/52f04e04c3342231ab80fafce31e515e385daf9f))
+ - **FIX**(ble): stop the MTU request from stalling Android connects (GATT 133). ([44587b5f](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/44587b5fd7c842b45b879c7e0f1677fb28597bff))
+ - **FIX**: harden device connect/disconnect and teardown paths. ([3c28f4ee](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/3c28f4ee09a69dd2e777b28deadfc9d00d4e9d55))
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts. ([e86ad3e4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e86ad3e42620a68f43a0e609ed767ddd8ac21264))
+ - **FIX**(ble): hide registered devices until rediscovered. ([002177ad](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/002177addc3018f6515f5d78b981d336e4602f49))
+ - **FIX**(ble): remove stale BLE devices on disconnect. ([7b328541](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/7b328541ab3f46efd5a6d7f69bc2ca82f5598539))
+ - **FIX**: await BLE MIDI readiness in connectToDevice. ([ede4ab5d](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/ede4ab5d6b04373d99e82997467e72bb58b53360))
+ - **FIX**: bluetooth discovery with latest Universal_ble. ([972d6e7e](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/972d6e7ef6153e8291e1c40726df9c94e98f4f65))
+ - **FIX**: subscribe to BLE MIDI notifications on platforms without a pairing. ([6278a165](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/6278a1656721f20f47a40de941990129f596098c))
+ - **FEAT**(ble): report incoming framing this transport cannot use. ([981b3039](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/981b30394dc15f3b59cbb0464889ffdb49a3cbc2))
+ - **FEAT**(ble): drop peripherals that have stopped advertising. ([2d6c8e52](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/2d6c8e521bb3a4f03c25ab391fc8a3625a925439))
+ - **FEAT**: BLE MIDI throughput, write integrity and diagnostics for 1.1.0. ([86fc04d0](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/86fc04d07e007263dc0d4592d55a82408c3e685f))
+ - **FEAT**(ble): bundle Android permissions and document platform setup. ([8ccbdee6](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/8ccbdee68fe65e50376cd18838833130bc861de4))
+ - **DOCS**(ble): describe the failure modes without naming a device. ([f981d6a4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/f981d6a4f2f40b31215ea1d28036109deecb9a8b))
+ - **DOCS**(ble): describe how Android actually bonds during a subscription. ([4a86da11](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/4a86da11189260801fe9a1fadbd29fad7edccb2d))
+
 ## 1.3.0
 
  - FIX: resolve running status, so a device that sends a status byte once and then only data bytes no longer produces duplicated and lost messages. A keyboard sending `90 3C 64 40 7F` now delivers two Note Ons rather than repeating the first and dropping the second, and the missed Note Off that left notes sounding is gone. The BLE parser was a single nine-state machine that conflated BLE framing with MIDI assembly and never cleared its assembly buffer, so every further data byte re-emitted a longer packet. It is now two stages: `BleMidiFramer` for the transport's framing and `MidiMessageSplitter` for MIDI assembly. Reported in [#179](https://github.com/InvisibleWrench/FlutterMidiCommand/issues/179).

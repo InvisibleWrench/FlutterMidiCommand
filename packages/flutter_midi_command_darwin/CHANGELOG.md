@@ -1,3 +1,13 @@
+## 1.4.0
+
+ - **FIX**(android,darwin): resolve running status correctly in the native parsers. ([2a972fa4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/2a972fa4a00efaca7f7bfd5b6c50743118695b00))
+ - **FIX**(darwin): create MIDINetworkSession lazily, not at plugin init. ([a28af471](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/a28af47169db4bbaaa1b5d9bb66824a0d14a9966))
+ - **FIX**(darwin): iterate original MIDIPacketList memory when receiving. ([0f2a4709](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/0f2a47098d8d9179b504d55db81dfb737f738a13))
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts. ([e86ad3e4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e86ad3e42620a68f43a0e609ed767ddd8ac21264))
+ - **FEAT**: BLE MIDI throughput, write integrity and diagnostics for 1.1.0. ([86fc04d0](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/86fc04d07e007263dc0d4592d55a82408c3e685f))
+ - **DOCS**(darwin): explain lazy network session creation. ([e9f0e249](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e9f0e249238087064665c88622d82eb30536d78a))
+ - **DOCS**: record the darwin packet-list fix in the 1.1.0 changelogs. ([fb44893d](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/fb44893dc8f17cd3a2b7b3e54d8f3f0570b0084a))
+
 ## 1.3.0
 
  - FIX: resolve running status correctly. `MidiPacketParser` latched a byte into `statusByte` before checking its length, so a clock (`0xF8`) clobbered the running status and every subsequent running-status note was **silently dropped** — the same user-visible symptom as [#179](https://github.com/InvisibleWrench/FlutterMidiCommand/issues/179) on a different transport.

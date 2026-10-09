@@ -1,3 +1,10 @@
+## 1.4.0
+
+ - **FIX**(windows,linux): deliver complete, private MIDI messages. ([4f123831](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/4f123831a322e6c9c25c4e046bfb079f9f52df0e))
+ - **FIX**: return futures from virtual device and network session APIs. ([e6bfa198](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e6bfa19827135e80d3ecea800a529a3b2b077144))
+ - **FIX**(ci): track pubspec_overrides.yaml so melos bootstrap works on clean checkouts. ([e86ad3e4](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e86ad3e42620a68f43a0e609ed767ddd8ac21264))
+ - **FEAT**: BLE MIDI throughput, write integrity and diagnostics for 1.1.0. ([86fc04d0](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/86fc04d07e007263dc0d4592d55a82408c3e685f))
+
 ## 1.3.0
 
  - FIX: a SysEx spanning more than one input buffer arrives whole. The parser accumulated the chunks but then delivered only the last one, so a long SysEx was truncated to its tail.

@@ -1,3 +1,12 @@
+## 1.4.0
+
+ - **FIX**(ble): resolve running status, fixing duplicated and lost notes. ([6080faec](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/6080faeceb5a365aca3a5360df71902e887d86e6))
+ - **FIX**: return futures from virtual device and network session APIs. ([e6bfa198](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/e6bfa19827135e80d3ecea800a529a3b2b077144))
+ - **FIX**: harden device connect/disconnect and teardown paths. ([3c28f4ee](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/3c28f4ee09a69dd2e777b28deadfc9d00d4e9d55))
+ - **FIX**(ble): remove stale BLE devices on disconnect. ([7b328541](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/7b328541ab3f46efd5a6d7f69bc2ca82f5598539))
+ - **FIX**: await BLE MIDI readiness in connectToDevice. ([ede4ab5d](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/ede4ab5d6b04373d99e82997467e72bb58b53360))
+ - **FEAT**: BLE MIDI throughput, write integrity and diagnostics for 1.1.0. ([86fc04d0](https://github.com/InvisibleWrench/FlutterMidiCommand/commit/86fc04d07e007263dc0d4592d55a82408c3e685f))
+
 ## 1.3.0
 
  - FEAT: `MidiMessageSplitter`, the shared MIDI-assembly stage every transport feeds once it has stripped its own framing. It resolves running status, keeps partial messages across calls, reassembles and bounds SysEx, and emits System Real-Time bytes without disturbing the message around them. Its eight numbered rules are the one specification the Dart, Kotlin and Swift implementations answer to.
