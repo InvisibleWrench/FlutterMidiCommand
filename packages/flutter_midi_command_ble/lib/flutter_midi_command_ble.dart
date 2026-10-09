@@ -910,6 +910,11 @@ class _BleMidiDevice extends MidiDevice {
             // indistinguishable from a transient fault. Retrying would
             // reconnect, re-subscribe, and provoke the stack into asking
             // again — so stop, and report the refusal rather than the drop.
+            // Already the right type if the subscription stage got there
+            // first; do not wrap it in a second copy of itself.
+            if (error is MidiPairingRejectedException) {
+              rethrow;
+            }
             throw MidiPairingRejectedException(
               deviceId: deviceId,
               cause: error,
@@ -918,12 +923,69 @@ class _BleMidiDevice extends MidiDevice {
           if (attempt > 0 || !_isTransientLinkFailure(cause)) {
             rethrow;
           }
+          if (await _subscriptionMayHavePrompted(error, cause)) {
+            // Same situation as above, reached without the pairing callback
+            // having told us so. Report the drop as it arrived rather than
+            // claiming a refusal we did not observe.
+            _log(
+              '$deviceId: the subscription took the link down and the device '
+              'is still unbonded; not retrying, because retrying would ask '
+              'again',
+            );
+            rethrow;
+          }
           _log('$deviceId: link dropped during setup ($error); retrying once');
         }
         await Future<void>.delayed(_gattRetryDelay);
       }
     } finally {
       _readinessInProgress = false;
+    }
+  }
+
+  /// Whether [error] is a subscription that took the link down on a device
+  /// that is still unbonded — the shape a declined pairing dialog arrives in,
+  /// and therefore one that must not be retried.
+  ///
+  /// This exists because the direct signal cannot be relied on. universal_ble
+  /// publishes a failed bond through `onPairingStateChange`, but
+  /// `updatePairingState` de-duplicates against a process-wide map that is
+  /// never cleared — so the first decline is delivered and every later one in
+  /// the same run is swallowed. [_bondDeclined] therefore catches the first
+  /// decline only, and this catches the rest.
+  ///
+  /// The discrimination is `deviceDisconnected` against a GATT status. On
+  /// Android the stack raises its own bonding prompt from the CCCD write, and
+  /// declining it tears the connection down, which universal_ble reports by
+  /// failing the in-flight subscription with `deviceDisconnected`. A
+  /// subscription that instead fails with a GATT status — the generic 133 of
+  /// a link that died mid-handshake — is a genuine transient fault and keeps
+  /// its retry.
+  ///
+  /// The bond state is what separates a declined prompt from a peripheral
+  /// that never prompts at all: a bond already in place means the drop cannot
+  /// have been a prompt, so the retry is safe and is what recovers the common
+  /// case of Android dropping the link behind a successful `createBond`.
+  ///
+  /// The cost is narrow and deliberate: a peripheral that needs no bond, and
+  /// whose link genuinely dies during the subscription, loses its one
+  /// automatic retry and surfaces instead. That is a worse trade than
+  /// retrying only if the alternative were not an unbounded dialog loop.
+  Future<bool> _subscriptionMayHavePrompted(Object error, Object cause) async {
+    if (cause is! UniversalBleException ||
+        cause.code != UniversalBleErrorCode.deviceDisconnected) {
+      return false;
+    }
+    if (error is! MidiConnectionException ||
+        error.stage != MidiConnectionStage.notificationSubscription) {
+      return false;
+    }
+    try {
+      final isPaired = await UniversalBle.isPaired(deviceId);
+      return !(isPaired ?? false);
+    } catch (_) {
+      // Cannot tell, so assume the cautious answer.
+      return true;
     }
   }
 

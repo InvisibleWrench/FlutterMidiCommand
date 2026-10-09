@@ -60,6 +60,13 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   /// where the declined bond takes the link down with it.
   final Set<String> bondDeclinedDuringSubscribeIds = <String>{};
 
+  /// Whether a declined bond publishes its pairing state at all.
+  ///
+  /// universal_ble de-duplicates `updatePairingState` against a process-wide
+  /// map that is never cleared, so only the *first* decline in a run is
+  /// delivered. Set this false to model every decline after that one.
+  bool publishDeclinedPairingState = true;
+
   /// Code the two refusal fixtures report. Defaults to what Android maps an
   /// ATT 0x05 Insufficient Authentication descriptor write to.
   UniversalBleErrorCode subscribeRefusalCode =
@@ -252,7 +259,9 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
       // The stack asked, the user said no. universal_ble publishes the failed
       // bond from ACTION_BOND_STATE_CHANGED (BOND_BONDING -> BOND_NONE), and
       // the held CCCD write then fails.
-      updatePairingState(deviceId, false);
+      if (publishDeclinedPairingState) {
+        updatePairingState(deviceId, false);
+      }
       if (subscribeRefusalCode == UniversalBleErrorCode.deviceDisconnected) {
         updateConnection(deviceId, false);
         _connectionByDevice[deviceId] = BleConnectionState.disconnected;
@@ -949,6 +958,39 @@ void main() {
     );
     // One connect attempt, no second dialog from a reconnect.
     expect(fakePlatform.connectCalls, <String>['ble-declined-drop']);
+    expect(fakePlatform.pairCalls, isEmpty);
+    expect(device.connected, isFalse);
+  });
+
+  test('a declined bond is not retried once the signal is swallowed', () async {
+    // The second and every later decline in an app run. universal_ble
+    // de-duplicates the failed-bond callback against a process-wide map, so
+    // only the first one is ever delivered — which is why the field report
+    // showed a clean stop on the first attempt and a reappearing dialog on
+    // the second. Nothing may depend on that callback having arrived.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    fakePlatform.servicesByDevice['ble-declined-again'] = midiServices();
+    fakePlatform.bondDeclinedDuringSubscribeIds.add('ble-declined-again');
+    fakePlatform.subscribeRefusalCode =
+        UniversalBleErrorCode.deviceDisconnected;
+    fakePlatform.publishDeclinedPairingState = false;
+    fakePlatform.emitScanDevice(
+      BleDevice(
+        deviceId: 'ble-declined-again',
+        name: 'Declined Again',
+        services: <String>[],
+      ),
+    );
+    final device = (await transport.devices).single;
+
+    await expectLater(
+      transport.connectToDevice(device),
+      throwsA(isA<MidiNotificationSubscriptionException>()),
+    );
+    // The point of the test: one connect, so no reconnect raised the dialog
+    // a second time, even with nothing having told us the bond was declined.
+    expect(fakePlatform.connectCalls, <String>['ble-declined-again']);
     expect(fakePlatform.pairCalls, isEmpty);
     expect(device.connected, isFalse);
   });
