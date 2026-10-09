@@ -71,8 +71,11 @@ class MidiCommand {
     return _instance!;
   }
 
-  MidiCommand._({MidiBleTransport? bleTransport})
-    : _bleTransport = bleTransport;
+  // `this._bleTransport` rather than a separate `bleTransport` parameter: the
+  // call site still passes `bleTransport:`, since a private initializing formal
+  // is exposed under its public name. Required by `prefer_initializing_formals`,
+  // which applies from language version 3.12 (this package's SDK floor).
+  MidiCommand._({this._bleTransport});
 
   MidiTransportPolicy _transportPolicy = const MidiTransportPolicy();
   MidiBleTransport? _bleTransport;
@@ -225,8 +228,9 @@ class MidiCommand {
 
     final bleActive =
         _bleTransport != null && isTransportEnabled(MidiTransport.ble);
-    final bleDevices =
-        bleActive ? await _bleTransport!.devices : <MidiDevice>[];
+    final bleDevices = bleActive
+        ? await _bleTransport!.devices
+        : <MidiDevice>[];
     // BLE-transport devices (advertised name) indexed by id.
     final bleById = <String, MidiDevice>{
       for (final device in bleDevices) device.id: device,
@@ -824,10 +828,9 @@ class MidiCommand {
         return;
       }
 
-      final delay =
-          remaining == null || remaining > pollInterval
-              ? pollInterval
-              : remaining;
+      final delay = remaining == null || remaining > pollInterval
+          ? pollInterval
+          : remaining;
       if (delay > Duration.zero) {
         await Future<void>.delayed(delay);
       }

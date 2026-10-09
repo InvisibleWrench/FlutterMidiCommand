@@ -284,12 +284,11 @@ void main() {
   });
 
   test('addVirtualDevice reports platform failures to the caller', () async {
-    final platform =
-        _FakePlatform()
-          ..virtualDeviceError = PlatformException(
-            code: 'AUDIOERROR',
-            message: 'Error -2 while create MIDI virtual source',
-          );
+    final platform = _FakePlatform()
+      ..virtualDeviceError = PlatformException(
+        code: 'AUDIOERROR',
+        message: 'Error -2 while create MIDI virtual source',
+      );
     MidiCommand.setPlatformOverride(platform);
     final midi = MidiCommand();
 
@@ -328,9 +327,10 @@ void main() {
     final ble = _FakeBleTransport();
     MidiCommand.setPlatformOverride(platform);
 
-    final midi = MidiCommand(bleTransport: ble)..configureTransportPolicy(
-      const MidiTransportPolicy(excludedTransports: {MidiTransport.ble}),
-    );
+    final midi = MidiCommand(bleTransport: ble)
+      ..configureTransportPolicy(
+        const MidiTransportPolicy(excludedTransports: {MidiTransport.ble}),
+      );
 
     expect(
       () => midi.startScanningForBluetoothDevices(),
@@ -914,9 +914,10 @@ void main() {
     final platform = _FakePlatform();
     final ble = _FakeBleTransport();
     MidiCommand.setPlatformOverride(platform);
-    final midi = MidiCommand(bleTransport: ble)..configureTransportPolicy(
-      const MidiTransportPolicy(excludedTransports: {MidiTransport.ble}),
-    );
+    final midi = MidiCommand(bleTransport: ble)
+      ..configureTransportPolicy(
+        const MidiTransportPolicy(excludedTransports: {MidiTransport.ble}),
+      );
 
     final data = Uint8List.fromList([0x90, 0x3C, 0x64]);
     midi.sendData(data);

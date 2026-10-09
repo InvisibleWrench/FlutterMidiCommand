@@ -399,20 +399,18 @@ class _ParameterState {
       nrpnParameterLsb != null &&
       !(nrpnParameterMsb == 0x7F && nrpnParameterLsb == 0x7F);
 
-  int? get nrpnParameterValue =>
-      hasNrpnParameter
-          ? ((nrpnParameterMsb! & 0x7F) << 7) | (nrpnParameterLsb! & 0x7F)
-          : null;
+  int? get nrpnParameterValue => hasNrpnParameter
+      ? ((nrpnParameterMsb! & 0x7F) << 7) | (nrpnParameterLsb! & 0x7F)
+      : null;
 
   bool get hasRpnParameter =>
       rpnParameterMsb != null &&
       rpnParameterLsb != null &&
       !(rpnParameterMsb == 0x7F && rpnParameterLsb == 0x7F);
 
-  int? get rpnParameterValue =>
-      hasRpnParameter
-          ? ((rpnParameterMsb! & 0x7F) << 7) | (rpnParameterLsb! & 0x7F)
-          : null;
+  int? get rpnParameterValue => hasRpnParameter
+      ? ((rpnParameterMsb! & 0x7F) << 7) | (rpnParameterLsb! & 0x7F)
+      : null;
 
   MidiMessage? buildPendingMessage(int channel) {
     if (hasNrpnParameter && pendingNrpnValueMsb != null) {
