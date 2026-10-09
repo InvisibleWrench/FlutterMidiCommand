@@ -202,10 +202,23 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   /// A peripheral that does not advertise the service can still be used: pass it
   /// to [registerKnownDevice], or connect to it by id. Devices this transport
   /// already knows are never filtered.
+  /// [hideUnseenPeripheralsAfter] is how long a peripheral stays listed after
+  /// its last advertisement while a scan is running. A peripheral that is
+  /// switched off or carried out of range stops advertising but says nothing,
+  /// so without this it stays in [devices] until it is connected and
+  /// disconnected again, or the transport is torn down. Set it to null to keep
+  /// every peripheral that has ever been seen.
+  ///
+  /// Aging only runs while scanning, because a peripheral cannot be expected to
+  /// advertise when nobody is listening, and it never applies to a peripheral
+  /// that is connected or on its way there — most stop advertising once
+  /// connected, and hiding the device an application is using would be worse
+  /// than the stale entry this removes.
   UniversalBleMidiTransport({
     this.useNegotiatedMtu = true,
     this.requestHighPerformanceConnection = true,
     this.requireAdvertisedMidiService = !kIsWeb,
+    this.hideUnseenPeripheralsAfter = const Duration(seconds: 10),
   }) {
     UniversalBle.timeout = const Duration(seconds: 10);
     _registerCallbacks();
@@ -248,6 +261,9 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   /// See [UniversalBleMidiTransport.new].
   final bool requestHighPerformanceConnection;
 
+  /// See [UniversalBleMidiTransport.new].
+  final Duration? hideUnseenPeripheralsAfter;
+
   /// Optional sink for diagnostics (MTU negotiation, packet sizing, connection
   /// priority, write backlog, and incoming framing this transport could not
   /// use). Defaults to null (silent).
@@ -279,6 +295,10 @@ class UniversalBleMidiTransport implements MidiBleTransport {
   // Deliberately not a short-circuit: a device whose MIDI service arrives in a
   // later advertisement is still picked up.
   final Set<String> _nonMidiDeviceIds = {};
+
+  /// Sweeps [_devices] for peripherals that have stopped advertising. Runs only
+  /// while a scan is running.
+  Timer? _agingTimer;
 
   void _registerCallbacks() {
     if (_callbacksRegistered) {
@@ -312,6 +332,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       }
       if (existing != null) {
         existing.name = result.name!;
+        existing.lastSeen = DateTime.now();
         if (!existing.visible) {
           existing.visible = true;
           _setupStreamController.add(MidiSetupChange.deviceAppeared);
@@ -322,7 +343,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
         deviceId: result.deviceId,
         name: result.name!,
         visible: true,
-      );
+      )..lastSeen = DateTime.now();
       _setupStreamController.add(MidiSetupChange.deviceAppeared);
     });
 
@@ -364,6 +385,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     }
     unawaited(_scanSubscription?.cancel());
     _scanSubscription = null;
+    _stopAging();
     _nonMidiDeviceIds.clear();
     UniversalBle.onAvailabilityChange = null;
     UniversalBle.onConnectionChange = null;
@@ -378,6 +400,59 @@ class UniversalBleMidiTransport implements MidiBleTransport {
     }
     _isTornDown = false;
     _registerCallbacks();
+  }
+
+  /// Starts the aging sweep, if it is enabled and not already running.
+  void _startAging() {
+    final window = hideUnseenPeripheralsAfter;
+    if (window == null || _agingTimer != null) {
+      return;
+    }
+    // Sweep at half the window, so the worst-case delay before a peripheral
+    // drops out is one and a half windows rather than two. Guarded against a
+    // zero period only — a window short enough to make this hot is the
+    // caller's choice, and clamping it would make the knob mean something
+    // other than what it says.
+    final half = window ~/ 2;
+    final period = half > Duration.zero
+        ? half
+        : const Duration(milliseconds: 1);
+    _agingTimer = Timer.periodic(period, (_) => _hideUnseenPeripherals(window));
+  }
+
+  void _stopAging() {
+    _agingTimer?.cancel();
+    _agingTimer = null;
+  }
+
+  /// Hides peripherals that have not advertised within [window].
+  ///
+  /// Hidden rather than removed, so the [MidiDevice] an application is holding
+  /// stays the same object when the peripheral comes back; [devices] already
+  /// filters on [MidiDevice.visible]. A peripheral that is connected or on its
+  /// way there is never hidden, because most stop advertising once connected.
+  void _hideUnseenPeripherals(Duration window) {
+    final cutoff = DateTime.now().subtract(window);
+    var hidAny = false;
+    for (final device in _devices.values) {
+      if (!device.visible ||
+          device.connectionState != MidiConnectionState.disconnected) {
+        continue;
+      }
+      final lastSeen = device.lastSeen;
+      if (lastSeen == null || lastSeen.isAfter(cutoff)) {
+        continue;
+      }
+      device.visible = false;
+      hidAny = true;
+      _log(
+        '${device.deviceId}: no advertisement for '
+        '${window.inSeconds}s, hiding it',
+      );
+    }
+    if (hidAny) {
+      _setupStreamController.add(MidiSetupChange.deviceDisappeared);
+    }
   }
 
   void _removeDisconnectedDevice(String deviceId) {
@@ -432,6 +507,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       return;
     }
     _isScanning = true;
+    _startAging();
     try {
       await UniversalBle.startScan(
         scanFilter: ScanFilter(withServices: [midiServiceId]),
@@ -450,6 +526,7 @@ class UniversalBleMidiTransport implements MidiBleTransport {
       return;
     }
     _isScanning = false;
+    _stopAging();
     unawaited(_stopScanIgnoringFailure());
   }
 
@@ -854,6 +931,12 @@ class _BleMidiDevice extends MidiDevice {
   final bool requestHighPerformanceConnection;
   final void Function(String message) _log;
   bool visible;
+
+  /// When this peripheral last turned up in a scan result, or null if it has
+  /// never been seen — a device registered through
+  /// [UniversalBleMidiTransport.registerKnownDevice] rather than discovered.
+  /// Read by the aging sweep, which leaves a never-seen device alone.
+  DateTime? lastSeen;
 
   _DeviceState _devState = _DeviceState.none;
   BleService? _midiService;

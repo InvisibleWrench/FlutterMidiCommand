@@ -470,10 +470,14 @@ void main() {
   /// `requireAdvertisedMidiService` defaults to `!kIsWeb`, so a test of the
   /// check itself has to say which behaviour it means to exercise or it would
   /// assert the opposite thing under `--platform chrome`.
-  void reconfigure({required bool requireAdvertisedMidiService}) {
+  void reconfigure({
+    bool? requireAdvertisedMidiService,
+    Duration? hideUnseenPeripheralsAfter = const Duration(seconds: 10),
+  }) {
     transport.teardown();
     transport = UniversalBleMidiTransport(
-      requireAdvertisedMidiService: requireAdvertisedMidiService,
+      requireAdvertisedMidiService: requireAdvertisedMidiService ?? !kIsWeb,
+      hideUnseenPeripheralsAfter: hideUnseenPeripheralsAfter,
     );
   }
 
@@ -688,6 +692,132 @@ void main() {
 
   test('the advertised-service check is on everywhere but web', () {
     expect(transport.requireAdvertisedMidiService, !kIsWeb);
+  });
+
+  group('scan aging', () {
+    // A short window so the sweep, which runs at half the window, fires
+    // promptly. The behaviour is the same at the 10 s default.
+    //
+    // Sized for margin rather than speed: the sweep is driven by a real timer,
+    // so the window has to be long enough that ordinary scheduling jitter on a
+    // loaded machine cannot move a peripheral across a sweep boundary.
+    const window = Duration(milliseconds: 150);
+
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 400));
+
+    test('hides a peripheral that stops advertising', () async {
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      await transport.startScanningForBluetoothDevices();
+      await fakePlatform.emitScanDevice(midiScanResult('ble-gone', 'Gone'));
+      expect(await transport.devices, hasLength(1));
+
+      await settle();
+
+      expect(await transport.devices, isEmpty);
+    });
+
+    test('lists it again on its next advertisement, same object', () async {
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      await transport.startScanningForBluetoothDevices();
+      await fakePlatform.emitScanDevice(midiScanResult('ble-back', 'Back'));
+      final before = (await transport.devices).single;
+
+      await settle();
+      expect(await transport.devices, isEmpty);
+
+      await fakePlatform.emitScanDevice(midiScanResult('ble-back', 'Back'));
+
+      // Hidden, not removed, so an application holding the device keeps a
+      // live object rather than a dead one.
+      expect((await transport.devices).single, same(before));
+    });
+
+    test('keeps a peripheral that is still advertising', () async {
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      await transport.startScanningForBluetoothDevices();
+      // Spans several windows, so a sweep that ignored a fresh sighting would
+      // show up here.
+      for (var i = 0; i < 10; i++) {
+        await fakePlatform.emitScanDevice(midiScanResult('ble-here', 'Here'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+
+      expect(await transport.devices, hasLength(1));
+    });
+
+    test('never hides a connected peripheral', () async {
+      // Most peripherals stop advertising once connected, so aging the device
+      // an application is using would be worse than the stale entry.
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      await transport.startScanningForBluetoothDevices();
+      fakePlatform.servicesByDevice['ble-busy'] = midiServices();
+      await fakePlatform.emitScanDevice(midiScanResult('ble-busy', 'Busy'));
+      final device = (await transport.devices).single;
+      await transport.connectToDevice(device);
+
+      await settle();
+
+      expect(await transport.devices, hasLength(1));
+      expect(device.connected, isTrue);
+    });
+
+    test('emits deviceDisappeared once for a whole sweep', () async {
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      final changes = <MidiSetupChange>[];
+      final sub = transport.onMidiSetupChanged.listen(changes.add);
+      await transport.startScanningForBluetoothDevices();
+      // Both sightings are recorded before anything is awaited, so the two
+      // peripherals cannot be separated by a sweep boundary and the test is
+      // about the coalescing rather than about timing.
+      fakePlatform.updateScanResult(midiScanResult('ble-a', 'A'));
+      fakePlatform.updateScanResult(midiScanResult('ble-b', 'B'));
+      await Future<void>.delayed(Duration.zero);
+      expect(await transport.devices, hasLength(2));
+
+      await settle();
+      await sub.cancel();
+
+      expect(
+        changes.where((c) => c == MidiSetupChange.deviceDisappeared),
+        hasLength(1),
+      );
+    });
+
+    test('does not age while no scan is running', () async {
+      // A peripheral cannot be expected to advertise when nobody is listening.
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      await transport.startScanningForBluetoothDevices();
+      await fakePlatform.emitScanDevice(midiScanResult('ble-idle', 'Idle'));
+      transport.stopScanningForBluetoothDevices();
+
+      await settle();
+
+      expect(await transport.devices, hasLength(1));
+    });
+
+    test('null keeps every peripheral that has been seen', () async {
+      reconfigure(hideUnseenPeripheralsAfter: null);
+      await transport.startScanningForBluetoothDevices();
+      await fakePlatform.emitScanDevice(midiScanResult('ble-keep', 'Keep'));
+
+      await settle();
+
+      expect(await transport.devices, hasLength(1));
+    });
+
+    test('a registered but never-seen device is left alone', () async {
+      // registerKnownDevice creates it invisible, so aging must not touch it:
+      // it has no sighting to age against.
+      reconfigure(hideUnseenPeripheralsAfter: window);
+      await transport.startScanningForBluetoothDevices();
+      transport.registerKnownDevice('ble-known', 'Known');
+
+      await settle();
+
+      expect(await transport.devices, isEmpty);
+      expect(transport.registerKnownDevice('ble-known', 'Known'), isNotNull);
+    });
   });
 
   test('connectToDevice completes only when BLE connection succeeds', () async {

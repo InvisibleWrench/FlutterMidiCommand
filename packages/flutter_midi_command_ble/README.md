@@ -283,3 +283,28 @@ UniversalBleMidiTransport(requireAdvertisedMidiService: false);
 
 It defaults to `false` on web, where a scan is the browser's device chooser and
 the chosen device carries no advertisement to inspect.
+
+## Peripherals that stop advertising
+
+A peripheral switched off or carried out of range stops advertising without
+saying anything, so while a scan is running this transport drops one from
+`devices` after `hideUnseenPeripheralsAfter` without a sighting (10 s by
+default):
+
+```dart
+UniversalBleMidiTransport(hideUnseenPeripheralsAfter: Duration(seconds: 30));
+UniversalBleMidiTransport(hideUnseenPeripheralsAfter: null); // never drop one
+```
+
+It is hidden rather than forgotten, so the `MidiDevice` your application holds
+is the same object when the peripheral comes back, and `MidiSetupChange.deviceDisappeared`
+is emitted once per sweep so an event-driven UI refreshes.
+
+Two things are never aged. A peripheral that is connected or on its way there
+is left alone, because most stop advertising once connected and hiding the
+device an application is using would be worse than the stale entry this
+removes. And a peripheral registered through `registerKnownDevice` but never
+seen in a scan has no sighting to age against, so it is unaffected.
+
+Aging only runs while a scan is running: a peripheral cannot be expected to
+advertise when nobody is listening.
