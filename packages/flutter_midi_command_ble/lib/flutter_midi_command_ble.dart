@@ -1318,10 +1318,10 @@ class _BleMidiDevice extends MidiDevice {
   ///
   /// BLE MIDI does not require a bond. The MMA specification puts no security
   /// requirement on the MIDI service, and plenty of peripherals expose it
-  /// openly — a GEWA PP-2 on firmware 2.36 among them, which accepts Android's
-  /// bonding request, never completes the bond, and then carries MIDI and
-  /// SysEx perfectly over the unbonded link. Bonding up front therefore cost a
-  /// system dialog nobody needed and then failed the whole connection for a
+  /// openly. Some go further and accept Android's bonding request without
+  /// ever completing the bond, while carrying MIDI and SysEx perfectly over
+  /// the unbonded link. Bonding up front therefore cost a system dialog
+  /// nobody needed and then failed the whole connection for a
   /// link that worked, which is what drove one application to fork this
   /// package and skip pairing for a hardcoded device name.
   ///
@@ -1408,7 +1408,7 @@ class _BleMidiDevice extends MidiDevice {
   /// interchangeable. Android, Windows and Linux have a system pairing API, so
   /// ask for a bond and then verify it took — [UniversalBle.pair] resolving
   /// does not prove a bond exists, and a bond reported established can be lost
-  /// again moments later, which is exactly the PP-2's failure mode. Apple and
+  /// again moments later, which is how such a peripheral fails. Apple and
   /// web have no such API, and there the lever is the access itself: reading
   /// the MIDI characteristic makes the OS start "Just Works" pairing and
   /// completes once the user accepts

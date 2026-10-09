@@ -151,7 +151,7 @@ Future<_Rig> connectRig() async {
   final transport = UniversalBleMidiTransport();
 
   fake.servicesByDevice['dev'] = midiServices();
-  await fake.emitScan('dev', 'GEWA');
+  await fake.emitScan('dev', 'Keyboard');
   final device = (await transport.devices).single;
   await transport.connectToDevice(device);
   await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -171,7 +171,7 @@ void main() {
     final transport = UniversalBleMidiTransport();
 
     fake.servicesByDevice['dev'] = midiServices();
-    await fake.emitScan('dev', 'GEWA');
+    await fake.emitScan('dev', 'Keyboard');
     final device = (await transport.devices).single;
     await transport.connectToDevice(device);
     await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -274,7 +274,7 @@ void main() {
       final transport = UniversalBleMidiTransport();
 
       fake.servicesByDevice['dev'] = midiServices();
-      await fake.emitScan('dev', 'GEWA');
+      await fake.emitScan('dev', 'Keyboard');
       final device = (await transport.devices).single;
       await transport.connectToDevice(device);
       await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -500,7 +500,7 @@ void main() {
       rig.transport.disconnectDevice(rig.device);
       await Future<void>.delayed(const Duration(milliseconds: 5));
 
-      await rig.fake.emitScan('dev', 'GEWA');
+      await rig.fake.emitScan('dev', 'Keyboard');
       final device = (await rig.transport.devices).single;
       await rig.transport.connectToDevice(device);
       await Future<void>.delayed(const Duration(milliseconds: 5));

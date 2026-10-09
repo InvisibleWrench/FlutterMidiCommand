@@ -40,7 +40,7 @@ class _FakeUniversalBlePlatform extends UniversalBlePlatform {
   final Set<String> bondRequiredSubscribeIds = <String>{};
 
   /// Peripherals whose `pair` reports success without a bond ever landing —
-  /// the PP-2's failure mode, and why the bond state is re-read rather than
+  /// a real failure mode, and why the bond state is re-read rather than
   /// trusting `pair`.
   final Set<String> pairWithoutBondingIds = <String>{};
 
@@ -751,8 +751,8 @@ void main() {
   });
 
   test('a bond that reports success but never lands is rejected', () async {
-    // The PP-2's own failure mode: pair() resolves, the user accepts, and no
-    // bond exists afterwards.
+    // A real failure mode: pair() resolves, the user accepts, and no bond
+    // exists afterwards.
     fakePlatform.servicesByDevice['ble-phantom'] = midiServices();
     fakePlatform.bondRequiredSubscribeIds.add('ble-phantom');
     fakePlatform.pairWithoutBondingIds.add('ble-phantom');
@@ -993,7 +993,7 @@ void main() {
     'a bond the stack makes inside the subscribe needs no escalation',
     () async {
       // What Android actually does for a peripheral that requires encryption,
-      // confirmed in the field against a GEWA_Mid: the CCCD write is held while
+      // confirmed against a peripheral that requires one: the write is held while
       // the system puts up its own pairing dialog, a bond appears with nobody
       // having called pair(), and the write then completes. The escalation in
       // this transport is the fallback for when that does not happen.
