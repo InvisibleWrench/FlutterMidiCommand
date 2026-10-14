@@ -332,6 +332,40 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         return result
     }
 
+    /// The user-facing name of a native (hardware) entity.
+    ///
+    /// CoreMIDI only qualifies a port name with its device name at the endpoint
+    /// level: for a Roland A-88MK2 the device is named "A-88MK2", its entities
+    /// are named "Port 1" and "Port 2", and the endpoints' display names are
+    /// "A-88MK2 Port 1" and "A-88MK2 Port 2". That display name is what the OS
+    /// (and apps such as MIDI Monitor) show, so prefer it over the bare entity
+    /// name, which reads as an anonymous "Port 1" once more than one device is
+    /// connected. Fall back to the entity name, then the device name, for the
+    /// rare entity without endpoints or without a display name.
+    static func nativeEntityDisplayName(entity: MIDIEntityRef, device: MIDIDeviceRef) -> String {
+        let sourceCount = MIDIEntityGetNumberOfSources(entity)
+        let destinationCount = MIDIEntityGetNumberOfDestinations(entity)
+        if sourceCount > 0 || destinationCount > 0 {
+            let endpoint = sourceCount > 0 ? MIDIEntityGetSource(entity, 0) : MIDIEntityGetDestination(entity, 0)
+            let displayName = getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint)
+            if displayName != "Error" && !displayName.isEmpty {
+                return displayName
+            }
+        }
+        let entityName = getMIDIProperty(kMIDIPropertyName, fromObject: entity)
+        if entityName != "Error" && !entityName.isEmpty {
+            return entityName
+        }
+        return getMIDIProperty(kMIDIPropertyName, fromObject: device)
+    }
+
+    /// The name of one logical port of a native entity. An entity with several
+    /// sources or destinations is exposed as one device per port, so suffix the
+    /// port number to tell them apart.
+    static func nativePortDisplayName(baseName: String, portIndex: Int, logicalPortCount: Int) -> String {
+        return logicalPortCount == 1 ? baseName : "\(baseName) [\(portIndex + 1)]"
+    }
+
     static func isNetwork(device:MIDIObjectRef) -> Bool {
         var isNetwork:Bool = false
 
@@ -471,9 +505,8 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
                 let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
                 let isBluetooth = SwiftFlutterMidiCommandPlugin.isBluetooth(device: entity)
-                let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: entity)
                 let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-                var baseName = entityName == "Error" || entityName.isEmpty ? deviceName : entityName
+                var baseName = SwiftFlutterMidiCommandPlugin.nativeEntityDisplayName(entity: entity, device: device)
                 var baseId = "\(device):\(entityIndex)"
 
                 // For BLE MIDI, expose the CoreBluetooth peripheral UUID as the id
@@ -492,7 +525,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
                     // BLE devices keep their bare UUID id (single port); only
                     // multi-port native devices get a per-port suffix.
                     let deviceId = (logicalPortCount == 1 || bluetoothUUID != nil) ? baseId : "\(baseId):\(portIndex)"
-                    let displayName = logicalPortCount == 1 ? baseName : "\(baseName) [\(portIndex + 1)]"
+                    let displayName = SwiftFlutterMidiCommandPlugin.nativePortDisplayName(baseName: baseName, portIndex: portIndex, logicalPortCount: logicalPortCount)
 
                     devices.append(
                         MidiHostDevice(
@@ -1080,15 +1113,16 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
 
         self.ports = ports
 
+        // Name the connected device exactly as `getDevices()` listed it, so the
+        // name a host shows before and after connecting is the same.
         func resolveEntityName() {
             if let e = entity {
-                let entityName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: e)
-
                 var device:MIDIDeviceRef = 0
                 MIDIEntityGetDevice(e, &device)
-                let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
 
-                name = "\(deviceName) \(entityName)"
+                let baseName = SwiftFlutterMidiCommandPlugin.nativeEntityDisplayName(entity: e, device: device)
+                let logicalPortCount = max(MIDIEntityGetNumberOfSources(e), MIDIEntityGetNumberOfDestinations(e))
+                name = SwiftFlutterMidiCommandPlugin.nativePortDisplayName(baseName: baseName, portIndex: selectedPortIndex, logicalPortCount: logicalPortCount)
             } else {
                 midiDebugLog("no entity")
             }
