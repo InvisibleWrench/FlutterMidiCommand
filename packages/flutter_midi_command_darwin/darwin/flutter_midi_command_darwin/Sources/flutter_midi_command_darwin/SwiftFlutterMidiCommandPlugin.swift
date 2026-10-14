@@ -332,7 +332,14 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         return result
     }
 
-    /// The user-facing name of a native (hardware) entity.
+    /// Whether `getMIDIProperty` actually read a name. It reports a failure as
+    /// the string "Error", and a driver may hand back an empty name.
+    static func isReadableName(_ name: String) -> Bool {
+        return name != "Error" && !name.isEmpty
+    }
+
+    /// Chooses the name an entity is listed under, out of the names CoreMIDI
+    /// holds for it, before any per-port suffix.
     ///
     /// CoreMIDI only qualifies a port name with its device name at the endpoint
     /// level: for a Roland A-88MK2 the device is named "A-88MK2", its entities
@@ -342,21 +349,58 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
     /// name, which reads as an anonymous "Port 1" once more than one device is
     /// connected. Fall back to the entity name, then the device name, for the
     /// rare entity without endpoints or without a display name.
-    static func nativeEntityDisplayName(entity: MIDIEntityRef, device: MIDIDeviceRef) -> String {
-        let sourceCount = MIDIEntityGetNumberOfSources(entity)
-        let destinationCount = MIDIEntityGetNumberOfDestinations(entity)
-        if sourceCount > 0 || destinationCount > 0 {
-            let endpoint = sourceCount > 0 ? MIDIEntityGetSource(entity, 0) : MIDIEntityGetDestination(entity, 0)
-            let displayName = getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint)
-            if displayName != "Error" && !displayName.isEmpty {
-                return displayName
-            }
+    ///
+    /// A BLE MIDI peripheral is the exception. The OS driver names its entity,
+    /// and with it the endpoint display name, after the transport rather than
+    /// the peripheral ("Bluetooth"), while the peripheral's advertised name
+    /// sits on the device, so prefer the device name there.
+    ///
+    /// Takes the names rather than CoreMIDI object refs, which cannot be
+    /// fabricated in a test without mutating the machine's MIDI setup.
+    static func resolveNativeEntityName(
+        endpointDisplayName: String?,
+        entityName: String,
+        deviceName: String,
+        isBluetoothPeripheral: Bool
+    ) -> String {
+        if isBluetoothPeripheral && isReadableName(deviceName) {
+            return deviceName
         }
-        let entityName = getMIDIProperty(kMIDIPropertyName, fromObject: entity)
-        if entityName != "Error" && !entityName.isEmpty {
+        if let endpointDisplayName, isReadableName(endpointDisplayName) {
+            return endpointDisplayName
+        }
+        if isReadableName(entityName) {
             return entityName
         }
-        return getMIDIProperty(kMIDIPropertyName, fromObject: device)
+        return deviceName
+    }
+
+    /// The display name of an entity's first endpoint, or nil for an entity
+    /// without endpoints.
+    static func firstEndpointDisplayName(ofEntity entity: MIDIEntityRef) -> String? {
+        let sourceCount = MIDIEntityGetNumberOfSources(entity)
+        let destinationCount = MIDIEntityGetNumberOfDestinations(entity)
+        guard sourceCount > 0 || destinationCount > 0 else {
+            return nil
+        }
+        let endpoint = sourceCount > 0 ? MIDIEntityGetSource(entity, 0) : MIDIEntityGetDestination(entity, 0)
+        return getMIDIProperty(kMIDIPropertyDisplayName, fromObject: endpoint)
+    }
+
+    /// The user-facing name of a native (hardware) entity. Every caller that
+    /// names a device goes through here, so that the name a host lists and the
+    /// name it sees once connected are produced by the same rules.
+    ///
+    /// `isBluetoothPeripheral` is whether this entity belongs to a BLE MIDI
+    /// peripheral the OS driver exposes a `bleMidiDeviceUUID` for; see
+    /// `resolveNativeEntityName`.
+    static func nativeEntityDisplayName(entity: MIDIEntityRef, device: MIDIDeviceRef, isBluetoothPeripheral: Bool) -> String {
+        return resolveNativeEntityName(
+            endpointDisplayName: firstEndpointDisplayName(ofEntity: entity),
+            entityName: getMIDIProperty(kMIDIPropertyName, fromObject: entity),
+            deviceName: getMIDIProperty(kMIDIPropertyName, fromObject: device),
+            isBluetoothPeripheral: isBluetoothPeripheral
+        )
     }
 
     /// The name of one logical port of a native entity. An entity with several
@@ -505,21 +549,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
                 let isNetwork = SwiftFlutterMidiCommandPlugin.isNetwork(device: entity)
                 let isBluetooth = SwiftFlutterMidiCommandPlugin.isBluetooth(device: entity)
-                let deviceName = SwiftFlutterMidiCommandPlugin.getMIDIProperty(kMIDIPropertyName, fromObject: device)
-                var baseName = SwiftFlutterMidiCommandPlugin.nativeEntityDisplayName(entity: entity, device: device)
-                var baseId = "\(device):\(entityIndex)"
 
                 // For BLE MIDI, expose the CoreBluetooth peripheral UUID as the id
                 // so it matches the universal_ble device id for the same physical
-                // peripheral. The entity name is the generic "Bluetooth", so prefer
-                // the more descriptive device-level name.
+                // peripheral.
                 let bluetoothUUID = isBluetooth ? SwiftFlutterMidiCommandPlugin.bleMidiDeviceUUID(device) : nil
-                if let bluetoothUUID = bluetoothUUID {
-                    baseId = bluetoothUUID
-                    if !deviceName.isEmpty && deviceName != "Error" {
-                        baseName = deviceName
-                    }
-                }
+                let baseId = bluetoothUUID ?? "\(device):\(entityIndex)"
+                let baseName = SwiftFlutterMidiCommandPlugin.nativeEntityDisplayName(
+                    entity: entity,
+                    device: device,
+                    isBluetoothPeripheral: bluetoothUUID != nil
+                )
 
                 for portIndex in 0..<logicalPortCount {
                     // BLE devices keep their bare UUID id (single port); only
@@ -1114,13 +1154,20 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         self.ports = ports
 
         // Name the connected device exactly as `getDevices()` listed it, so the
-        // name a host shows before and after connecting is the same.
-        func resolveEntityName() {
+        // name a host shows before and after connecting is the same. Both pass
+        // the same `isBluetoothPeripheral`: it is true here only on the branch
+        // that resolved the id as a BLE MIDI Device UUID, which is also the
+        // only case in which `getDevices()` listed the device under that id.
+        func resolveEntityName(isBluetoothPeripheral: Bool) {
             if let e = entity {
                 var device:MIDIDeviceRef = 0
                 MIDIEntityGetDevice(e, &device)
 
-                let baseName = SwiftFlutterMidiCommandPlugin.nativeEntityDisplayName(entity: e, device: device)
+                let baseName = SwiftFlutterMidiCommandPlugin.nativeEntityDisplayName(
+                    entity: e,
+                    device: device,
+                    isBluetoothPeripheral: isBluetoothPeripheral
+                )
                 let logicalPortCount = max(MIDIEntityGetNumberOfSources(e), MIDIEntityGetNumberOfDestinations(e))
                 name = SwiftFlutterMidiCommandPlugin.nativePortDisplayName(baseName: baseName, portIndex: selectedPortIndex, logicalPortCount: logicalPortCount)
             } else {
@@ -1134,7 +1181,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
         if id.contains("-"), let resolved = SwiftFlutterMidiCommandPlugin.bluetoothEntity(forUUID: id) {
             selectedPortIndex = 0
             entity = MIDIDeviceGetEntity(resolved.device, resolved.entityIndex)
-            resolveEntityName()
+            resolveEntityName(isBluetoothPeripheral: true)
         } else {
             let idParts = id.split(separator: ":")
 
@@ -1145,7 +1192,7 @@ class ConnectedNativeDevice : ConnectedVirtualOrNativeDevice {
                         selectedPortIndex = portIndex
                     }
                     entity = MIDIDeviceGetEntity(deviceId, entityId)
-                    resolveEntityName()
+                    resolveEntityName(isBluetoothPeripheral: false)
                 } else {
                     midiDebugLog("no entityId")
                 }
