@@ -86,8 +86,17 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         instance.setup(registrar)
     }
 
+    // The client is created on its own thread, see ensureClient().
+    private let clientCondition = NSCondition()
+    private var clientThreadStarted = false
+    private var clientCreated = false
+    private var clientRunLoop: CFRunLoop?
+
     deinit {
         NotificationCenter.default.removeObserver(self)
+        if let runLoop = clientRunLoop {
+            CFRunLoopStop(runLoop)
+        }
         MIDIClientDispose(midiClient)
     }
 
@@ -110,11 +119,63 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
         }
 
 
-        // MIDI client with notification handler
-        MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &midiClient) { (notification) in
-            self.handleMIDINotification(notification)
+        // MIDIClientCreateWithBlock waits on the system MIDI
+        // server (about 1 s on an iPad 7), so it no longer runs on the main
+        // thread during registration. Every entry point calls ensureClient().
+        startClientThread()
+    }
+
+    /// Starts the thread that owns the CoreMIDI client (idempotent).
+    private func startClientThread() {
+        clientCondition.lock()
+        defer { clientCondition.unlock() }
+        if clientThreadStarted { return }
+        clientThreadStarted = true
+        let thread = Thread { [weak self] in
+            self?.runClientThread()
         }
-        knownDeviceSnapshots = currentDeviceSnapshots()
+        thread.name = "FlutterMidiCommand.client"
+        thread.qualityOfService = .utility
+        thread.start()
+    }
+
+    /// Creates the client, publishes it, then keeps this thread's run loop
+    /// alive: CoreMIDI delivers the setup notifications (hot-plug) on the run
+    /// loop of the thread that created the client, so a GCD worker would never
+    /// receive them.
+    private func runClientThread() {
+        var client = MIDIClientRef()
+        MIDIClientCreateWithBlock("plugins.invisiblewrench.com.FlutterMidiCommand" as CFString, &client) { [weak self] (notification) in
+            self?.handleMIDINotification(notification)
+        }
+
+        let runLoop = RunLoop.current
+        clientCondition.lock()
+        midiClient = client
+        clientRunLoop = runLoop.getCFRunLoop()
+        clientCreated = true
+        clientCondition.broadcast()
+        clientCondition.unlock()
+
+        // The snapshot reads state owned by the main thread.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.knownDeviceSnapshots = self.currentDeviceSnapshots()
+        }
+
+        // A port keeps the run loop from returning; CFRunLoopStop (deinit) ends it.
+        runLoop.add(NSMachPort(), forMode: .default)
+        CFRunLoopRun()
+    }
+
+    /// Blocks until the CoreMIDI client exists. Cheap once it does.
+    func ensureClient() {
+        startClientThread()
+        clientCondition.lock()
+        defer { clientCondition.unlock() }
+        while !clientCreated {
+            clientCondition.wait()
+        }
     }
 
     func updateSetupState(data: MidiSetupChange) {
@@ -154,10 +215,12 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
     }
 
     func listDevices() throws -> [MidiHostDevice] {
+        ensureClient()
         return getDevices()
     }
 
     func connect(device: MidiHostDevice, ports: [MidiPort]?) throws {
+        ensureClient()
         guard let id = device.id else {
             throw PigeonError(code: "MESSAGEERROR", message: "No device Id", details: nil)
         }
@@ -178,6 +241,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
     }
 
     func sendData(packet: MidiPacket) throws {
+        ensureClient()
         guard let data = packet.data else {
             return
         }
@@ -186,6 +250,7 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
     }
 
     func addVirtualDevice(name: String?) throws {
+        ensureClient()
         let deviceName = name ?? appName()
         let ownVirtualDevice = findOrCreateOwnVirtualDevice(name: deviceName)
         if ownVirtualDevice.errors.count > 0 {
@@ -745,7 +810,11 @@ public class SwiftFlutterMidiCommandPlugin: NSObject, FlutterPlugin, MidiHostApi
 
         switch notification.messageID {
         case .msgSetupChanged, .msgObjectAdded, .msgObjectRemoved, .msgPropertyChanged:
-            refreshMidiSetupSnapshot()
+            // This runs on the client thread; the snapshot,
+            // connectedDevices and the Flutter channels belong to the main thread.
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshMidiSetupSnapshot()
+            }
         default:
             break
         }
